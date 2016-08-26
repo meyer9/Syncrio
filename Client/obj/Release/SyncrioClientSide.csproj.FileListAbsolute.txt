@@ -1,0 +1,26 @@
+C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Client\bin\Release\SyncrioClientSide.dll
+C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Client\bin\Release\ICSharpCode.SharpZipLib.dll
+C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Client\bin\Release\MessageWriter2.dll
+C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Client\bin\Release\SyncrioCommon.dll
+C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
+C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Client\obj\Release\SyncrioClientSide.dll
+E:\Syncrio\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
+E:\Syncrio\Client\obj\Release\SyncrioClientSide.dll
+E:\Making Games\KSP Mod Making\Syncrio\Client\bin\Release\SyncrioClientSide.dll
+E:\Making Games\KSP Mod Making\Syncrio\Client\bin\Release\ICSharpCode.SharpZipLib.dll
+E:\Making Games\KSP Mod Making\Syncrio\Client\bin\Release\MessageWriter2.dll
+E:\Making Games\KSP Mod Making\Syncrio\Client\bin\Release\SyncrioCommon.dll
+E:\Making Games\KSP Mod Making\Syncrio\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
+E:\Making Games\KSP Mod Making\Syncrio\Client\obj\Release\SyncrioClientSide.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone\Client\bin\Release\SyncrioClientSide.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone\Client\bin\Release\ICSharpCode.SharpZipLib.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone\Client\bin\Release\MessageWriter2.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone\Client\bin\Release\SyncrioCommon.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone\Client\obj\Release\SyncrioClientSide.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\bin\Release\SyncrioClientSide.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\bin\Release\ICSharpCode.SharpZipLib.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\bin\Release\MessageWriter2.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\bin\Release\SyncrioCommon.dll
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
+E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\obj\Release\SyncrioClientSide.dll

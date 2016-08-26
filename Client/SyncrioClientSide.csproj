@@ -1,0 +1,111 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{7AD735F5-A076-44D2-97EC-02ECAD827001}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>SyncrioClientSide</RootNamespace>
+    <AssemblyName>SyncrioClientSide</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG;</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="Assembly-CSharp">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Xml" />
+    <Reference Include="MessageWriter2">
+      <HintPath>..\MessageWriter2.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>..\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
+    <Reference Include="KSPUtil">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\KSPUtil.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="GroupSystem.cs" />
+    <Compile Include="GroupWindow.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Main.cs" />
+    <Compile Include="Log.cs" />
+    <Compile Include="ConfigNodeSerializer.cs" />
+    <Compile Include="ScenarioWindow.cs" />
+    <Compile Include="Utilities\CompatibilityChecker.cs" />
+    <Compile Include="TimeSyncer.cs" />
+    <Compile Include="NetworkWorker.cs" />
+    <Compile Include="ConnectionWindow.cs" />
+    <Compile Include="Settings.cs" />
+    <Compile Include="PlayerStatusWindow.cs" />
+    <Compile Include="PlayerStatusWorker.cs" />
+    <Compile Include="ScenarioWorker.cs" />
+    <Compile Include="DebugWindow.cs" />
+    <Compile Include="DynamicTickWorker.cs" />
+    <Compile Include="ModWorker.cs" />
+    <Compile Include="ModWindow.cs" />
+    <Compile Include="CraftLibraryWorker.cs" />
+    <Compile Include="ChatWorker.cs" />
+    <Compile Include="ScenarioSyncCache.cs" />
+    <Compile Include="ScreenshotWorker.cs" />
+    <Compile Include="LockSystem.cs" />
+    <Compile Include="PlayerColorWorker.cs" />
+    <Compile Include="OptionsWindow.cs" />
+    <Compile Include="ScenarioConverter.cs" />
+    <Compile Include="ScenarioConverterWindow.cs" />
+    <Compile Include="Utilities\InstallChecker.cs" />
+    <Compile Include="FlagSyncer.cs" />
+    <Compile Include="DisclaimerWindow.cs" />
+    <Compile Include="SyncrioModInterface.cs" />
+    <Compile Include="Profiler.cs" />
+    <Compile Include="AdminSystem.cs" />
+    <Compile Include="SyncrioGuiUtil.cs" />
+    <Compile Include="ToolbarWrapper.cs" />
+    <Compile Include="ToolbarSupport.cs" />
+    <Compile Include="KerbalReassigner.cs" />
+    <Compile Include="VesselWorker.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\SyncrioCommon.csproj">
+      <Project>{423C5A4B-EA79-450D-BD86-5B46141D58D1}</Project>
+      <Name>SyncrioCommon</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+</Project>
