@@ -678,13 +678,13 @@ namespace SyncrioClientSide
 
                     if (entry.scenarioName == "Funding")
                     {
-                        double fundsAmount = Convert.ToDouble(entry.scenarioNode.GetValue("funds"));
+                        float fundsAmount = Convert.ToSingle(entry.scenarioNode.GetValue("funds"));
                         string fundsAmountDiffString = string.Empty;
                         if (scenarioFundsHistory.Contains("funds"))
                         {
                             int lastFunds = scenarioFundsHistory.LastIndexOf("funds") + 1;
-                            double lastFundsAmount = Convert.ToDouble(scenarioFundsHistory[lastFunds].ToString());
-                            double fundsAmountDiff = fundsAmount - lastFundsAmount;
+                            float lastFundsAmount = Convert.ToSingle(scenarioFundsHistory[lastFunds].ToString());
+                            float fundsAmountDiff = fundsAmount - lastFundsAmount;
                             fundsAmountDiffString = Convert.ToString(fundsAmountDiff);
                         }
                         else

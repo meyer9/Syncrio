@@ -24,3 +24,9 @@ E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\bi
 E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\bin\Release\SyncrioCommon.dll
 E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
 E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Client\obj\Release\SyncrioClientSide.dll
+C:\Users\Rob\Documents\GitHub\Syncrio\Client\bin\Release\SyncrioClientSide.dll
+C:\Users\Rob\Documents\GitHub\Syncrio\Client\bin\Release\ICSharpCode.SharpZipLib.dll
+C:\Users\Rob\Documents\GitHub\Syncrio\Client\bin\Release\MessageWriter2.dll
+C:\Users\Rob\Documents\GitHub\Syncrio\Client\bin\Release\SyncrioCommon.dll
+C:\Users\Rob\Documents\GitHub\Syncrio\Client\obj\Release\SyncrioClientSide.csprojResolveAssemblyReference.cache
+C:\Users\Rob\Documents\GitHub\Syncrio\Client\obj\Release\SyncrioClientSide.dll

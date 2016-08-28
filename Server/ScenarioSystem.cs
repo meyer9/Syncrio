@@ -237,6 +237,10 @@ namespace SyncrioServer
         {
             string thisGroupDirectory = Path.Combine(GroupSystem.fetch.groupDirectory, groupName);
             string thisGroupScenarioFundsVersionHistory = Path.Combine(thisGroupDirectory, "SVH_funds.txt");
+            if (!File.Exists(thisGroupScenarioFundsVersionHistory))
+            {
+                File.Create(thisGroupScenarioFundsVersionHistory).Close();
+            }
 
             return File.ReadAllLines(thisGroupScenarioFundsVersionHistory);
         }
@@ -253,6 +257,10 @@ namespace SyncrioServer
         {
             string thisGroupDirectory = Path.Combine(GroupSystem.fetch.groupDirectory, groupName);
             string thisGroupScenarioRepVersionHistory = Path.Combine(thisGroupDirectory, "SVH_rep.txt");
+            if (!File.Exists(thisGroupScenarioRepVersionHistory))
+            {
+                File.Create(thisGroupScenarioRepVersionHistory).Close();
+            }
 
             return File.ReadAllLines(thisGroupScenarioRepVersionHistory);
         }
@@ -269,6 +277,10 @@ namespace SyncrioServer
         {
             string thisGroupDirectory = Path.Combine(GroupSystem.fetch.groupDirectory, groupName);
             string thisGroupScenarioSciVersionHistory = Path.Combine(thisGroupDirectory, "SVH_sci.txt");
+            if (!File.Exists(thisGroupScenarioSciVersionHistory))
+            {
+                File.Create(thisGroupScenarioSciVersionHistory).Close();
+            }
 
             return File.ReadAllLines(thisGroupScenarioSciVersionHistory);
         }
