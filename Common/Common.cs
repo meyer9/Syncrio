@@ -63,7 +63,7 @@ namespace SyncrioCommon
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
         public const int PROTOCOL_VERSION = 41;
         //Program version. This is written in the build scripts.
-        public const string PROGRAM_VERSION = "0.1.8.3";
+        public const string PROGRAM_VERSION = "0.1.9.0";
         //Compression threshold
         public const int COMPRESSION_THRESHOLD = 4096;
 
