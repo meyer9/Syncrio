@@ -71,6 +71,9 @@ namespace SyncrioServer.Messages
             using (MessageWriter mw = new MessageWriter())
             {
                 mw.Write<string[]>(scenarioNames);
+                mw.Write<string[]>(new string[0]);
+                mw.Write<string[]>(new string[0]);
+                mw.Write<string[]>(new string[0]);
                 foreach (byte[] scenarioData in scenarioDataArray)
                 {
                     if (client.compressionEnabled)
