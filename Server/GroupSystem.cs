@@ -134,19 +134,6 @@ namespace SyncrioServer
                         }
                     }
 
-                    if (!File.Exists(Path.Combine(thisGroupDirectory, "SVH_funds.txt")))
-                    {
-                        File.Create(Path.Combine(thisGroupDirectory, "SVH_funds.txt"));
-                    }
-                    if (!File.Exists(Path.Combine(thisGroupDirectory, "SVH_rep.txt")))
-                    {
-                        File.Create(Path.Combine(thisGroupDirectory, "SVH_rep.txt"));
-                    }
-                    if (!File.Exists(Path.Combine(thisGroupDirectory, "SVH_sci.txt")))
-                    {
-                        File.Create(Path.Combine(thisGroupDirectory, "SVH_sci.txt"));
-                    }
-
                     string membersFile = Path.Combine(thisGroupDirectory, "members.txt");
                     string settingsFile = Path.Combine(thisGroupDirectory, "settings.txt");
                     if (!File.Exists(membersFile))
@@ -231,19 +218,6 @@ namespace SyncrioServer
                 {
                     File.Copy(file, Path.Combine(thisGroupScenarioDirectory, Path.GetFileName(file)));
                 }
-            }
-
-            if (!File.Exists(Path.Combine(thisGroupScenarioDirectory, "SVH_funds.txt")))
-            {
-                File.Create(Path.Combine(thisGroupScenarioDirectory, "SVH_funds.txt"));
-            }
-            if (!File.Exists(Path.Combine(thisGroupScenarioDirectory, "SVH_rep.txt")))
-            {
-                File.Create(Path.Combine(thisGroupScenarioDirectory, "SVH_rep.txt"));
-            }
-            if (!File.Exists(Path.Combine(thisGroupScenarioDirectory, "SVH_sci.txt")))
-            {
-                File.Create(Path.Combine(thisGroupScenarioDirectory, "SVH_sci.txt"));
             }
 
             string membersFile = Path.Combine(thisGroupDirectory, "members.txt");

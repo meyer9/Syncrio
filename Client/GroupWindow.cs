@@ -324,7 +324,6 @@ namespace SyncrioClientSide
                             {
                                 if (!joinButton[groupName].executed)
                                 {
-                                    joinButton[groupName].executed = true;
                                     if (GUILayout.Button("Cancel", buttonStyle))
                                     {
                                         joinButton[groupName].pressed = false;
@@ -340,6 +339,7 @@ namespace SyncrioClientSide
                                         {
                                             if (GUILayout.Button("Enter", buttonStyle))
                                             {
+                                                joinButton[groupName].executed = true;
                                                 groupNameJoin = groupName;
                                                 GroupSystem.fetch.JoinGroup();
                                             }
@@ -347,6 +347,7 @@ namespace SyncrioClientSide
                                     }
                                     else
                                     {
+                                        joinButton[groupName].executed = true;
                                         groupNameJoin = groupName;
                                         GroupSystem.fetch.JoinGroup();
                                     }
