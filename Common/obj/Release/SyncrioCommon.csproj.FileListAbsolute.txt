@@ -16,3 +16,4 @@ E:\Making Games\KSP Mod Making\Syncrio Stand Alone with DMP Co-op mode\Common\ob
 C:\Users\Rob\Documents\GitHub\Syncrio\Common\bin\Release\SyncrioCommon.dll
 C:\Users\Rob\Documents\GitHub\Syncrio\Common\bin\Release\ICSharpCode.SharpZipLib.dll
 C:\Users\Rob\Documents\GitHub\Syncrio\Common\obj\Release\SyncrioCommon.dll
+C:\Users\Rob\Documents\GitHub\Syncrio\Common\obj\Release\SyncrioCommon.csprojResolveAssemblyReference.cache

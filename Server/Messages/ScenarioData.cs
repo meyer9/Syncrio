@@ -231,7 +231,7 @@ namespace SyncrioServer.Messages
                                 {
                                     List<string> scenarioDataStringList = ByteArraySerializer.fetch.Deserialize(scenarioData);
                                     List<string> oldScenarioDataStringList = ByteArraySerializer.fetch.Deserialize(oldScenarioData);
-                                    List<string> mergedScenarioDataStringList = oldScenarioDataStringList.Union(scenarioDataStringList).ToList<string>();
+                                    List<string> mergedScenarioDataStringList = oldScenarioDataStringList.Concat(scenarioDataStringList).ToList<string>();
                                     List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList.ToArray());
                                     byte[] mergedScenarioDataSerializedStringList = ByteArraySerializer.fetch.Serialize(noDuplicatesScenarioDataStringList);
                                     File.WriteAllBytes(filePath, mergedScenarioDataSerializedStringList);
@@ -354,7 +354,7 @@ namespace SyncrioServer.Messages
                                     }
                                     List<string> scenarioDataStringList = ByteArraySerializer.fetch.Deserialize(scenarioData);
                                     List<string> oldScenarioDataStringList = ByteArraySerializer.fetch.Deserialize(oldScenarioData);
-                                    List<string> mergedScenarioDataStringList = oldScenarioDataStringList.Union(scenarioDataStringList).ToList<string>();
+                                    List<string> mergedScenarioDataStringList = oldScenarioDataStringList.Concat(scenarioDataStringList).ToList<string>();
                                     List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList.ToArray());
                                     if (noDuplicatesScenarioDataStringList.Any(s => s.Contains("funds")))
                                     {

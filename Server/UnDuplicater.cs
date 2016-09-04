@@ -133,7 +133,7 @@ namespace SyncrioServer
                     {
                         if (preResult[i] != null && preResult[i2] != null)
                         {
-                            if (preResult[i] == preResult[i2])
+                            if (preResult[i].Trim() == preResult[i2].Trim())
                             {
                                 preResult[i2] = null;
                             }
