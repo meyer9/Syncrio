@@ -103,7 +103,10 @@ namespace SyncrioServer
                     while (!reader.EndOfStream)
                     {
                         string line = reader.ReadLine();
-                        lines.Add(line);
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            lines.Add(line);
+                        }
                     }
 
                     return lines;

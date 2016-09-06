@@ -57,6 +57,7 @@ namespace SyncrioClientSide
         public bool workerEnabled = false;
         private static ScenarioWorker singleton;
         private object scenarioLock = new object();
+        private object scenarioHistoryLock = new object();
         private Dictionary<string,string> checkData = new Dictionary<string, string>();
         private Queue<ScenarioEntry> scenarioQueue = new Queue<ScenarioEntry>();
         private bool blockScenarioDataSends = false;
@@ -520,43 +521,73 @@ namespace SyncrioClientSide
 
         public void scenarioSync(bool isInGroup, bool toServer, bool highPriority)
         {
-            string[] scenarioName;
-            byte[][] scenarioData;
-            if (toServer)
+            lock (scenarioHistoryLock)
             {
-                GetCurrentScenarioModules();
-                if (currentScenarioName != null)
+                string[] scenarioName;
+                byte[][] scenarioData;
+                if (toServer)
                 {
-                    scenarioName = currentScenarioName;
+                    GetCurrentScenarioModules();
+                    if (currentScenarioName != null)
+                    {
+                        scenarioName = currentScenarioName;
+                    }
+                    else
+                    {
+                        SyncrioLog.Debug("Error during sync scenario: 'currentScenarioName' is null");
+                        scenarioName = null;
+                    }
+                    if (currentScenarioData != null)
+                    {
+                        scenarioData = currentScenarioData;
+                    }
+                    else
+                    {
+                        SyncrioLog.Debug("Error during sync scenario: 'currentScenarioData' is null");
+                        scenarioData = null;
+                    }
                 }
                 else
                 {
-                    SyncrioLog.Debug("Error during sync scenario: 'currentScenarioName' is null");
                     scenarioName = null;
-                }
-                if (currentScenarioData != null)
-                {
-                    scenarioData = currentScenarioData;
-                }
-                else
-                {
-                    SyncrioLog.Debug("Error during sync scenario: 'currentScenarioData' is null");
                     scenarioData = null;
                 }
-            }
-            else
-            {
-                scenarioName = null;
-                scenarioData = null;
-            }
-            if (isInGroup)
-            {
-                if (scenarioName != null && scenarioData != null)
+                if (isInGroup)
                 {
-                    ScenatioVersionHistoryToGroup(scenarioName, scenarioData);
+                    if (scenarioName != null && scenarioData != null)
+                    {
+                        ScenatioVersionHistoryToGroup(scenarioName, scenarioData);
+                    }
+                    string groupName = GroupSystem.playerGroupName;
+                    if (!string.IsNullOrEmpty(groupName))
+                    {
+                        byte[] messageBytes;
+                        ClientMessage newMessage = new ClientMessage();
+                        newMessage.handled = false;
+                        newMessage.type = ClientMessageType.SYNC_SCENARIO_REQUEST;
+                        using (MessageWriter mw = new MessageWriter())
+                        {
+                            mw.Write<bool>(toServer);
+                            mw.Write<bool>(isInGroup);
+                            mw.Write<string>(groupName);
+                            if (toServer)
+                            {
+                                mw.Write<string[]>(scenarioName);
+                                mw.Write<string[]>(scenarioFundsHistory.ToArray());
+                                mw.Write<string[]>(scenarioRepHistory.ToArray());
+                                mw.Write<string[]>(scenarioSciHistory.ToArray());
+                                foreach (byte[] scenarioBytes in scenarioData)
+                                {
+                                    mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
+                                }
+                            }
+                            messageBytes = mw.GetMessageBytes();
+                        }
+                        newMessage.data = messageBytes;
+                        NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
+                    }
                 }
-                string groupName = GroupSystem.playerGroupName;
-                if (!string.IsNullOrEmpty(groupName))
+                else
                 {
                     byte[] messageBytes;
                     ClientMessage newMessage = new ClientMessage();
@@ -566,43 +597,16 @@ namespace SyncrioClientSide
                     {
                         mw.Write<bool>(toServer);
                         mw.Write<bool>(isInGroup);
-                        mw.Write<string>(groupName);
-                        if (toServer)
+                        mw.Write<string[]>(scenarioName);
+                        foreach (byte[] scenarioBytes in scenarioData)
                         {
-                            mw.Write<string[]>(scenarioName);
-                            mw.Write<string[]>(scenarioFundsHistory.ToArray());
-                            mw.Write<string[]>(scenarioRepHistory.ToArray());
-                            mw.Write<string[]>(scenarioSciHistory.ToArray());
-                            foreach (byte[] scenarioBytes in scenarioData)
-                            {
-                                mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
-                            }
+                            mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
                         }
                         messageBytes = mw.GetMessageBytes();
                     }
                     newMessage.data = messageBytes;
                     NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
                 }
-            }
-            else
-            {
-                byte[] messageBytes;
-                ClientMessage newMessage = new ClientMessage();
-                newMessage.handled = false;
-                newMessage.type = ClientMessageType.SYNC_SCENARIO_REQUEST;
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(toServer);
-                    mw.Write<bool>(isInGroup);
-                    mw.Write<string[]>(scenarioName);
-                    foreach (byte[] scenarioBytes in scenarioData)
-                    {
-                        mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
-                    }
-                    messageBytes = mw.GetMessageBytes();
-                }
-                newMessage.data = messageBytes;
-                NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
             }
         }
 
@@ -666,74 +670,81 @@ namespace SyncrioClientSide
             scenarioSciHistory.Clear();
             scenarioSciHistory = new List<string>(File.ReadAllLines(scenarioSciHistoryFile));
 
-            for (int i = 0; i < scenarioName.Length; i++)
+            try
             {
-                byte[] scenarioBytes = scenarioData[i];
-                ConfigNode scenarioDataConfigNode = ConfigNodeSerializer.fetch.Deserialize(scenarioBytes);
-                if (scenarioDataConfigNode != null)
+                for (int i = 0; i < scenarioName.Length; i++)
                 {
-                    ScenarioEntry entry = new ScenarioEntry();
-                    entry.scenarioName = scenarioName[i];
-                    entry.scenarioNode = scenarioDataConfigNode;
-
-                    if (entry.scenarioName == "Funding")
+                    byte[] scenarioBytes = scenarioData[i];
+                    ConfigNode scenarioDataConfigNode = ConfigNodeSerializer.fetch.Deserialize(scenarioBytes);
+                    if (scenarioDataConfigNode != null)
                     {
-                        float fundsAmount = Convert.ToSingle(entry.scenarioNode.GetValue("funds"));
-                        string fundsAmountDiffString = string.Empty;
-                        if (scenarioFundsHistory.Contains("funds"))
-                        {
-                            int lastFunds = scenarioFundsHistory.LastIndexOf("funds") + 1;
-                            float lastFundsAmount = Convert.ToSingle(scenarioFundsHistory[lastFunds].ToString());
-                            float fundsAmountDiff = fundsAmount - lastFundsAmount;
-                            fundsAmountDiffString = Convert.ToString(fundsAmountDiff);
-                        }
-                        else
-                        {
-                            fundsAmountDiffString = Convert.ToString(fundsAmount);
-                        }
+                        ScenarioEntry entry = new ScenarioEntry();
+                        entry.scenarioName = scenarioName[i];
+                        entry.scenarioNode = scenarioDataConfigNode;
 
-                        scenarioFundsHistory.Add("funds");
-                        scenarioFundsHistory.Add(fundsAmountDiffString);
-                    }
-                    if (entry.scenarioName == "Reputation")
-                    {
-                        float repAmount = Convert.ToSingle(entry.scenarioNode.GetValue("rep"));
-                        string repAmountDiffString = string.Empty;
-                        if (scenarioRepHistory.Contains("rep"))
+                        if (entry.scenarioName == "Funding")
                         {
-                            int lastRep = scenarioRepHistory.LastIndexOf("rep") + 1;
-                            float lastRepAmount = Convert.ToSingle(scenarioRepHistory[lastRep].ToString());
-                            float repAmountDiff = repAmount - lastRepAmount;
-                            repAmountDiffString = Convert.ToString(repAmountDiff);
-                        }
-                        else
-                        {
-                            repAmountDiffString = Convert.ToString(repAmount);
-                        }
+                            float fundsAmount = Convert.ToSingle(entry.scenarioNode.GetValue("funds"));
+                            string fundsAmountDiffString = string.Empty;
+                            if (scenarioFundsHistory.Contains("funds"))
+                            {
+                                int lastFunds = scenarioFundsHistory.LastIndexOf("funds") + 1;
+                                float lastFundsAmount = Convert.ToSingle(scenarioFundsHistory[lastFunds].ToString());
+                                float fundsAmountDiff = fundsAmount - lastFundsAmount;
+                                fundsAmountDiffString = Convert.ToString(fundsAmountDiff);
+                            }
+                            else
+                            {
+                                fundsAmountDiffString = Convert.ToString(fundsAmount);
+                            }
 
-                        scenarioRepHistory.Add("rep");
-                        scenarioRepHistory.Add(repAmountDiffString);
-                    }
-                    if (entry.scenarioName == "ResearchAndDevelopment")
-                    {
-                        float sciAmount = Convert.ToSingle(entry.scenarioNode.GetValue("sci"));
-                        string sciAmountDiffString = string.Empty;
-                        if (scenarioSciHistory.Contains("sci"))
-                        {
-                            int lastSci = scenarioSciHistory.LastIndexOf("sci") + 1;
-                            float lastSciAmount = Convert.ToSingle(scenarioSciHistory[lastSci].ToString());
-                            float sciAmountDiff = sciAmount - lastSciAmount;
-                            sciAmountDiffString = Convert.ToString(sciAmountDiff);
+                            scenarioFundsHistory.Add("funds");
+                            scenarioFundsHistory.Add(fundsAmountDiffString);
                         }
-                        else
+                        if (entry.scenarioName == "Reputation")
                         {
-                            sciAmountDiffString = Convert.ToString(sciAmount);
-                        }
+                            float repAmount = Convert.ToSingle(entry.scenarioNode.GetValue("rep"));
+                            string repAmountDiffString = string.Empty;
+                            if (scenarioRepHistory.Contains("rep"))
+                            {
+                                int lastRep = scenarioRepHistory.LastIndexOf("rep") + 1;
+                                float lastRepAmount = Convert.ToSingle(scenarioRepHistory[lastRep].ToString());
+                                float repAmountDiff = repAmount - lastRepAmount;
+                                repAmountDiffString = Convert.ToString(repAmountDiff);
+                            }
+                            else
+                            {
+                                repAmountDiffString = Convert.ToString(repAmount);
+                            }
 
-                        scenarioSciHistory.Add("sci");
-                        scenarioSciHistory.Add(sciAmountDiffString);
+                            scenarioRepHistory.Add("rep");
+                            scenarioRepHistory.Add(repAmountDiffString);
+                        }
+                        if (entry.scenarioName == "ResearchAndDevelopment")
+                        {
+                            float sciAmount = Convert.ToSingle(entry.scenarioNode.GetValue("sci"));
+                            string sciAmountDiffString = string.Empty;
+                            if (scenarioSciHistory.Contains("sci"))
+                            {
+                                int lastSci = scenarioSciHistory.LastIndexOf("sci") + 1;
+                                float lastSciAmount = Convert.ToSingle(scenarioSciHistory[lastSci].ToString());
+                                float sciAmountDiff = sciAmount - lastSciAmount;
+                                sciAmountDiffString = Convert.ToString(sciAmountDiff);
+                            }
+                            else
+                            {
+                                sciAmountDiffString = Convert.ToString(sciAmount);
+                            }
+
+                            scenarioSciHistory.Add("sci");
+                            scenarioSciHistory.Add(sciAmountDiffString);
+                        }
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                SyncrioLog.Debug("Error writing scenario history: " + e);
             }
             File.WriteAllLines(scenarioFundsHistoryFile, scenarioFundsHistory.ToArray());
             File.WriteAllLines(scenarioRepHistoryFile, scenarioRepHistory.ToArray());

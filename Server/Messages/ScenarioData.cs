@@ -204,14 +204,14 @@ namespace SyncrioServer.Messages
                 using (MessageReader mr = new MessageReader(messageData))
                 {
                     string[] scenarioName = mr.Read<string[]>();
-                    List<string> playerScenarioFundsHistory = new List<string>(mr.Read<string[]>());
-                    List<string> playerScenarioRepHistory = new List<string>(mr.Read<string[]>());
-                    List<string> playerScenarioSciHistory = new List<string>(mr.Read<string[]>());
+                    List<string> playerScenarioFundsHistory = mr.Read<string[]>().ToList();
+                    List<string> playerScenarioRepHistory = mr.Read<string[]>().ToList();
+                    List<string> playerScenarioSciHistory = mr.Read<string[]>().ToList();
                     string groupName = mr.Read<string>();
 
-                    List<string> groupScenarioFundsHistory = new List<string>(ScenarioSystem.fetch.GetScenatioFundsVersionHistory(groupName));
-                    List<string> groupScenarioRepHistory = new List<string>(ScenarioSystem.fetch.GetScenatioRepVersionHistory(groupName));
-                    List<string> groupScenarioSciHistory = new List<string>(ScenarioSystem.fetch.GetScenatioSciVersionHistory(groupName));
+                    List<string> groupScenarioFundsHistory = ScenarioSystem.fetch.GetScenatioFundsVersionHistory(groupName).ToList();
+                    List<string> groupScenarioRepHistory = ScenarioSystem.fetch.GetScenatioRepVersionHistory(groupName).ToList();
+                    List<string> groupScenarioSciHistory = ScenarioSystem.fetch.GetScenatioSciVersionHistory(groupName).ToList();
 
                     SyncrioLog.Debug("Saving " + scenarioName.Length + " scenario group modules from " + client.playerName + " to " + groupName);
 
@@ -231,7 +231,8 @@ namespace SyncrioServer.Messages
                                 {
                                     List<string> scenarioDataStringList = ByteArraySerializer.fetch.Deserialize(scenarioData);
                                     List<string> oldScenarioDataStringList = ByteArraySerializer.fetch.Deserialize(oldScenarioData);
-                                    List<string> mergedScenarioDataStringList = oldScenarioDataStringList.Concat(scenarioDataStringList).ToList<string>();
+                                    oldScenarioDataStringList = RemoveHeader.HeaderRemover(oldScenarioDataStringList);
+                                    List<string> mergedScenarioDataStringList = scenarioDataStringList.Concat(oldScenarioDataStringList).ToList<string>();
                                     List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList.ToArray());
                                     byte[] mergedScenarioDataSerializedStringList = ByteArraySerializer.fetch.Serialize(noDuplicatesScenarioDataStringList);
                                     File.WriteAllBytes(filePath, mergedScenarioDataSerializedStringList);
@@ -249,46 +250,107 @@ namespace SyncrioServer.Messages
 
                                                 bool stopThisStep = false;
                                                 bool stopNextStep = false;
+                                                bool addPlayerHistory = false;
 
                                                 for (int v = 1; v < playerScenarioFundsHistory.Count; v += 2)
                                                 {
-                                                    if (playerScenarioFundsHistory[v - 1].ToString() != "funds")
+                                                    if ((v - 1) < playerScenarioFundsHistory.Count())
                                                     {
-                                                        stopThisStep = true;
-                                                    }
-                                                    if (groupScenarioFundsHistory[v - 1].ToString() != "funds")
-                                                    {
-                                                        stopThisStep = true;
-                                                    }
-                                                    if (!stopThisStep)
-                                                    {
-                                                        if (!stopNextStep)
+                                                        if (playerScenarioFundsHistory[v - 1].ToString() != "funds")
                                                         {
-                                                            float currentPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[v].ToString());
-
-                                                            float currentGroupFundsValue = Convert.ToSingle(groupScenarioFundsHistory[v].ToString());
-
-                                                            if (currentPlayerFundsValue != currentGroupFundsValue)
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        stopThisStep = true;
+                                                    }
+                                                    if ((v - 1) < groupScenarioFundsHistory.Count())
+                                                    {
+                                                        if (groupScenarioFundsHistory[v - 1].ToString() != "funds")
+                                                        {
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        if ((v - 1) < playerScenarioFundsHistory.Count())
+                                                        {
+                                                            addPlayerHistory = true;
+                                                        }
+                                                        else
+                                                        {
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    if (!addPlayerHistory)
+                                                    {
+                                                        if (!stopThisStep)
+                                                        {
+                                                            if (!stopNextStep)
                                                             {
-                                                                float lastPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[v - 2].ToString());
-                                                                float playerFundsValueDff = currentPlayerFundsValue -= lastPlayerFundsValue;
+                                                                float currentPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[v].ToString());
 
-                                                                float lastGroupFundsValue = Convert.ToSingle(groupScenarioFundsHistory[v - 2].ToString());
-                                                                float groupFundsValueDff = currentGroupFundsValue -= lastGroupFundsValue;
+                                                                float currentGroupFundsValue = Convert.ToSingle(groupScenarioFundsHistory[v].ToString());
 
-                                                                float valueDff = playerFundsValueDff + groupFundsValueDff;
-                                                                finalValueDff += valueDff;
-                                                                mergedScenarioFundsHistory.Add("funds");
-                                                                mergedScenarioFundsHistory.Add(Convert.ToString(valueDff));
+                                                                if (currentPlayerFundsValue != currentGroupFundsValue)
+                                                                {
+                                                                    float lastPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[v - 2].ToString());
+                                                                    float playerFundsValueDff = currentPlayerFundsValue -= lastPlayerFundsValue;
+
+                                                                    float lastGroupFundsValue = Convert.ToSingle(groupScenarioFundsHistory[v - 2].ToString());
+                                                                    float groupFundsValueDff = currentGroupFundsValue -= lastGroupFundsValue;
+
+                                                                    float valueDff = playerFundsValueDff + groupFundsValueDff;
+                                                                    finalValueDff += valueDff;
+                                                                    mergedScenarioFundsHistory.Add("funds");
+                                                                    mergedScenarioFundsHistory.Add(Convert.ToString(valueDff));
+                                                                }
+                                                                if ((v + 1) < playerScenarioFundsHistory.Count())
+                                                                {
+                                                                    if (playerScenarioFundsHistory[v + 1].ToString() != "funds")
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    stopNextStep = true;
+                                                                }
+                                                                if ((v + 1) < groupScenarioFundsHistory.Count())
+                                                                {
+                                                                    if (groupScenarioFundsHistory[v + 1].ToString() != "funds")
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    if ((v + 1) < playerScenarioFundsHistory.Count())
+                                                                    {
+                                                                        addPlayerHistory = true;
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
                                                             }
-                                                            if (playerScenarioFundsHistory[v + 1].ToString() != "funds")
-                                                            {
-                                                                stopNextStep = true;
-                                                            }
-                                                            if (groupScenarioFundsHistory[v + 1].ToString() != "funds")
-                                                            {
-                                                                stopNextStep = true;
-                                                            }
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        int x = v;
+                                                        while ((x + 1) < playerScenarioFundsHistory.Count())
+                                                        {
+                                                            float currentPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[x].ToString());
+
+                                                            float lastPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[x - 2].ToString());
+                                                            float valueDff = currentPlayerFundsValue -= lastPlayerFundsValue;
+                                                            
+                                                            mergedScenarioFundsHistory.Add("funds");
+                                                            mergedScenarioFundsHistory.Add(Convert.ToString(valueDff));
+                                                            x += 2;
                                                         }
                                                     }
                                                 }
@@ -312,46 +374,107 @@ namespace SyncrioServer.Messages
 
                                                 bool stopThisStep = false;
                                                 bool stopNextStep = false;
+                                                bool addPlayerHistory = false;
 
                                                 for (int v = 1; v < playerScenarioRepHistory.Count; v += 2)
                                                 {
-                                                    if (playerScenarioFundsHistory[v - 1].ToString() != "rep")
+                                                    if ((v - 1) < playerScenarioRepHistory.Count())
                                                     {
-                                                        stopThisStep = true;
-                                                    }
-                                                    if (groupScenarioFundsHistory[v - 1].ToString() != "rep")
-                                                    {
-                                                        stopThisStep = true;
-                                                    }
-                                                    if (!stopThisStep)
-                                                    {
-                                                        if (!stopNextStep)
+                                                        if (playerScenarioRepHistory[v - 1].ToString() != "rep")
                                                         {
-                                                            float currentPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[v].ToString());
-
-                                                            float currentGroupRepValue = Convert.ToSingle(groupScenarioRepHistory[v].ToString());
-
-                                                            if (currentPlayerRepValue != currentGroupRepValue)
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        stopThisStep = true;
+                                                    }
+                                                    if ((v - 1) < groupScenarioRepHistory.Count())
+                                                    {
+                                                        if (groupScenarioRepHistory[v - 1].ToString() != "rep")
+                                                        {
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        if ((v - 1) < playerScenarioRepHistory.Count())
+                                                        {
+                                                            addPlayerHistory = true;
+                                                        }
+                                                        else
+                                                        {
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    if (!addPlayerHistory)
+                                                    {
+                                                        if (!stopThisStep)
+                                                        {
+                                                            if (!stopNextStep)
                                                             {
-                                                                float lastPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[v - 2].ToString());
-                                                                float playerRepValueDff = currentPlayerRepValue -= lastPlayerRepValue;
+                                                                float currentPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[v].ToString());
 
-                                                                float lastGroupRepValue = Convert.ToSingle(groupScenarioRepHistory[v - 2].ToString());
-                                                                float groupRepValueDff = currentGroupRepValue -= lastGroupRepValue;
+                                                                float currentGroupRepValue = Convert.ToSingle(groupScenarioRepHistory[v].ToString());
 
-                                                                float valueDff = playerRepValueDff + groupRepValueDff;
-                                                                finalValueDff += valueDff;
-                                                                mergedScenarioRepHistory.Add("rep");
-                                                                mergedScenarioRepHistory.Add(Convert.ToString(valueDff));
+                                                                if (currentPlayerRepValue != currentGroupRepValue)
+                                                                {
+                                                                    float lastPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[v - 2].ToString());
+                                                                    float playerRepValueDff = currentPlayerRepValue -= lastPlayerRepValue;
+
+                                                                    float lastGroupRepValue = Convert.ToSingle(groupScenarioRepHistory[v - 2].ToString());
+                                                                    float groupRepValueDff = currentGroupRepValue -= lastGroupRepValue;
+
+                                                                    float valueDff = playerRepValueDff + groupRepValueDff;
+                                                                    finalValueDff += valueDff;
+                                                                    mergedScenarioRepHistory.Add("rep");
+                                                                    mergedScenarioRepHistory.Add(Convert.ToString(valueDff));
+                                                                }
+                                                                if ((v + 1) < playerScenarioRepHistory.Count())
+                                                                {
+                                                                    if (playerScenarioRepHistory[v + 1].ToString() != "rep")
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    stopNextStep = true;
+                                                                }
+                                                                if ((v + 1) < groupScenarioRepHistory.Count())
+                                                                {
+                                                                    if (groupScenarioRepHistory[v + 1].ToString() != "rep")
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    if ((v - 1) < playerScenarioRepHistory.Count())
+                                                                    {
+                                                                        addPlayerHistory = true;
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
                                                             }
-                                                            if (playerScenarioFundsHistory[v + 1].ToString() != "rep")
-                                                            {
-                                                                stopNextStep = true;
-                                                            }
-                                                            if (groupScenarioFundsHistory[v + 1].ToString() != "rep")
-                                                            {
-                                                                stopNextStep = true;
-                                                            }
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        int x = v;
+                                                        while ((x + 1) < playerScenarioRepHistory.Count())
+                                                        {
+                                                            float currentPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[x].ToString());
+
+                                                            float lastPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[x - 2].ToString());
+                                                            float valueDff = currentPlayerRepValue -= lastPlayerRepValue;
+
+                                                            mergedScenarioRepHistory.Add("rep");
+                                                            mergedScenarioRepHistory.Add(Convert.ToString(valueDff));
+                                                            x += 2;
                                                         }
                                                     }
                                                 }
@@ -375,46 +498,107 @@ namespace SyncrioServer.Messages
 
                                                 bool stopThisStep = false;
                                                 bool stopNextStep = false;
+                                                bool addPlayerHistory = false;
 
                                                 for (int v = 1; v < playerScenarioSciHistory.Count; v += 2)
                                                 {
-                                                    if (playerScenarioFundsHistory[v - 1].ToString() != "sci")
+                                                    if ((v - 1) < playerScenarioSciHistory.Count())
                                                     {
-                                                        stopThisStep = true;
-                                                    }
-                                                    if (groupScenarioFundsHistory[v - 1].ToString() != "sci")
-                                                    {
-                                                        stopThisStep = true;
-                                                    }
-                                                    if (!stopThisStep)
-                                                    {
-                                                        if (!stopNextStep)
+                                                        if (playerScenarioSciHistory[v - 1].ToString() != "sci")
                                                         {
-                                                            float currentPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[v].ToString());
-
-                                                            float currentGroupSciValue = Convert.ToSingle(groupScenarioSciHistory[v].ToString());
-
-                                                            if (currentPlayerSciValue != currentGroupSciValue)
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        stopThisStep = true;
+                                                    }
+                                                    if ((v - 1) < groupScenarioSciHistory.Count())
+                                                    {
+                                                        if (groupScenarioSciHistory[v - 1].ToString() != "sci")
+                                                        {
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        if ((v - 1) < playerScenarioSciHistory.Count())
+                                                        {
+                                                            addPlayerHistory = true;
+                                                        }
+                                                        else
+                                                        {
+                                                            stopThisStep = true;
+                                                        }
+                                                    }
+                                                    if (!addPlayerHistory)
+                                                    {
+                                                        if (!stopThisStep)
+                                                        {
+                                                            if (!stopNextStep)
                                                             {
-                                                                float lastPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[v - 2].ToString());
-                                                                float playerSciValueDff = currentPlayerSciValue -= lastPlayerSciValue;
+                                                                float currentPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[v].ToString());
 
-                                                                float lastGroupSciValue = Convert.ToSingle(groupScenarioSciHistory[v - 2].ToString());
-                                                                float groupSciValueDff = currentGroupSciValue -= lastGroupSciValue;
+                                                                float currentGroupSciValue = Convert.ToSingle(groupScenarioSciHistory[v].ToString());
 
-                                                                float valueDff = playerSciValueDff + groupSciValueDff;
-                                                                finalValueDff += valueDff;
-                                                                mergedScenarioSciHistory.Add("sci");
-                                                                mergedScenarioSciHistory.Add(Convert.ToString(valueDff));
+                                                                if (currentPlayerSciValue != currentGroupSciValue)
+                                                                {
+                                                                    float lastPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[v - 2].ToString());
+                                                                    float playerSciValueDff = currentPlayerSciValue -= lastPlayerSciValue;
+
+                                                                    float lastGroupSciValue = Convert.ToSingle(groupScenarioSciHistory[v - 2].ToString());
+                                                                    float groupSciValueDff = currentGroupSciValue -= lastGroupSciValue;
+
+                                                                    float valueDff = playerSciValueDff + groupSciValueDff;
+                                                                    finalValueDff += valueDff;
+                                                                    mergedScenarioSciHistory.Add("sci");
+                                                                    mergedScenarioSciHistory.Add(Convert.ToString(valueDff));
+                                                                }
+                                                                if ((v + 1) < playerScenarioSciHistory.Count())
+                                                                {
+                                                                    if (playerScenarioSciHistory[v + 1].ToString() != "sci")
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    stopNextStep = true;
+                                                                }
+                                                                if ((v + 1) < groupScenarioSciHistory.Count())
+                                                                {
+                                                                    if (groupScenarioSciHistory[v + 1].ToString() != "sci")
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    if ((v - 1) < playerScenarioSciHistory.Count())
+                                                                    {
+                                                                        addPlayerHistory = true;
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        stopNextStep = true;
+                                                                    }
+                                                                }
                                                             }
-                                                            if (playerScenarioFundsHistory[v + 1].ToString() != "sci")
-                                                            {
-                                                                stopNextStep = true;
-                                                            }
-                                                            if (groupScenarioFundsHistory[v + 1].ToString() != "sci")
-                                                            {
-                                                                stopNextStep = true;
-                                                            }
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        int x = v;
+                                                        while ((x + 1) < playerScenarioSciHistory.Count())
+                                                        {
+                                                            float currentPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[x].ToString());
+
+                                                            float lastPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[x - 2].ToString());
+                                                            float valueDff = currentPlayerSciValue -= lastPlayerSciValue;
+
+                                                            mergedScenarioSciHistory.Add("sci");
+                                                            mergedScenarioSciHistory.Add(Convert.ToString(valueDff));
+                                                            x += 2;
                                                         }
                                                     }
                                                 }
@@ -429,7 +613,8 @@ namespace SyncrioServer.Messages
                                     }
                                     List<string> scenarioDataStringList = ByteArraySerializer.fetch.Deserialize(scenarioData);
                                     List<string> oldScenarioDataStringList = ByteArraySerializer.fetch.Deserialize(oldScenarioData);
-                                    List<string> mergedScenarioDataStringList = oldScenarioDataStringList.Concat(scenarioDataStringList).ToList<string>();
+                                    oldScenarioDataStringList = RemoveHeader.HeaderRemover(oldScenarioDataStringList);
+                                    List<string> mergedScenarioDataStringList = scenarioDataStringList.Concat(oldScenarioDataStringList).ToList<string>();
                                     List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList.ToArray());
                                     if (noDuplicatesScenarioDataStringList.Any(s => s.Contains("funds")))
                                     {

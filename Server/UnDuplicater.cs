@@ -44,9 +44,6 @@ namespace SyncrioServer
 
             List<string> result = new List<string>(lines);
 
-            result[0] = lines[0];
-            result[1] = lines[1];
-
             int cursor = 2;
             while (cursor < lines.Count())
             {
@@ -62,7 +59,9 @@ namespace SyncrioServer
                     List<string> childStringLines = lines.GetRange(range.Key, range.Value);
                     lines.RemoveRange(range.Key, range.Value);
 
-                    result.AddRange(RemoveStringDuplicates(String.Join(Environment.NewLine, childStringLines.ToArray())));
+                    result.RemoveRange(range.Key, range.Value);
+                    
+                    result.InsertRange(range.Key, RemoveStringDuplicates(String.Join(Environment.NewLine, childStringLines.ToArray())));
                 }
                 else
                 {
@@ -70,8 +69,6 @@ namespace SyncrioServer
                     cursor++;
                 }
             }
-
-            result.Add(lines.Last());
             return result;
         }
 
@@ -93,10 +90,10 @@ namespace SyncrioServer
             if (lines[1] != "{") throw new ArgumentException("Invalid node format!");
             if (lines.Last() != "}") throw new ArgumentException("Invalid node format!");
 
-            List<string> result = new List<string>(lines);
+            List<string> result = new List<string>();
 
-            result[0] = lines[0];
-            result[1] = lines[1];
+            result.Add(lines[0]);
+            result.Add(lines[1]);
 
             int preResultNumber = 0;
             string[] preResult = new string[lines.Count];
@@ -155,7 +152,7 @@ namespace SyncrioServer
         }
 
 
-        static int FindMatchingBracket(List<string> lines, int startFrom)
+        public static int FindMatchingBracket(List<string> lines, int startFrom)
         {
             int brackets = 0;
             for (int i = startFrom; i < lines.Count(); i++)

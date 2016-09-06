@@ -197,6 +197,13 @@ namespace SyncrioServer
                     }
 
                     StartHTTPServer();
+
+                    GroupSystem.fetch.ServerStarting();
+                    while (!GroupSystem.fetch.groupsLoaded)
+                    {
+                        Thread.Sleep(500);
+                    }
+
                     SyncrioLog.Normal("Ready!");
                     SyncrioPluginHandler.FireOnServerStart();
                     while (serverRunning)

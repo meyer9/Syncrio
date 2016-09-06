@@ -53,6 +53,7 @@
     <Compile Include="Main.cs" />
     <Compile Include="CommandHandler.cs" />
     <Compile Include="ClientHandler.cs" />
+    <Compile Include="RemoveHeader.cs" />
     <Compile Include="ScenarioSystem.cs" />
     <Compile Include="ScreenshotExpire.cs" />
     <Compile Include="Settings.cs" />

@@ -56,6 +56,8 @@ namespace SyncrioServer
         private static GroupSystem singleton;
         //Data structure
         private Dictionary<string, GroupObject> groups;
+        //Groups loaded
+        public bool groupsLoaded = false;
         //Number of Groups
         public static int groupCount = 0;
         //Kick Player Votes
@@ -90,6 +92,11 @@ namespace SyncrioServer
                 }
                 return singleton;
             }
+        }
+
+        public void ServerStarting()
+        {
+            //Yes this is blank, it is only here to get "fetch" called
         }
 
         public Dictionary<string, GroupObject> GetCopy()
@@ -192,6 +199,8 @@ namespace SyncrioServer
                     SyncrioLog.Debug("Skipping Initial Group Scenario as it is not a group");
                 }
             }
+            groupsLoaded = true;
+            SyncrioLog.Debug("Groups Loaded");
             groupCount = groups.Count;
             SetKickPlayerVotes();
         }
