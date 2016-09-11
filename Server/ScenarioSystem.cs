@@ -54,6 +54,7 @@ namespace SyncrioServer
     class ScenarioSystem
     {
         private static ScenarioSystem singleton;
+        public int numberOfPlayersSyncing = 0;
         //Directories
         public string groupDirectory
         {
@@ -98,11 +99,32 @@ namespace SyncrioServer
                 return singleton;
             }
         }
+        public void ScenarioInitialSync(ClientObject callingClient, byte[] messageData)
+        {
+            using (MessageReader mr = new MessageReader(messageData))
+            {
+                string playerName = mr.Read<string>();
+                if (GroupSystem.fetch.PlayerIsInGroup(playerName))
+                {
+                    string groupName = GroupSystem.fetch.GetPlayerGroup(playerName);
+                    Messages.ScenarioData.SendScenarioGroupModules(callingClient, groupName);
+                }
+                else
+                {
+                    Messages.ScenarioData.SendScenarioModules(callingClient);
+                }
+            }
+        }
 
         public void SyncScenario(ClientObject callingClient, byte[] messageData)
         {
             using (MessageReader mr = new MessageReader(messageData))
             {
+                bool isAutoReply = mr.Read<bool>();
+                if (isAutoReply)
+                {
+                    numberOfPlayersSyncing -= 1;
+                }
                 bool toServer = mr.Read<bool>();//If we are syncing the server's copy(true) of the scenario or the player's copy(false) of the scenario.
                 bool isInGroup = mr.Read<bool>();
                 using (MessageWriter mw = new MessageWriter())
@@ -129,8 +151,7 @@ namespace SyncrioServer
                         }
                         else
                         {
-                            mw.Write<string>(groupName);
-                            Messages.ScenarioData.SendScenarioGroupModules(callingClient, mw.GetMessageBytes());
+                            Messages.ScenarioData.SendScenarioGroupModules(callingClient, groupName);
                         }
                     }
                     else
@@ -231,6 +252,14 @@ namespace SyncrioServer
                     }
                 }
             }
+        }
+
+        public void SendAutoSyncScenarioRequest(ClientObject targetClient)
+        {
+            ServerMessage newMessage = new ServerMessage();
+            newMessage.type = ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST;
+            newMessage.data = null;
+            ClientHandler.SendToClient(targetClient, newMessage, true);
         }
 
         public string[] GetScenatioFundsVersionHistory(string groupName)

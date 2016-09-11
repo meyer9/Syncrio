@@ -311,6 +311,19 @@ namespace SyncrioServer
             return groups[groupName].members[0];
         }
 
+        public int GetNumberOfPlayersInAllGroups()
+        {
+            int returnValue = 0;
+            foreach (ClientObject client in ClientHandler.GetClients())
+            {
+                if (PlayerIsInGroup(client.playerName))
+                {
+                    returnValue += 1;
+                }
+            }
+            return returnValue;
+        }
+
         /// <summary>
         /// Creates the group. Returns true if successful.
         /// </summary>
@@ -1062,7 +1075,7 @@ namespace SyncrioServer
                 if (IsGroupMemberOnline(groupName, member))
                 {
                     ClientObject client = ClientHandler.GetClientByName(member);
-                    Messages.ScenarioData.SendScenarioGroupModulesStringGroupName(client, groupName);
+                    Messages.ScenarioData.SendScenarioGroupModules(client, groupName);
                     if (client != clientWhoReset)
                     {
                         Messages.Chat.SendChatMessageToClient(client, clientWhoReset.playerName + " has reset the group scenario!");

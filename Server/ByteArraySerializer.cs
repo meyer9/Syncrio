@@ -69,14 +69,13 @@ namespace SyncrioServer
             byte[][] dataArray = list.Select(s => Encoding.UTF8.GetBytes(s)).ToArray();
             using (MemoryStream stream = new MemoryStream())
             {
-                foreach (var bytes in dataArray)
+                byte[] newline = Encoding.UTF8.GetBytes(Environment.NewLine);
+                foreach (byte[] bytes in dataArray)
                 {
                     stream.Write(bytes, 0, bytes.Length);
-                    byte[] newline = Encoding.UTF8.GetBytes(Environment.NewLine);
                     stream.Write(newline, 0, newline.Length);
                 }
-                byte[] data = new byte[stream.Length];
-                data = stream.ToArray();
+                byte[] data = stream.ToArray();
 
                 return data;
             }

@@ -29,20 +29,26 @@ namespace SyncrioServer
 {
     class UnDuplicater
     {
-        public static List<string> StringDuplicateRemover(string[] stringArray)
+        public static List<string> StringDuplicateRemover(List<string> stringList)
         {
             Regex wordRegex = new Regex(@"^[\w_]+$", RegexOptions.None);// matches a single word on a line by itself
 
             // Split the text in lines and trim each line
-            List<string> lines = stringArray.ToList();
+            List<string> lines = new List<string>(stringList);
 
             for (int i = 0; i < lines.Count(); i++)
+            {
                 lines[i] = lines[i].Trim();
+            }
 
             // Remove comment lines
             lines.RemoveAll(l => l.StartsWith("//"));
 
             List<string> result = new List<string>(lines);
+
+            List<string> preResult = new List<string>();
+
+            List<KeyValuePair<int, int>> ranges = new List<KeyValuePair<int, int>>();
 
             int cursor = 2;
             while (cursor < lines.Count())
@@ -60,8 +66,14 @@ namespace SyncrioServer
                     lines.RemoveRange(range.Key, range.Value);
 
                     result.RemoveRange(range.Key, range.Value);
-                    
-                    result.InsertRange(range.Key, RemoveStringDuplicates(String.Join(Environment.NewLine, childStringLines.ToArray())));
+
+                    List<string> childLinesToAdd = RemoveStringDuplicates(childStringLines);
+
+                    KeyValuePair<int, int> rangeToAdd = new KeyValuePair<int, int>(preResult.Count, childLinesToAdd.Count);
+
+                    ranges.Add(rangeToAdd);
+
+                    preResult.AddRange(childLinesToAdd);
                 }
                 else
                 {
@@ -69,18 +81,25 @@ namespace SyncrioServer
                     cursor++;
                 }
             }
+
+            List<string> tempResult = NodeDuplicateRemover(preResult, ranges);
+
+            result.AddRange(tempResult);
+
             return result;
         }
 
-        public static List<string> RemoveStringDuplicates(string stringToUnDuplicate)
+        public static List<string> RemoveStringDuplicates(List<string> stringListToUnDuplicate)
         {
             Regex wordRegex = new Regex(@"^[\w_]+$", RegexOptions.None);// matches a single word on a line by itself
 
-            // Split the text in lines and trim each line
-            List<string> lines = stringToUnDuplicate.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            // Set lines and trim each line
+            List<string> lines = new List<string>(stringListToUnDuplicate);
 
             for (int i = 0; i < lines.Count(); i++)
+            {
                 lines[i] = lines[i].Trim();
+            }
 
             // Remove comment lines
             lines.RemoveAll(l => l.StartsWith("//"));
@@ -112,41 +131,52 @@ namespace SyncrioServer
                     List<string> childStringLines = lines.GetRange(range.Key, range.Value);
                     lines.RemoveRange(range.Key, range.Value);
 
-                    preResult[preResultNumber] = RemoveStringDuplicates(String.Join(Environment.NewLine, childStringLines.ToArray())).ToString();
-                    preResultNumber++;
+                    string preResultToAdd = string.Join(Environment.NewLine, RemoveStringDuplicates(childStringLines));
+
+                    if (!preResult.Contains(preResultToAdd))
+                    {
+                        preResult[preResultNumber] = preResultToAdd;
+                        preResultNumber++;
+                    }
                 }
                 else
                 {
+                    preResult[preResultNumber] = lines[cursor];
+                    preResultNumber++;
                     // Only increment if a string was not removed
                     cursor++;
                 }
             }
-
-            for (int i = 0; i < preResult.Length; i++)
-            {
-                for (int i2 = 0; i2 < preResult.Length; i2++)
-                {
-                    if (i != i2)
-                    {
-                        if (preResult[i] != null && preResult[i2] != null)
-                        {
-                            if (preResult[i].Trim() == preResult[i2].Trim())
-                            {
-                                preResult[i2] = null;
-                            }
-                        }
-                    }
-                }
-            }
             preResult = preResult.Where(x => !string.IsNullOrEmpty(x)).ToArray();
 
-            string tempPreResult = preResult.ToString();
-
-            preResult = tempPreResult.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-
-            result.AddRange(preResult.ToList());
+            result.AddRange(preResult);
 
             result.Add(lines.Last());
+
+            return result;
+        }
+
+        public static List<string> NodeDuplicateRemover(List<string> nodeListToUnDuplicate, List<KeyValuePair<int, int>> nodeRangesToCheck)
+        {
+            List<string> preResult = nodeListToUnDuplicate;
+
+            string[] ranges = new string[nodeRangesToCheck.Count];
+
+            for (int i = 0; i < nodeRangesToCheck.Count; i++)
+            {
+                ranges[i] = string.Join(Environment.NewLine, preResult.GetRange(nodeRangesToCheck[i].Key, nodeRangesToCheck[i].Value));
+            }
+
+            List<string> distinctRanges = ranges.Distinct().ToList();
+
+            preResult.Clear();
+
+            for (int i = 0; i < distinctRanges.Count; i++)
+            {
+                preResult.AddRange(distinctRanges[i].Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None));
+            }
+
+            List<string> result = preResult;
 
             return result;
         }

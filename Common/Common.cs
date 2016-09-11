@@ -63,7 +63,7 @@ namespace SyncrioCommon
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
         public const int PROTOCOL_VERSION = 41;
         //Program version. This is written in the build scripts.
-        public const string PROGRAM_VERSION = "v0.2.0.0";
+        public const string PROGRAM_VERSION = "v0.2.5.0";
         //Compression threshold
         public const int COMPRESSION_THRESHOLD = 4096;
 
@@ -152,8 +152,8 @@ namespace SyncrioCommon
         CHAT_MESSAGE,
         PLAYER_STATUS,
         PLAYER_COLOR,
-        SCENARIO_DATA,
         SYNC_SCENARIO_REQUEST,
+        INITIAL_SCENARIO_DATA_REQUEST,
         RESET_SCENARIO,
         JOIN_GROUP_REQUEST,
         LEAVE_GROUP,
@@ -192,6 +192,8 @@ namespace SyncrioCommon
         PLAYER_JOIN,
         PLAYER_DISCONNECT,
         SCENARIO_DATA,
+        INITIAL_SCENARIO_DATA_REPLY,
+        AUTO_SYNC_SCENARIO_REQUEST,
         CREATE_GROUP_REPLY,
         CREATE_GROUP_ERROR,
         CHANGE_LEADER_REQUEST_RELAY,

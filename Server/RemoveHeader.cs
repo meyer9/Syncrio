@@ -34,10 +34,12 @@ namespace SyncrioServer
             Regex wordRegex = new Regex(@"^[\w_]+$", RegexOptions.None);// matches a single word on a line by itself
 
             // Split the text in lines and trim each line
-            List<string> lines = stringList;
+            List<string> lines = new List<string>(stringList);
 
             for (int i = 0; i < lines.Count(); i++)
+            {
                 lines[i] = lines[i].Trim();
+            }
 
             // Remove comment lines
             lines.RemoveAll(l => l.StartsWith("//"));

@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ByteArraySerializer.cs" />
+    <Compile Include="DataCleaner.cs" />
     <Compile Include="GroupCommand.cs" />
     <Compile Include="GroupSystem.cs" />
     <Compile Include="Messages\Group.cs" />

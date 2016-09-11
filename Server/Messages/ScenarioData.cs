@@ -95,51 +95,7 @@ namespace SyncrioServer.Messages
             }
         }
 
-        public static void SendScenarioGroupModules(ClientObject client, byte[] messageData)
-        {
-            lock (scenarioDataLock)
-            {
-                using (MessageReader mr = new MessageReader(messageData))
-                {
-                    string groupName = mr.Read<string>();
-                    int numberOfScenarioModules = Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Groups", groupName, "Scenario")).Length;
-                    int currentScenarioModule = 0;
-                    string[] scenarioNames = new string[numberOfScenarioModules];
-                    byte[][] scenarioDataArray = new byte[numberOfScenarioModules][];
-                    foreach (string file in Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Groups", groupName, "Scenario")))
-                    {
-                        //Remove the .txt part for the name
-                        scenarioNames[currentScenarioModule] = Path.GetFileNameWithoutExtension(file);
-                        scenarioDataArray[currentScenarioModule] = File.ReadAllBytes(file);
-                        currentScenarioModule++;
-                    }
-                    ServerMessage newMessage = new ServerMessage();
-                    newMessage.type = ServerMessageType.SCENARIO_DATA;
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<string[]>(scenarioNames);
-                        mw.Write<string[]>(ScenarioSystem.fetch.GetScenatioFundsVersionHistory(groupName));
-                        mw.Write<string[]>(ScenarioSystem.fetch.GetScenatioRepVersionHistory(groupName));
-                        mw.Write<string[]>(ScenarioSystem.fetch.GetScenatioSciVersionHistory(groupName));
-                        foreach (byte[] scenarioData in scenarioDataArray)
-                        {
-                            if (client.compressionEnabled)
-                            {
-                                mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioData));
-                            }
-                            else
-                            {
-                                mw.Write<byte[]>(Compression.AddCompressionHeader(scenarioData, false));
-                            }
-                        }
-                        newMessage.data = mw.GetMessageBytes();
-                    }
-                    ClientHandler.SendToClient(client, newMessage, true);
-                }
-            }
-        }
-
-        public static void SendScenarioGroupModulesStringGroupName(ClientObject client, string groupName)
+        public static void SendScenarioGroupModules(ClientObject client, string groupName)
         {
             lock (scenarioDataLock)
             {
@@ -231,11 +187,21 @@ namespace SyncrioServer.Messages
                                 {
                                     List<string> scenarioDataStringList = ByteArraySerializer.fetch.Deserialize(scenarioData);
                                     List<string> oldScenarioDataStringList = ByteArraySerializer.fetch.Deserialize(oldScenarioData);
-                                    oldScenarioDataStringList = RemoveHeader.HeaderRemover(oldScenarioDataStringList);
-                                    List<string> mergedScenarioDataStringList = scenarioDataStringList.Concat(oldScenarioDataStringList).ToList<string>();
-                                    List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList.ToArray());
-                                    byte[] mergedScenarioDataSerializedStringList = ByteArraySerializer.fetch.Serialize(noDuplicatesScenarioDataStringList);
-                                    File.WriteAllBytes(filePath, mergedScenarioDataSerializedStringList);
+                                    List<string> cleanedScenarioDataStringList = new List<string>();
+                                    if (DataCleaner.IsDataGood(oldScenarioDataStringList))
+                                    {
+                                        List<string> mergedScenarioDataStringList = new List<string>(scenarioDataStringList);
+                                        mergedScenarioDataStringList.AddRange(RemoveHeader.HeaderRemover(oldScenarioDataStringList));
+                                        List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList);
+                                        cleanedScenarioDataStringList = DataCleaner.CleanData(noDuplicatesScenarioDataStringList);
+                                    }
+                                    else
+                                    {
+                                        List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(scenarioDataStringList);
+                                        cleanedScenarioDataStringList = DataCleaner.CleanData(noDuplicatesScenarioDataStringList);
+                                    }
+                                    byte[] mergedScenarioDataSerialized = ByteArraySerializer.fetch.Serialize(cleanedScenarioDataStringList);
+                                    File.WriteAllBytes(filePath, mergedScenarioDataSerialized);
                                 }
                                 else
                                 {
@@ -347,11 +313,14 @@ namespace SyncrioServer.Messages
 
                                                             float lastPlayerFundsValue = Convert.ToSingle(playerScenarioFundsHistory[x - 2].ToString());
                                                             float valueDff = currentPlayerFundsValue -= lastPlayerFundsValue;
-                                                            
+
+                                                            finalValueDff += valueDff;
+
                                                             mergedScenarioFundsHistory.Add("funds");
                                                             mergedScenarioFundsHistory.Add(Convert.ToString(valueDff));
                                                             x += 2;
                                                         }
+                                                        break;
                                                     }
                                                 }
                                                 fundsValueDff += finalValueDff;
@@ -472,10 +441,13 @@ namespace SyncrioServer.Messages
                                                             float lastPlayerRepValue = Convert.ToSingle(playerScenarioRepHistory[x - 2].ToString());
                                                             float valueDff = currentPlayerRepValue -= lastPlayerRepValue;
 
+                                                            finalValueDff += valueDff;
+
                                                             mergedScenarioRepHistory.Add("rep");
                                                             mergedScenarioRepHistory.Add(Convert.ToString(valueDff));
                                                             x += 2;
                                                         }
+                                                        break;
                                                     }
                                                 }
                                                 repValueDff += finalValueDff;
@@ -596,10 +568,13 @@ namespace SyncrioServer.Messages
                                                             float lastPlayerSciValue = Convert.ToSingle(playerScenarioSciHistory[x - 2].ToString());
                                                             float valueDff = currentPlayerSciValue -= lastPlayerSciValue;
 
+                                                            finalValueDff += valueDff;
+
                                                             mergedScenarioSciHistory.Add("sci");
                                                             mergedScenarioSciHistory.Add(Convert.ToString(valueDff));
                                                             x += 2;
                                                         }
+                                                        break;
                                                     }
                                                 }
                                                 sciValueDff += finalValueDff;
@@ -613,53 +588,60 @@ namespace SyncrioServer.Messages
                                     }
                                     List<string> scenarioDataStringList = ByteArraySerializer.fetch.Deserialize(scenarioData);
                                     List<string> oldScenarioDataStringList = ByteArraySerializer.fetch.Deserialize(oldScenarioData);
-                                    oldScenarioDataStringList = RemoveHeader.HeaderRemover(oldScenarioDataStringList);
-                                    List<string> mergedScenarioDataStringList = scenarioDataStringList.Concat(oldScenarioDataStringList).ToList<string>();
-                                    List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList.ToArray());
-                                    if (noDuplicatesScenarioDataStringList.Any(s => s.Contains("funds")))
+                                    List<string> cleanedScenarioDataStringList = new List<string>();
+                                    if (DataCleaner.IsDataGood(oldScenarioDataStringList))
                                     {
-                                        for (int v = 0; v < noDuplicatesScenarioDataStringList.Count; v++)
+                                        List<string> mergedScenarioDataStringList = new List<string>(scenarioDataStringList);
+                                        mergedScenarioDataStringList.AddRange(RemoveHeader.HeaderRemover(oldScenarioDataStringList));
+                                        List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(mergedScenarioDataStringList);
+                                        cleanedScenarioDataStringList = DataCleaner.CleanData(noDuplicatesScenarioDataStringList);
+                                    }
+                                    else
+                                    {
+                                        List<string> noDuplicatesScenarioDataStringList = UnDuplicater.StringDuplicateRemover(scenarioDataStringList);
+                                        cleanedScenarioDataStringList = DataCleaner.CleanData(noDuplicatesScenarioDataStringList);
+                                    }
+                                    if (cleanedScenarioDataStringList.Any(s => s.Contains("funds")))
+                                    {
+                                        for (int v = 0; v < cleanedScenarioDataStringList.Count; v++)
                                         {
-                                            if (noDuplicatesScenarioDataStringList[v].Contains("funds"))
+                                            if (cleanedScenarioDataStringList[v].Contains("funds"))
                                             {
-                                                noDuplicatesScenarioDataStringList[v].Replace("funds = ", "");
-                                                float newFunds = Convert.ToSingle(noDuplicatesScenarioDataStringList[v]) + fundsValueDff;
-                                                noDuplicatesScenarioDataStringList[v] = Convert.ToString(newFunds);
-                                                noDuplicatesScenarioDataStringList[v] = "funds = " + Convert.ToString(noDuplicatesScenarioDataStringList[v]);
+                                                cleanedScenarioDataStringList[v].Replace("funds = ", "");
+                                                float newFunds = Convert.ToSingle(cleanedScenarioDataStringList[v]) + fundsValueDff;
+                                                cleanedScenarioDataStringList[v] = "funds = " + Convert.ToString(newFunds);
                                                 break;
                                             }
                                         }
                                     }
-                                    if (noDuplicatesScenarioDataStringList.Any(s => s.Contains("rep")))
+                                    if (cleanedScenarioDataStringList.Any(s => s.Contains("rep")))
                                     {
-                                        for (int v = 0; v < noDuplicatesScenarioDataStringList.Count; v++)
+                                        for (int v = 0; v < cleanedScenarioDataStringList.Count; v++)
                                         {
-                                            if (noDuplicatesScenarioDataStringList[v].Contains("rep"))
+                                            if (cleanedScenarioDataStringList[v].Contains("rep"))
                                             {
-                                                noDuplicatesScenarioDataStringList[v].Replace("rep = ", "");
-                                                float newRep = Convert.ToSingle(noDuplicatesScenarioDataStringList[v]) + repValueDff;
-                                                noDuplicatesScenarioDataStringList[v] = Convert.ToString(newRep);
-                                                noDuplicatesScenarioDataStringList[v] = "rep = " + Convert.ToString(noDuplicatesScenarioDataStringList[v]);
+                                                cleanedScenarioDataStringList[v].Replace("rep = ", "");
+                                                float newRep = Convert.ToSingle(cleanedScenarioDataStringList[v]) + repValueDff;
+                                                cleanedScenarioDataStringList[v] = "rep = " + Convert.ToString(newRep);
                                                 break;
                                             }
                                         }
                                     }
-                                    if (noDuplicatesScenarioDataStringList.Any(s => s.Contains("sci")))
+                                    if (cleanedScenarioDataStringList.Any(s => s.Contains("sci")))
                                     {
-                                        for (int v = 0; v < noDuplicatesScenarioDataStringList.Count; v++)
+                                        for (int v = 0; v < cleanedScenarioDataStringList.Count; v++)
                                         {
-                                            if (noDuplicatesScenarioDataStringList[v] == "sci")
+                                            if (cleanedScenarioDataStringList[v] == "sci")
                                             {
-                                                noDuplicatesScenarioDataStringList[v].Replace("sci = ", "");
-                                                float newSci = Convert.ToSingle(noDuplicatesScenarioDataStringList[v]) + sciValueDff;
-                                                noDuplicatesScenarioDataStringList[v] = Convert.ToString(newSci);
-                                                noDuplicatesScenarioDataStringList[v] = "sci = " + Convert.ToString(noDuplicatesScenarioDataStringList[v]);
+                                                cleanedScenarioDataStringList[v].Replace("sci = ", "");
+                                                float newSci = Convert.ToSingle(cleanedScenarioDataStringList[v]) + sciValueDff;
+                                                cleanedScenarioDataStringList[v] = "sci = " + Convert.ToString(newSci);
                                                 break;
                                             }
                                         }
                                     }
-                                    byte[] mergedScenarioDataSerializedStringList = ByteArraySerializer.fetch.Serialize(noDuplicatesScenarioDataStringList);
-                                    File.WriteAllBytes(filePath, mergedScenarioDataSerializedStringList);
+                                    byte[] mergedScenarioDataSerialized = ByteArraySerializer.fetch.Serialize(cleanedScenarioDataStringList);
+                                    File.WriteAllBytes(filePath, mergedScenarioDataSerialized);
                                 }
                             }
                         }

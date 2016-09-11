@@ -271,7 +271,7 @@ namespace SyncrioServer.Messages
                     else
                     {
                         string groupname = GroupSystem.fetch.GetPlayerGroup(client.playerName);
-                        Messages.ScenarioData.SendScenarioGroupModulesStringGroupName(client, groupname);
+                        Messages.ScenarioData.SendScenarioGroupModules(client, groupname);
                     }
                     Messages.LockSystem.SendAllLocks(client);
                     Messages.AdminSystem.SendAllAdmins(client);
