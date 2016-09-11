@@ -133,17 +133,7 @@ namespace SyncrioClientSide
             GUILayout.BeginHorizontal();
             if (isInGroup)
             {
-                if (!ScenarioWorker.fetch.autoSendScenarios)
-                {
-                    syncToGroup = GUILayout.Toggle(syncToGroup, "Sync to group", buttonStyle);
-                }
-                else
-                {
-                    GUILayout.Label("Auto sync is on. There is no need to sync manually.", labelOptionsTwo);
-                    GUILayout.EndHorizontal();
-
-                    GUILayout.BeginHorizontal();
-                }
+                syncToGroup = GUILayout.Toggle(syncToGroup, "Sync to group", buttonStyle);
                 syncFromGroup = GUILayout.Toggle(syncFromGroup, "Sync From group", buttonStyle);
 
                 if (syncToGroup)
@@ -157,7 +147,7 @@ namespace SyncrioClientSide
 
                     if (GUILayout.Button("Yes", buttonStyle))
                     {
-                        ScenarioWorker.fetch.scenarioSync(isInGroup, true, true);
+                        ScenarioWorker.fetch.scenarioSync(isInGroup, true, true, false);
                         syncToGroup = false;
                     }
                     if (GUILayout.Button("No", buttonStyle))
@@ -177,7 +167,7 @@ namespace SyncrioClientSide
 
                     if (GUILayout.Button("Yes", buttonStyle))
                     {
-                        ScenarioWorker.fetch.scenarioSync(isInGroup, false, true);
+                        ScenarioWorker.fetch.scenarioSync(isInGroup, false, true, false);
                         syncFromGroup = false;
                     }
                     if (GUILayout.Button("No", buttonStyle))
@@ -190,16 +180,9 @@ namespace SyncrioClientSide
             {
                 if (ScenarioWorker.fetch.nonGroupScenarios)
                 {
-                    if (!ScenarioWorker.fetch.autoSendScenarios)
+                    if (GUILayout.Button("Sync to server", buttonStyle))
                     {
-                        if (GUILayout.Button("Sync to server", buttonStyle))
-                        {
-                            ScenarioWorker.fetch.scenarioSync(isInGroup, true, true);
-                        }
-                    }
-                    else
-                    {
-                        GUILayout.Label("Auto sync is on. There is no need to sync manually.", labelOptionsTwo);
+                        ScenarioWorker.fetch.scenarioSync(isInGroup, true, true, false);
                     }
                 }
                 else

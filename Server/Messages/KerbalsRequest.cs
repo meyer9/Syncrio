@@ -72,7 +72,7 @@ namespace SyncrioServer.Messages
             else
             {
                 string groupname = GroupSystem.fetch.GetPlayerGroup(client.playerName);
-                Messages.ScenarioData.SendScenarioGroupModulesStringGroupName(client, groupname);
+                Messages.ScenarioData.SendScenarioGroupModules(client, groupname);
             }
             Messages.CraftLibrary.SendCraftList(client);
             Messages.Chat.SendPlayerChatChannels(client);

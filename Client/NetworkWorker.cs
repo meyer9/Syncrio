@@ -104,6 +104,7 @@ namespace SyncrioClientSide
         private Thread sendThread;
         private string serverMotd;
         private bool displayMotd;
+        private bool makeInitialScenarioSync = false;
 
         public NetworkWorker()
         {
@@ -216,6 +217,7 @@ namespace SyncrioClientSide
                 {
                     if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
                     {
+                        makeInitialScenarioSync = true;
                         state = ClientState.RUNNING;
                         Client.fetch.status = "Running";
                         Client.fetch.gameRunning = true;
@@ -230,6 +232,7 @@ namespace SyncrioClientSide
                 }
                 else
                 {
+                    makeInitialScenarioSync = true;
                     state = ClientState.RUNNING;
                     Client.fetch.status = "Running";
                     Client.fetch.gameRunning = true;
@@ -237,6 +240,14 @@ namespace SyncrioClientSide
                     ScenarioWorker.fetch.workerEnabled = true;
                     DynamicTickWorker.fetch.workerEnabled = true;
                     ToolbarSupport.fetch.EnableToolbar();
+                }
+            }
+            if (state == ClientState.RUNNING && makeInitialScenarioSync)
+            {
+                if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
+                {
+                    makeInitialScenarioSync = false;
+                    ScenarioWorker.fetch.InitialScenarioDataRequest();
                 }
             }
             if (displayMotd && (HighLogic.LoadedScene != GameScenes.LOADING) && (Time.timeSinceLevelLoad > 2f))
@@ -868,6 +879,9 @@ namespace SyncrioClientSide
                         case ServerMessageType.SCENARIO_DATA:
                             HandleScenarioModuleData(message.data);
                             break;
+                        case ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST:
+                            ScenarioWorker.fetch.AutoSendScenariosReply();
+                            break;
                         case ServerMessageType.KERBAL_REPLY:
                             HandleKerbalReply(message.data);
                             break;
@@ -956,6 +970,9 @@ namespace SyncrioClientSide
                             break;
                         case ServerMessageType.SCENARIO_DATA:
                             HandleScenarioModuleData(message.data);
+                            break;
+                        case ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST:
+                            ScenarioWorker.fetch.AutoSendScenariosReply();
                             break;
                         case ServerMessageType.SYNC_TIME_REPLY:
                             HandleSyncTimeReply(message.data);
@@ -1656,40 +1673,6 @@ namespace SyncrioClientSide
             newMessage.type = ClientMessageType.SCREENSHOT_LIBRARY;
             newMessage.data = messageData;
             QueueOutgoingMessage(newMessage, false);
-        }
-        //Called from ScenarioWorker
-        public void SendScenarioModuleData(string[] scenarioNames, byte[][] scenarioData)
-        {
-            ClientMessage newMessage = new ClientMessage();
-            newMessage.type = ClientMessageType.SCENARIO_DATA;
-            using (MessageWriter mw = new MessageWriter())
-            {
-                mw.Write<string[]>(scenarioNames);
-                foreach (byte[] scenarioBytes in scenarioData)
-                {
-                    mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
-                }
-                newMessage.data = mw.GetMessageBytes();
-            }
-            SyncrioLog.Debug("Sending " + scenarioNames.Length + " scenario modules");
-            QueueOutgoingMessage(newMessage, false);
-        }
-        // Same method as above, only that in this, the message is queued as high priority
-        public void SendScenarioModuleDataHighPriority(string[] scenarioNames, byte[][] scenarioData)
-        {
-            ClientMessage newMessage = new ClientMessage();
-            newMessage.type = ClientMessageType.SCENARIO_DATA;
-            using (MessageWriter mw = new MessageWriter())
-            {
-                mw.Write<string[]>(scenarioNames);
-                foreach (byte[] scenarioBytes in scenarioData)
-                {
-                    mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
-                }
-                newMessage.data = mw.GetMessageBytes();
-            }
-            SyncrioLog.Debug("Sending " + scenarioNames.Length + " scenario modules (high priority)");
-            QueueOutgoingMessage(newMessage, true);
         }
 
         public void SendKerbalProtoMessage(string kerbalName, byte[] kerbalBytes)

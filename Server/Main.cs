@@ -68,6 +68,8 @@ namespace SyncrioServer
         public static long lastPlayerActivity;
         public static object ScenarioSizeLock = new object();
         private static int day;
+        private static bool syncing = false;
+        private static int numberOfClientsInGroupsAtSync = 0;
 
         public static void Main()
         {
@@ -95,6 +97,11 @@ namespace SyncrioServer
 
                 //Periodic day check
                 long lastDayCheck = 0;
+
+                //Periodic scenario sync
+                long lastScenarioSendTime = 0;
+
+                long autoSyncScenariosWaitInterval = Settings.settingsStore.autoSyncScenariosWaitInterval * 60000;
 
                 //Set Scenario directory and modfile path
                 ScenarioDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scenarios");
@@ -235,6 +242,53 @@ namespace SyncrioServer
                                 SyncrioLog.LogFilename = Path.Combine(SyncrioLog.LogFolder, "Syncrioserver " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ".log");
                                 SyncrioLog.WriteToLog("Continued from logfile " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ".log");
                                 day = DateTime.Now.Day;
+                            }
+                        }
+                        //Auto Sync Scenarios
+                        if (Settings.settingsStore.autoSyncScenarios && autoSyncScenariosWaitInterval != 0)
+                        {
+                            if ((serverClock.ElapsedMilliseconds - lastScenarioSendTime) > autoSyncScenariosWaitInterval)
+                            {
+                                lastScenarioSendTime = serverClock.ElapsedMilliseconds;
+                                ScenarioSystem.fetch.numberOfPlayersSyncing = 0;
+                                numberOfClientsInGroupsAtSync = 0;
+                                foreach (ClientObject client in ClientHandler.GetClients())
+                                {
+                                    if (GroupSystem.fetch.PlayerIsInGroup(client.playerName))
+                                    {
+                                        ScenarioSystem.fetch.SendAutoSyncScenarioRequest(client);
+                                        ScenarioSystem.fetch.numberOfPlayersSyncing += 1;
+                                        numberOfClientsInGroupsAtSync += 1;
+                                    }
+                                }
+                                syncing = true;
+                            }
+
+                            if (syncing)
+                            {
+                                int playersInGroups = GroupSystem.fetch.GetNumberOfPlayersInAllGroups();
+
+                                if (numberOfClientsInGroupsAtSync > playersInGroups)
+                                {
+                                    int lostPlayers = numberOfClientsInGroupsAtSync - playersInGroups;
+                                    numberOfClientsInGroupsAtSync -= lostPlayers;
+                                    ScenarioSystem.fetch.numberOfPlayersSyncing -= lostPlayers;
+                                }
+                            }
+                        }
+                        if (syncing && ScenarioSystem.fetch.numberOfPlayersSyncing == 0)
+                        {
+                            syncing = false;
+                            foreach (ClientObject client in ClientHandler.GetClients())
+                            {
+                                if (GroupSystem.fetch.PlayerIsInGroup(client.playerName))
+                                {
+                                    Messages.ScenarioData.SendScenarioGroupModules(client, GroupSystem.fetch.GetPlayerGroup(client.playerName));
+                                }
+                                else
+                                {
+                                    //Don't care
+                                }
                             }
                         }
 

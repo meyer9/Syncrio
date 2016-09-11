@@ -116,8 +116,10 @@ namespace SyncrioServer
         public int maxGroups = 15;
         [Description("Minimum % of kick votes that has to be sent to kick a player from a group.\n# -Note! Any keep votes sent will lower the % of kick votes sent.\n# -Note! The leader of the group has ultimate power over the vote system and can instantly kick a player, but can't vote to keep the player and is excluded from the vote count.\n# -Note! Enter a number from 0 to 100, 100 is ok to enter, but 0 is not. Do not enter 0!\n# -Note! The number will be divided by 100.")]
         public int groupKickPlayerVotesThreshold = 75;
-        [Description("Specify if the server is to automatically sync the player's scenario data.\n# -Note! This only syncs the server's copy of the player's scenario data.")]
+        [Description("Specify if the server is to automatically sync the player's scenario data.")]
         public bool autoSyncScenarios = true;
+        [Description("Specify the amount of time the server is to wait between automatic scenario syncs.\n# -Note! The time is in minutes.\n# -Note! This only matters if you set 'autoSyncScenarios' to true.")]
+        public int autoSyncScenariosWaitInterval = 1;
         [Description("Specify if players can have saved scenarios when they're not in a group.\n# -Note! If false, any player who is not in a group will not have their scenario saved.")]
         public bool nonGroupScenarios = true;
         [Description("Specify if players can reset their scenario to the default settings.\n# WARNING: Using this command will override your/the player's scenario(or your/the player's group's scenario, if you/the player are in a group) using the initial scenario set by you!\n# WARNING: If you are in a group this will override everyone of the group's member's scenario!\n# -Note! If the initial scenario is not set this will do nothing.")]

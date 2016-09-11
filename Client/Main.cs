@@ -272,7 +272,7 @@ namespace SyncrioClientSide
                 {
                     PlayerStatusWindow.fetch.disconnectEventHandled = true;
                     forceQuit = true;
-                    ScenarioWorker.fetch.scenarioSync(GroupSystem.playerGroupAssigned, true, true); // Send scenario modules before disconnecting
+                    ScenarioWorker.fetch.scenarioSync(GroupSystem.playerGroupAssigned, true, true, false); // Send scenario modules before disconnecting
                     NetworkWorker.fetch.SendDisconnect("Quit");
                 }
                 if (!ConnectionWindow.fetch.renameEventHandled)
@@ -626,7 +626,7 @@ namespace SyncrioClientSide
             if (gameRunning && NetworkWorker.fetch.state == ClientState.RUNNING)
             {
                 Application.CancelQuit();
-                ScenarioWorker.fetch.scenarioSync(GroupSystem.playerGroupAssigned, true, true);
+                ScenarioWorker.fetch.scenarioSync(GroupSystem.playerGroupAssigned, true, true, false);
                 HighLogic.LoadScene(GameScenes.MAINMENU);
             }
         }

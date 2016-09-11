@@ -60,8 +60,6 @@ namespace SyncrioClientSide
         private object scenarioHistoryLock = new object();
         private Dictionary<string,string> checkData = new Dictionary<string, string>();
         private Queue<ScenarioEntry> scenarioQueue = new Queue<ScenarioEntry>();
-        private bool blockScenarioDataSends = false;
-        private float lastScenarioSendTime = 0f;
         private const float SEND_SCENARIO_DATA_INTERVAL = 30f;
         public bool autoSendScenarios;
         public bool nonGroupScenarios;
@@ -91,14 +89,7 @@ namespace SyncrioClientSide
 
         private void Update()
         {
-            if (workerEnabled && !blockScenarioDataSends && autoSendScenarios)
-            {
-                if ((UnityEngine.Time.realtimeSinceStartup - lastScenarioSendTime) > SEND_SCENARIO_DATA_INTERVAL)
-                {
-                    lastScenarioSendTime = UnityEngine.Time.realtimeSinceStartup;
-                    scenarioSync(GroupSystem.playerGroupAssigned, true, false);
-                }
-            }
+
         }
 
         private void LoadScenarioTypes()
@@ -387,7 +378,6 @@ namespace SyncrioClientSide
                 if (entry.scenarioNode == null)
                 {
                     SyncrioLog.Debug(entry.scenarioName + " scenario data failed to create a ConfigNode!");
-                    blockScenarioDataSends = true;
                     return;
                 }
 
@@ -437,7 +427,6 @@ namespace SyncrioClientSide
                             catch (Exception e)
                             {
                                 SyncrioLog.Debug("Error loading " + entry.scenarioName + " scenario module, Exception: " + e);
-                                blockScenarioDataSends = true;
                             }
                             loaded = true;
                         }
@@ -500,7 +489,6 @@ namespace SyncrioClientSide
             catch
             {
                 SyncrioLog.Debug("Error loading scenario data!");
-                blockScenarioDataSends = true;
             }
         }
 
@@ -519,7 +507,7 @@ namespace SyncrioClientSide
             }
         }
 
-        public void scenarioSync(bool isInGroup, bool toServer, bool highPriority)
+        public void scenarioSync(bool isInGroup, bool toServer, bool highPriority, bool isAutoReply)
         {
             lock (scenarioHistoryLock)
             {
@@ -567,6 +555,7 @@ namespace SyncrioClientSide
                         newMessage.type = ClientMessageType.SYNC_SCENARIO_REQUEST;
                         using (MessageWriter mw = new MessageWriter())
                         {
+                            mw.Write<bool>(isAutoReply);
                             mw.Write<bool>(toServer);
                             mw.Write<bool>(isInGroup);
                             mw.Write<string>(groupName);
@@ -595,6 +584,7 @@ namespace SyncrioClientSide
                     newMessage.type = ClientMessageType.SYNC_SCENARIO_REQUEST;
                     using (MessageWriter mw = new MessageWriter())
                     {
+                        mw.Write<bool>(isAutoReply);
                         mw.Write<bool>(toServer);
                         mw.Write<bool>(isInGroup);
                         mw.Write<string[]>(scenarioName);
@@ -762,6 +752,29 @@ namespace SyncrioClientSide
             scenarioSciHistory.Clear();
             scenarioSciHistory = new List<string>(serverScenatioSciVersionHistory);
             File.WriteAllLines(scenarioSciHistoryFile, scenarioSciHistory.ToArray());
+        }
+
+        public void AutoSendScenariosReply()
+        {
+            if (HighLogic.LoadedScene != GameScenes.LOADING && HighLogic.LoadedScene != GameScenes.MAINMENU)
+            {
+                if (GroupSystem.playerGroupAssigned)
+                {
+                    scenarioSync(true, true, false, true);
+                }
+            }
+        }
+
+        public void InitialScenarioDataRequest()
+        {
+            ClientMessage newMessage = new ClientMessage();
+            newMessage.type = ClientMessageType.INITIAL_SCENARIO_DATA_REQUEST;
+            using (MessageWriter mw = new MessageWriter())
+            {
+                mw.Write<string>(Settings.fetch.playerName);
+                newMessage.data = mw.GetMessageBytes();
+            }
+            NetworkWorker.fetch.SendScenarioCommand(newMessage, true);
         }
 
         public static void Reset()

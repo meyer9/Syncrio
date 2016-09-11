@@ -626,9 +626,6 @@ namespace SyncrioServer
                     case ClientMessageType.PLAYER_COLOR:
                         Messages.PlayerColor.HandlePlayerColor(client, message.data);
                         break;
-                    case ClientMessageType.SCENARIO_DATA:
-                        Messages.ScenarioData.HandleScenarioModuleData(client, message.data);
-                        break;
                     case ClientMessageType.SYNC_TIME_REQUEST:
                         Messages.SyncTimeRequest.HandleSyncTimeRequest(client, message.data);
                         break;
@@ -688,6 +685,9 @@ namespace SyncrioServer
                         break;
                     case ClientMessageType.SYNC_SCENARIO_REQUEST:
                         ScenarioSystem.fetch.SyncScenario(client, message.data);
+                        break;
+                    case ClientMessageType.INITIAL_SCENARIO_DATA_REQUEST:
+                        ScenarioSystem.fetch.ScenarioInitialSync(client, message.data);
                         break;
                     case ClientMessageType.RESET_SCENARIO:
                         ScenarioSystem.fetch.ResetScenario(client, message.data);
