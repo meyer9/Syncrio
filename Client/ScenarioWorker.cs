@@ -57,7 +57,7 @@ namespace SyncrioClientSide
         public bool workerEnabled = false;
         private static ScenarioWorker singleton;
         private object scenarioLock = new object();
-        private object scenarioHistoryLock = new object();
+        private object scenarioSyncLock = new object();
         private Dictionary<string,string> checkData = new Dictionary<string, string>();
         private Queue<ScenarioEntry> scenarioQueue = new Queue<ScenarioEntry>();
         private const float SEND_SCENARIO_DATA_INTERVAL = 30f;
@@ -507,39 +507,33 @@ namespace SyncrioClientSide
             }
         }
 
-        public void scenarioSync(bool isInGroup, bool toServer, bool highPriority, bool isAutoReply)
+        public void scenarioSync(bool isInGroup, bool isTwoWay, bool toServer, bool isAutoReply)
         {
-            lock (scenarioHistoryLock)
+            lock (scenarioSyncLock)
             {
                 string[] scenarioName;
                 byte[][] scenarioData;
-                if (toServer)
+
+                GetCurrentScenarioModules();
+                if (currentScenarioName != null)
                 {
-                    GetCurrentScenarioModules();
-                    if (currentScenarioName != null)
-                    {
-                        scenarioName = currentScenarioName;
-                    }
-                    else
-                    {
-                        SyncrioLog.Debug("Error during sync scenario: 'currentScenarioName' is null");
-                        scenarioName = null;
-                    }
-                    if (currentScenarioData != null)
-                    {
-                        scenarioData = currentScenarioData;
-                    }
-                    else
-                    {
-                        SyncrioLog.Debug("Error during sync scenario: 'currentScenarioData' is null");
-                        scenarioData = null;
-                    }
+                    scenarioName = currentScenarioName;
                 }
                 else
                 {
+                    SyncrioLog.Debug("Error during sync scenario: 'currentScenarioName' is null");
                     scenarioName = null;
+                }
+                if (currentScenarioData != null)
+                {
+                    scenarioData = currentScenarioData;
+                }
+                else
+                {
+                    SyncrioLog.Debug("Error during sync scenario: 'currentScenarioData' is null");
                     scenarioData = null;
                 }
+
                 if (isInGroup)
                 {
                     if (scenarioName != null && scenarioData != null)
@@ -549,6 +543,7 @@ namespace SyncrioClientSide
                     string groupName = GroupSystem.playerGroupName;
                     if (!string.IsNullOrEmpty(groupName))
                     {
+
                         byte[] messageBytes;
                         ClientMessage newMessage = new ClientMessage();
                         newMessage.handled = false;
@@ -574,6 +569,10 @@ namespace SyncrioClientSide
                         }
                         newMessage.data = messageBytes;
                         NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
+                        if (toServer && isTwoWay)
+                        {
+                            scenarioSync(true, true, false, false);
+                        }
                     }
                 }
                 else
@@ -585,7 +584,7 @@ namespace SyncrioClientSide
                     using (MessageWriter mw = new MessageWriter())
                     {
                         mw.Write<bool>(isAutoReply);
-                        mw.Write<bool>(toServer);
+                        mw.Write<bool>(true);
                         mw.Write<bool>(isInGroup);
                         mw.Write<string[]>(scenarioName);
                         foreach (byte[] scenarioBytes in scenarioData)
@@ -760,7 +759,7 @@ namespace SyncrioClientSide
             {
                 if (GroupSystem.playerGroupAssigned)
                 {
-                    scenarioSync(true, true, false, true);
+                    scenarioSync(true, false, true, true);
                 }
             }
         }

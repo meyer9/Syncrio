@@ -58,8 +58,7 @@ namespace SyncrioClientSide
         private bool isWindowLocked = false;
         private object groupWindowLock = new object();
         private bool resetScenario = false;
-        private bool syncToGroup = false;
-        private bool syncFromGroup = false;
+        private bool sync = false;
         //GUI
         private GUIStyle windowStyle;
         private GUIStyle labelStyle;
@@ -133,46 +132,24 @@ namespace SyncrioClientSide
             GUILayout.BeginHorizontal();
             if (isInGroup)
             {
-                syncToGroup = GUILayout.Toggle(syncToGroup, "Sync to group", buttonStyle);
-                syncFromGroup = GUILayout.Toggle(syncFromGroup, "Sync From group", buttonStyle);
+                sync = GUILayout.Toggle(sync, "Sync", buttonStyle);
 
-                if (syncToGroup)
+                if (sync)
                 {
-                    syncFromGroup = false;
                     GUILayout.EndHorizontal();
 
                     GUILayout.BeginHorizontal();
 
-                    GUILayout.Label("To Group:", labelOptions);
+                    GUILayout.Label("Sync with server:", labelOptions);
 
                     if (GUILayout.Button("Yes", buttonStyle))
                     {
                         ScenarioWorker.fetch.scenarioSync(isInGroup, true, true, false);
-                        syncToGroup = false;
+                        sync = false;
                     }
                     if (GUILayout.Button("No", buttonStyle))
                     {
-                        syncToGroup = false;
-                    }
-                }
-
-                if (syncFromGroup)
-                {
-                    syncToGroup = false;
-                    GUILayout.EndHorizontal();
-
-                    GUILayout.BeginHorizontal();
-
-                    GUILayout.Label("From Group:", labelOptions);
-
-                    if (GUILayout.Button("Yes", buttonStyle))
-                    {
-                        ScenarioWorker.fetch.scenarioSync(isInGroup, false, true, false);
-                        syncFromGroup = false;
-                    }
-                    if (GUILayout.Button("No", buttonStyle))
-                    {
-                        syncFromGroup = false;
+                        sync = false;
                     }
                 }
             }
@@ -180,9 +157,9 @@ namespace SyncrioClientSide
             {
                 if (ScenarioWorker.fetch.nonGroupScenarios)
                 {
-                    if (GUILayout.Button("Sync to server", buttonStyle))
+                    if (GUILayout.Button("Sync", buttonStyle))
                     {
-                        ScenarioWorker.fetch.scenarioSync(isInGroup, true, true, false);
+                        ScenarioWorker.fetch.scenarioSync(isInGroup, false, true, false);
                     }
                 }
                 else
