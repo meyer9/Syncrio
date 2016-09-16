@@ -285,10 +285,6 @@ namespace SyncrioServer
                                 {
                                     Messages.ScenarioData.SendScenarioGroupModules(client, GroupSystem.fetch.GetPlayerGroup(client.playerName));
                                 }
-                                else
-                                {
-                                    //Don't care
-                                }
                             }
                         }
 

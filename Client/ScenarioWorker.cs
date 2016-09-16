@@ -203,7 +203,7 @@ namespace SyncrioClientSide
                         {
                             SyncrioLog.Debug("Spawning missing tourist (" + kerbalName + ") for active tourism contract");
                             ProtoCrewMember pcm = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Tourist);
-                            pcm.name = kerbalName;
+                            pcm.ChangeName(kerbalName);
                         }
                     }
                 }
@@ -223,7 +223,7 @@ namespace SyncrioClientSide
                     {
                         SyncrioLog.Debug("Spawning missing kerbal (" + kerbalName + ") for offered KerbalRescue contract");
                         ProtoCrewMember pcm = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Unowned);
-                        pcm.name = kerbalName;
+                        pcm.ChangeName(kerbalName);
                     }
                 }
                 if ((contractNode.GetValue("type") == "RescueKerbal") && (contractNode.GetValue("state") == "Active"))
@@ -245,14 +245,14 @@ namespace SyncrioClientSide
             //Add kerbal to crew roster.
             SyncrioLog.Debug("Spawning missing kerbal, name: " + kerbalName);
             ProtoCrewMember pcm = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Unowned);
-            pcm.name = kerbalName;
+            pcm.ChangeName(kerbalName);
             pcm.rosterStatus = ProtoCrewMember.RosterStatus.Assigned;
             //Create protovessel
             uint newPartID = ShipConstruction.GetUniqueFlightID(HighLogic.CurrentGame.flightState);
             CelestialBody contractBody = FlightGlobals.Bodies[bodyID];
             //Atmo: 10km above atmo, to half the planets radius out.
             //Non-atmo: 30km above ground, to half the planets radius out.
-            double minAltitude = FinePrint.Utilities.CelestialUtilities.GetMinimumOrbitalAltitude(contractBody, 1.1f);
+            double minAltitude = FinePrint.Utilities.CelestialUtilities.GetMinimumOrbitalDistance(contractBody, 1.1f);
             double maxAltitude = minAltitude + contractBody.Radius * 0.5;
             Orbit strandedOrbit = Orbit.CreateRandomOrbitAround(FlightGlobals.Bodies[bodyID], minAltitude, maxAltitude);
             ConfigNode[] kerbalPartNode = new ConfigNode[1];
@@ -287,7 +287,7 @@ namespace SyncrioClientSide
                         {
                             if (AddCrewMemberToRoster == null)
                             {
-                                MethodInfo addMemberToCrewRosterMethod = typeof(KerbalRoster).GetMethod("AddCrewMember", BindingFlags.NonPublic | BindingFlags.Instance);
+                                MethodInfo addMemberToCrewRosterMethod = typeof(KerbalRoster).GetMethod("AddCrewMember", BindingFlags.Public | BindingFlags.Instance);
                                 AddCrewMemberToRoster = (AddCrewMemberToRosterDelegate)Delegate.CreateDelegate(typeof(AddCrewMemberToRosterDelegate), HighLogic.CurrentGame.CrewRoster, addMemberToCrewRosterMethod);
                             }
                             if (AddCrewMemberToRoster == null)
@@ -296,7 +296,7 @@ namespace SyncrioClientSide
                             }
                             SyncrioLog.Debug("Generating missing kerbal from ProgressTracking: " + kerbalName);
                             ProtoCrewMember pcm = CrewGenerator.RandomCrewMemberPrototype(ProtoCrewMember.KerbalType.Crew);
-                            pcm.name = kerbalName;
+                            pcm.ChangeName(kerbalName);
                             AddCrewMemberToRoster(pcm);
                             //Also send it off to the server
                             VesselWorker.fetch.SendKerbalIfDifferent(pcm);
@@ -419,7 +419,7 @@ namespace SyncrioClientSide
                                 {
                                     ScenarioRunner.RemoveModule(psmLocked[i].moduleRef);
                                 }
-                                psmLocked[i].moduleRef = ScenarioRunner.fetch.AddModule(entry.scenarioNode);
+                                psmLocked[i].moduleRef = ScenarioRunner.Instance.AddModule(entry.scenarioNode);
                                 psmLocked[i].moduleRef.targetScenes = psmLocked[i].targetScenes;
 
                                 HighLogic.CurrentGame.Updated();
@@ -484,7 +484,7 @@ namespace SyncrioClientSide
             try
             {
                 HighLogic.CurrentGame.scenarios.Add(newModule);
-                newModule.Load(ScenarioRunner.fetch);
+                newModule.Load(ScenarioRunner.Instance);
             }
             catch
             {

@@ -48,6 +48,12 @@ namespace SyncrioServer
 
             switch (lines[0])
             {
+                case "name = CommNetScenario":
+                    {
+                        result.Add(lines[0]);
+                        result.Add(lines[1]);
+                    }
+                    break;
                 case "name = ContractSystem":
                     {
                         result.Add(lines[0]);
@@ -61,6 +67,12 @@ namespace SyncrioServer
                         result.Add(lines[0]);
                         result.Add(lines[1]);
                         result.Add(lines[2]);
+                    }
+                    break;
+                case "name = PartUpgradeManager":
+                    {
+                        result.Add(lines[0]);
+                        result.Add(lines[1]);
                     }
                     break;
                 case "name = ProgressTracking":
@@ -100,6 +112,12 @@ namespace SyncrioServer
                         result.Add(lines[0]);
                         result.Add(lines[1]);
                         result.Add(lines[2]);
+                    }
+                    break;
+                case "name = ScenarioCustomWaypoints":
+                    {
+                        result.Add(lines[0]);
+                        result.Add(lines[1]);
                     }
                     break;
                 case "name = ScenarioDestructibles":
@@ -187,6 +205,17 @@ namespace SyncrioServer
 
             switch (lines[0])
             {
+                case "name = CommNetScenario":
+                    {
+                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
                 case "name = ContractSystem":
                     {
                         if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]) && wordRegex.IsMatch(lines[3]))
@@ -199,6 +228,17 @@ namespace SyncrioServer
                         }
                     }
                 case "name = Funding":
+                    {
+                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                case "name = PartUpgradeManager":
                     {
                         if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
                         {
@@ -265,6 +305,17 @@ namespace SyncrioServer
                         }
                     }
                 case "name = ScenarioContractEvents":
+                    {
+                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                case "name = ScenarioCustomWaypoints":
                     {
                         if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
                         {

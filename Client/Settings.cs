@@ -180,7 +180,7 @@ namespace SyncrioClientSide
                 catch
                 {
                     SyncrioLog.Debug("Adding DarkMultiPlayer Co-op Mode to settings file");
-                    DarkMultiPlayerCoopMode = true;
+                    DarkMultiPlayerCoopMode = false;
                     saveXMLAfterLoad = true;
                 }
                 try
