@@ -19,6 +19,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Externalconsole>true</Externalconsole>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <Optimize>true</Optimize>
@@ -26,6 +27,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -43,18 +47,18 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ByteArraySerializer.cs" />
-    <Compile Include="DataCleaner.cs" />
     <Compile Include="GroupCommand.cs" />
     <Compile Include="GroupSystem.cs" />
     <Compile Include="Messages\Group.cs" />
+    <Compile Include="Messages\Vessel.cs" />
+    <Compile Include="Messages\WarpControl.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="GameplaySettings.cs" />
     <Compile Include="LogExpire.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="CommandHandler.cs" />
     <Compile Include="ClientHandler.cs" />
-    <Compile Include="RemoveHeader.cs" />
+    <Compile Include="ScenarioHandler.cs" />
     <Compile Include="ScenarioSystem.cs" />
     <Compile Include="ScreenshotExpire.cs" />
     <Compile Include="Settings.cs" />
@@ -67,7 +71,6 @@
     <Compile Include="Messages\Handshake.cs" />
     <Compile Include="Messages\Heartbeat.cs" />
     <Compile Include="BanSystem.cs" />
-    <Compile Include="UnDuplicater.cs" />
     <Compile Include="WhitelistSystem.cs" />
     <Compile Include="AdminSystem.cs" />
     <Compile Include="Messages\Chat.cs" />
@@ -98,5 +101,13 @@
       <Project>{423C5A4B-EA79-450D-BD86-5B46141D58D1}</Project>
       <Name>SyncrioCommon</Name>
     </ProjectReference>
+    <ProjectReference Include="..\SyncrioUtil\SyncrioUtil.csproj">
+      <Project>{2de79ab7-6f22-4133-a78a-fed07b7ffaf0}</Project>
+      <Name>SyncrioUtil</Name>
+    </ProjectReference>
   </ItemGroup>
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>

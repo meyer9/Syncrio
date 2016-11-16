@@ -63,6 +63,8 @@ namespace SyncrioServer.Messages
                 ClientHandler.SendToAll(client, joinMessage, true);
             }
             Messages.ServerSettings.SendServerSettings(client);
+            Messages.WarpControl.SendSetSubspace(client);
+            Messages.WarpControl.SendAllSubspaces(client);
             Messages.PlayerColor.SendAllPlayerColors(client);
             Messages.PlayerStatus.SendAllPlayerStatus(client);
             if (!GroupSystem.fetch.PlayerIsInGroup(client.playerName))
@@ -74,11 +76,13 @@ namespace SyncrioServer.Messages
                 string groupname = GroupSystem.fetch.GetPlayerGroup(client.playerName);
                 Messages.ScenarioData.SendScenarioGroupModules(client, groupname);
             }
+            Messages.WarpControl.SendAllReportedSkewRates(client);
             Messages.CraftLibrary.SendCraftList(client);
             Messages.Chat.SendPlayerChatChannels(client);
             Messages.LockSystem.SendAllLocks(client);
             Messages.AdminSystem.SendAllAdmins(client);
             Messages.Group.SendAllGroupsToClient(client);
+            Messages.Vessel.SendPlayerVessels(client);//This one is non DMP co-op mode only
             //Send kerbals
             lock (Server.ScenarioSizeLock)
             {

@@ -60,18 +60,12 @@ namespace SyncrioClientSide
         private object scenarioSyncLock = new object();
         private Dictionary<string,string> checkData = new Dictionary<string, string>();
         private Queue<ScenarioEntry> scenarioQueue = new Queue<ScenarioEntry>();
-        private const float SEND_SCENARIO_DATA_INTERVAL = 30f;
+        private List<KeyValuePair<string, byte[]>> activeScenarioQueue = new List<KeyValuePair<string, byte[]>>();
         public bool autoSendScenarios;
         public bool nonGroupScenarios;
         public bool canResetScenario;
-        public string[] currentScenarioName;
-        public byte[][] currentScenarioData;
-        public List<string> scenarioFundsHistory = new List<string>();
-        public List<string> scenarioRepHistory = new List<string>();
-        public List<string> scenarioSciHistory = new List<string>();
-        private string scenarioFundsHistoryFile = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "GameData"), "Syncrio"), "Plugins"), "Data"), "SVH_funds.txt");
-        private string scenarioRepHistoryFile = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "GameData"), "Syncrio"), "Plugins"), "Data"), "SVH_rep.txt");
-        private string scenarioSciHistoryFile = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "GameData"), "Syncrio"), "Plugins"), "Data"), "SVH_sci.txt");
+        public string[] currentScenarioCheckpoint;
+        public List<string> scenarioChangeList = new List<string>();
         //ScenarioType list to check.
         private Dictionary<string, Type> allScenarioTypesInAssemblies;
         //System.Reflection hackiness for loading kerbals into the crew roster:
@@ -114,12 +108,6 @@ namespace SyncrioClientSide
         {
             if (scenarioName == null)
             {
-                return false;
-            }
-            //Blacklist asteroid module from every game mode
-            if (scenarioName == "ScenarioDiscoverableObjects")
-            {
-                //We hijack this and enable / disable it if we need to.
                 return false;
             }
             if (allScenarioTypesInAssemblies == null)
@@ -318,22 +306,6 @@ namespace SyncrioClientSide
             }
         }
 
-        public void UpgradeTheAstronautComplexSoTheGameDoesntBugOut()
-        {
-            ProtoScenarioModule sm = HighLogic.CurrentGame.scenarios.Find(psm => psm.moduleName == "ScenarioUpgradeableFacilities");
-            if (sm != null)
-            {
-                if (ScenarioUpgradeableFacilities.protoUpgradeables.ContainsKey("SpaceCenter/AstronautComplex"))
-                {
-                    foreach (Upgradeables.UpgradeableFacility uf in ScenarioUpgradeableFacilities.protoUpgradeables["SpaceCenter/AstronautComplex"].facilityRefs)
-                    {
-                        SyncrioLog.Debug("Setting astronaut complex to max level");
-                        uf.SetLevel(uf.MaxLevel);
-                    }
-                }
-            }
-        }
-
         public void LoadMissingScenarioDataIntoGame()
         {
             List<KSPScenarioType> validScenarios = KSPScenarioType.GetAllScenarioTypesInAssemblies();
@@ -364,29 +336,78 @@ namespace SyncrioClientSide
             }
         }
 
-        public void LoadScenarioData(ScenarioEntry entry)
+        public void LoadScenarioData()
         {
             lock (scenarioLock)
             {
-                if (!IsScenarioModuleAllowed(entry.scenarioName))
+                List<KeyValuePair<string, byte[]>> scenarioListToAdd = new List<KeyValuePair<string, byte[]>>();
+                bool changed = false;
+
+                changed = DidScenarioChangeBetweenSyncs();
+
+                if (activeScenarioQueue != null)
                 {
-                    SyncrioLog.Debug("Skipped '" + entry.scenarioName + "' scenario data  in " + Client.fetch.gameMode + " mode");
+                    if (changed)
+                    {
+                        foreach (KeyValuePair<string, byte[]> kvp in activeScenarioQueue)
+                        {
+                            if (scenarioChangeList != null)
+                            {
+                                if (!scenarioChangeList.Contains(kvp.Key))
+                                {
+                                    scenarioListToAdd.Add(kvp);
+                                }
+                            }
+                            else
+                            {
+                                SyncrioLog.Debug("'scenarioChangeList' is null and it should not be null!");
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        scenarioListToAdd = activeScenarioQueue;
+                    }
+                }
+                else
+                {
+                    SyncrioLog.Debug("'activeScenarioQueue' is null!");
                     return;
                 }
 
-                //Load data from Syncrio
-                if (entry.scenarioNode == null)
+                if (scenarioListToAdd == null)
                 {
-                    SyncrioLog.Debug(entry.scenarioName + " scenario data failed to create a ConfigNode!");
                     return;
                 }
 
-                //Load data into game
-                if (DidScenarioChange(entry))
+                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+                List<ScenarioModule> loadedModules = ScenarioRunner.GetLoadedModules();
+                bool loaded = false;
+                bool loadedAll = true;
+                List<ScenarioEntry> listOfNewScenarioModulesToAdd = new List<ScenarioEntry>();
+
+                for (int v = 0; v < scenarioListToAdd.Count; v++)
                 {
-                    bool loaded = false;
-                    List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
-                    for (int i = 0; i < HighLogic.CurrentGame.scenarios.Count; i++)
+                    ScenarioEntry entry = new ScenarioEntry();
+                    entry.scenarioName = scenarioListToAdd[v].Key;
+                    entry.scenarioNode = ConfigNodeSerializer.fetch.Deserialize(scenarioListToAdd[v].Value);
+
+                    if (!IsScenarioModuleAllowed(entry.scenarioName))
+                    {
+                        SyncrioLog.Debug("Skipped '" + entry.scenarioName + "' scenario data  in " + Client.fetch.gameMode + " mode");
+                        continue;
+                    }
+
+                    //Load data from Syncrio
+                    if (entry.scenarioNode == null)
+                    {
+                        SyncrioLog.Debug(entry.scenarioName + " scenario data failed to create a ConfigNode!");
+                        continue;
+                    }
+
+                    //Load data into game
+                    for (int i = 0; i < psmLocked.Count; i++)
                     {
                         if (psmLocked[i].moduleName == entry.scenarioName)
                         {
@@ -414,15 +435,12 @@ namespace SyncrioClientSide
 
                                     ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
                                 }
-                                List<ScenarioModule> loadedModules = ScenarioRunner.GetLoadedModules();
                                 if (loadedModules.Contains(psmLocked[i].moduleRef))
                                 {
                                     ScenarioRunner.RemoveModule(psmLocked[i].moduleRef);
                                 }
                                 psmLocked[i].moduleRef = ScenarioRunner.Instance.AddModule(entry.scenarioNode);
                                 psmLocked[i].moduleRef.targetScenes = psmLocked[i].targetScenes;
-
-                                HighLogic.CurrentGame.Updated();
                             }
                             catch (Exception e)
                             {
@@ -430,18 +448,32 @@ namespace SyncrioClientSide
                             }
                             loaded = true;
                         }
-                        HighLogic.CurrentGame.scenarios = psmLocked;
                     }
                     if (!loaded)
                     {
-                        SyncrioLog.Debug("Loading new " + entry.scenarioName + " scenario module");
-                        LoadNewScenarioData(entry.scenarioNode);
+                        listOfNewScenarioModulesToAdd.Add(entry);
+                        loadedAll = false;
                     }
+                }
+                HighLogic.CurrentGame.scenarios = psmLocked;
+                if (!loadedAll)
+                {
+                    SyncrioLog.Debug("Loading " + listOfNewScenarioModulesToAdd.Count + " new scenario module(s)");
+                    LoadNewScenarioData(listOfNewScenarioModulesToAdd);
+                }
+                HighLogic.CurrentGame.Updated();
+
+                scenarioListToAdd.Clear();
+                activeScenarioQueue.Clear();
+
+                if (changed)
+                {
+                    ScenarioSync(GroupSystem.playerGroupAssigned, false, true, false);
                 }
             }
         }
         
-        public void resetScenatio(bool isInGroup)
+        public void ResetScenatio(bool isInGroup)
         {
             if (isInGroup)
             {
@@ -478,17 +510,21 @@ namespace SyncrioClientSide
             }
         }
 
-        public void LoadNewScenarioData(ConfigNode newScenarioData)
+        public void LoadNewScenarioData(List<ScenarioEntry> newScenarioDataList)
         {
-            ProtoScenarioModule newModule = new ProtoScenarioModule(newScenarioData);
-            try
+            for (int i = 0; i < newScenarioDataList.Count; i++)
             {
-                HighLogic.CurrentGame.scenarios.Add(newModule);
-                newModule.Load(ScenarioRunner.Instance);
-            }
-            catch
-            {
-                SyncrioLog.Debug("Error loading scenario data!");
+                SyncrioLog.Debug("Loading new " + newScenarioDataList[i].scenarioName + " scenario module");
+                ProtoScenarioModule newModule = new ProtoScenarioModule(newScenarioDataList[i].scenarioNode);
+                try
+                {
+                    HighLogic.CurrentGame.scenarios.Add(newModule);
+                    newModule.Load(ScenarioRunner.Instance);
+                }
+                catch
+                {
+                    SyncrioLog.Debug("Error loading scenario data!");
+                }
             }
         }
 
@@ -499,7 +535,8 @@ namespace SyncrioClientSide
             entry.scenarioNode = scenarioData;
             if (Client.fetch.gameRunning)
             {
-                LoadScenarioData(entry);
+                KeyValuePair<string, byte[]> kvp = new KeyValuePair<string, byte[]>(scenarioName, ConfigNodeSerializer.fetch.Serialize(scenarioData));
+                activeScenarioQueue.Add(kvp);
             }
             else
             {
@@ -507,43 +544,40 @@ namespace SyncrioClientSide
             }
         }
 
-        public void scenarioSync(bool isInGroup, bool isTwoWay, bool toServer, bool isAutoReply)
+        public void ScenarioSync(bool isInGroup, bool isTwoWay, bool toServer, bool isAutoReply)
         {
             lock (scenarioSyncLock)
             {
+                if (!Settings.fetch.DarkMultiPlayerCoopMode)
+                {
+                    VesselWorker.fetch.SendVessels();
+                }
+
                 string[] scenarioName;
                 byte[][] scenarioData;
 
-                GetCurrentScenarioModules();
-                if (currentScenarioName != null)
+                KeyValuePair<string[], byte[][]> currentScenario = GetCurrentScenarioModules(false);
+                scenarioName = currentScenario.Key;
+                scenarioData = currentScenario.Value;
+
+                if (isAutoReply)
                 {
-                    scenarioName = currentScenarioName;
-                }
-                else
-                {
-                    SyncrioLog.Debug("Error during sync scenario: 'currentScenarioName' is null");
-                    scenarioName = null;
-                }
-                if (currentScenarioData != null)
-                {
-                    scenarioData = currentScenarioData;
-                }
-                else
-                {
-                    SyncrioLog.Debug("Error during sync scenario: 'currentScenarioData' is null");
-                    scenarioData = null;
+                    if (scenarioName.Length > 0 && scenarioData.Length > 0)
+                    {
+                        List<byte[]> entryList = new List<byte[]>();
+                        for (int i = 0; i < scenarioName.Length; i++)
+                        {
+                            entryList.Add(scenarioData[i]);
+                        }
+                        SetScenarioChangeCheckpoint(entryList);
+                    }
                 }
 
                 if (isInGroup)
                 {
-                    if (scenarioName != null && scenarioData != null)
-                    {
-                        ScenatioVersionHistoryToGroup(scenarioName, scenarioData);
-                    }
                     string groupName = GroupSystem.playerGroupName;
                     if (!string.IsNullOrEmpty(groupName))
                     {
-
                         byte[] messageBytes;
                         ClientMessage newMessage = new ClientMessage();
                         newMessage.handled = false;
@@ -557,9 +591,6 @@ namespace SyncrioClientSide
                             if (toServer)
                             {
                                 mw.Write<string[]>(scenarioName);
-                                mw.Write<string[]>(scenarioFundsHistory.ToArray());
-                                mw.Write<string[]>(scenarioRepHistory.ToArray());
-                                mw.Write<string[]>(scenarioSciHistory.ToArray());
                                 foreach (byte[] scenarioBytes in scenarioData)
                                 {
                                     mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
@@ -571,7 +602,7 @@ namespace SyncrioClientSide
                         NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
                         if (toServer && isTwoWay)
                         {
-                            scenarioSync(true, true, false, false);
+                            ScenarioSync(true, true, false, false);
                         }
                     }
                 }
@@ -599,44 +630,84 @@ namespace SyncrioClientSide
             }
         }
 
-        public void GetCurrentScenarioModules()
+        public KeyValuePair<string[], byte[][]> GetCurrentScenarioModules(bool includeChanged)
         {
+            KeyValuePair<string[], byte[][]> returnList = new KeyValuePair<string[], byte[][]>();
+            int numberOfScenarioModulesLoaded = 0;
+
             List<string> scenarioName = new List<string>();
             List<byte[]> scenarioData = new List<byte[]>();
 
-            foreach (ScenarioModule sm in ScenarioRunner.GetLoadedModules())
+            if (HighLogic.CurrentGame != null)
             {
-                string scenarioType = sm.GetType().Name;
-                if (!IsScenarioModuleAllowed(scenarioType))
+                foreach (ScenarioModule sm in ScenarioRunner.GetLoadedModules())
                 {
-                    continue;
-                }
-                ConfigNode scenarioNode = new ConfigNode();
-                sm.Save(scenarioNode);
-                byte[] scenarioBytes = ConfigNodeSerializer.fetch.Serialize(scenarioNode);
-                string scenarioHash = Common.CalculateSHA256Hash(scenarioBytes);
-                if (scenarioBytes.Length == 0)
-                {
-                    SyncrioLog.Debug("Error writing scenario data for " + scenarioType);
-                    continue;
-                }
-                if (checkData.ContainsKey(scenarioType) ? (checkData[scenarioType] == scenarioHash) : false)
-                {
-                    //Data is the same since last time - Skip it.
-                    continue;
-                }
-                else
-                {
-                    checkData[scenarioType] = scenarioHash;
-                }
-                if (scenarioBytes != null)
-                {
-                    scenarioName.Add(scenarioType);
-                    scenarioData.Add(scenarioBytes);
+                    string scenarioType = sm.GetType().Name;
+                    if (!IsScenarioModuleAllowed(scenarioType))
+                    {
+                        continue;
+                    }
+                    if (scenarioType != "ContractSystem" && scenarioType != "Funding" && scenarioType != "PartUpgradeManager" && scenarioType != "ProgressTracking" && scenarioType != "Reputation" && scenarioType != "ResearchAndDevelopment" && scenarioType != "ResourceScenario" && scenarioType != "ScenarioCustomWaypoints" && scenarioType != "ScenarioDestructibles" && scenarioType != "ScenarioUpgradeableFacilities" && scenarioType != "StrategySystem")
+                    {
+                        continue;
+                    }
+                    ConfigNode scenarioNode = new ConfigNode();
+                    sm.Save(scenarioNode);
+                    byte[] scenarioBytes = ConfigNodeSerializer.fetch.Serialize(scenarioNode);
+                    string scenarioHash = Common.CalculateSHA256Hash(scenarioBytes);
+
+                    if (scenarioBytes != null)
+                    {
+                        if (scenarioBytes.Length == 0)
+                        {
+                            SyncrioLog.Debug("Error writing scenario data for " + scenarioType);
+                            continue;
+                        }
+                        if (!includeChanged)
+                        {
+                            if (checkData.ContainsKey(scenarioType) ? (checkData[scenarioType] == scenarioHash) : false)
+                            {
+                                //Data is the same since last time - Skip it.
+                                continue;
+                            }
+                            else
+                            {
+                                if (!checkData.ContainsKey(scenarioType))
+                                {
+                                    checkData.Add(scenarioType, scenarioHash);
+                                }
+                                else
+                                {
+                                    checkData[scenarioType] = scenarioHash;
+                                }
+                            }
+                        }
+                        scenarioName.Add(scenarioType);
+                        scenarioData.Add(scenarioBytes);
+                        numberOfScenarioModulesLoaded += 1;
+                    }
+                    else
+                    {
+                        SyncrioLog.Debug("Error writing scenario data for " + scenarioType + ", and/or the data is null!");
+                        continue;
+                    }
                 }
             }
-            currentScenarioName = scenarioName.ToArray();
-            currentScenarioData = scenarioData.ToArray();
+            else
+            {
+                throw new Exception("HighLogic.CurrentGame is Null!");
+            }
+
+            if (scenarioName.Count < 0 || scenarioData.Count < 0)
+            {
+                throw new Exception("We have receved no scenario data from KSP!");
+            }
+
+            SyncrioLog.Debug(numberOfScenarioModulesLoaded + " Scenario Modules loaded from KSP.");
+
+            returnList = new KeyValuePair<string[], byte[][]>(scenarioName.ToArray(), scenarioData.ToArray());
+
+            return returnList;
         }
 
         public bool DidScenarioChange(ScenarioEntry scenarioEntry)
@@ -650,107 +721,59 @@ namespace SyncrioClientSide
             return true;
         }
 
-        public void ScenatioVersionHistoryToGroup(string[] scenarioName, byte[][] scenarioData)
+        public bool DidScenarioChangeBetweenSyncs()
         {
-            scenarioFundsHistory.Clear();
-            scenarioFundsHistory = new List<string>(File.ReadAllLines(scenarioFundsHistoryFile));
-            scenarioRepHistory.Clear();
-            scenarioRepHistory = new List<string>(File.ReadAllLines(scenarioRepHistoryFile));
-            scenarioSciHistory.Clear();
-            scenarioSciHistory = new List<string>(File.ReadAllLines(scenarioSciHistoryFile));
+            scenarioChangeList.Clear();
+            KeyValuePair<string[], byte[][]> currentScenario = GetCurrentScenarioModules(true);
+            string[] scenarioName;
+            byte[][] scenarioData;
+            
+            scenarioName = currentScenario.Key;
+            scenarioData = currentScenario.Value;
 
-            try
+            bool didItChange = false;
+
+            if (currentScenarioCheckpoint == null)
+            {
+                didItChange = false;
+                List<byte[]> entryList = new List<byte[]>();
+                for (int i = 0; i < scenarioName.Length; i++)
+                {
+                    entryList.Add(scenarioData[i]);
+                }
+                SetScenarioChangeCheckpoint(entryList);
+            }
+            else
             {
                 for (int i = 0; i < scenarioName.Length; i++)
                 {
-                    byte[] scenarioBytes = scenarioData[i];
-                    ConfigNode scenarioDataConfigNode = ConfigNodeSerializer.fetch.Deserialize(scenarioBytes);
-                    if (scenarioDataConfigNode != null)
+                    ScenarioEntry entry = new ScenarioEntry();
+                    entry.scenarioName = scenarioName[i];
+
+                    string currentScenarioHash = Common.CalculateSHA256Hash(scenarioData[i]);
+                    bool changed = true;
+                    if (currentScenarioCheckpoint.Length > i)
                     {
-                        ScenarioEntry entry = new ScenarioEntry();
-                        entry.scenarioName = scenarioName[i];
-                        entry.scenarioNode = scenarioDataConfigNode;
-
-                        if (entry.scenarioName == "Funding")
-                        {
-                            float fundsAmount = Convert.ToSingle(entry.scenarioNode.GetValue("funds"));
-                            string fundsAmountDiffString = string.Empty;
-                            if (scenarioFundsHistory.Contains("funds"))
-                            {
-                                int lastFunds = scenarioFundsHistory.LastIndexOf("funds") + 1;
-                                float lastFundsAmount = Convert.ToSingle(scenarioFundsHistory[lastFunds].ToString());
-                                float fundsAmountDiff = fundsAmount - lastFundsAmount;
-                                fundsAmountDiffString = Convert.ToString(fundsAmountDiff);
-                            }
-                            else
-                            {
-                                fundsAmountDiffString = Convert.ToString(fundsAmount);
-                            }
-
-                            scenarioFundsHistory.Add("funds");
-                            scenarioFundsHistory.Add(fundsAmountDiffString);
-                        }
-                        if (entry.scenarioName == "Reputation")
-                        {
-                            float repAmount = Convert.ToSingle(entry.scenarioNode.GetValue("rep"));
-                            string repAmountDiffString = string.Empty;
-                            if (scenarioRepHistory.Contains("rep"))
-                            {
-                                int lastRep = scenarioRepHistory.LastIndexOf("rep") + 1;
-                                float lastRepAmount = Convert.ToSingle(scenarioRepHistory[lastRep].ToString());
-                                float repAmountDiff = repAmount - lastRepAmount;
-                                repAmountDiffString = Convert.ToString(repAmountDiff);
-                            }
-                            else
-                            {
-                                repAmountDiffString = Convert.ToString(repAmount);
-                            }
-
-                            scenarioRepHistory.Add("rep");
-                            scenarioRepHistory.Add(repAmountDiffString);
-                        }
-                        if (entry.scenarioName == "ResearchAndDevelopment")
-                        {
-                            float sciAmount = Convert.ToSingle(entry.scenarioNode.GetValue("sci"));
-                            string sciAmountDiffString = string.Empty;
-                            if (scenarioSciHistory.Contains("sci"))
-                            {
-                                int lastSci = scenarioSciHistory.LastIndexOf("sci") + 1;
-                                float lastSciAmount = Convert.ToSingle(scenarioSciHistory[lastSci].ToString());
-                                float sciAmountDiff = sciAmount - lastSciAmount;
-                                sciAmountDiffString = Convert.ToString(sciAmountDiff);
-                            }
-                            else
-                            {
-                                sciAmountDiffString = Convert.ToString(sciAmount);
-                            }
-
-                            scenarioSciHistory.Add("sci");
-                            scenarioSciHistory.Add(sciAmountDiffString);
-                        }
+                        changed = (currentScenarioCheckpoint[i] != currentScenarioHash);
+                    }
+                    if (changed)
+                    {
+                        didItChange = true;
+                        scenarioChangeList.Add(entry.scenarioName);
                     }
                 }
             }
-            catch (Exception e)
-            {
-                SyncrioLog.Debug("Error writing scenario history: " + e);
-            }
-            File.WriteAllLines(scenarioFundsHistoryFile, scenarioFundsHistory.ToArray());
-            File.WriteAllLines(scenarioRepHistoryFile, scenarioRepHistory.ToArray());
-            File.WriteAllLines(scenarioSciHistoryFile, scenarioSciHistory.ToArray());
+
+            return didItChange;
         }
 
-        public void ScenatioVersionHistoryFromGroup(string[] serverScenatioFundsVersionHistory, string[] serverScenatioRepVersionHistory, string[] serverScenatioSciVersionHistory)
+        public void SetScenarioChangeCheckpoint(List<byte[]> checkpointList)
         {
-            scenarioFundsHistory.Clear();
-            scenarioFundsHistory = new List<string>(serverScenatioFundsVersionHistory);
-            File.WriteAllLines(scenarioFundsHistoryFile, scenarioFundsHistory.ToArray());
-            scenarioRepHistory.Clear();
-            scenarioRepHistory = new List<string>(serverScenatioRepVersionHistory);
-            File.WriteAllLines(scenarioRepHistoryFile, scenarioRepHistory.ToArray());
-            scenarioSciHistory.Clear();
-            scenarioSciHistory = new List<string>(serverScenatioSciVersionHistory);
-            File.WriteAllLines(scenarioSciHistoryFile, scenarioSciHistory.ToArray());
+            currentScenarioCheckpoint = new string[checkpointList.Count];
+            for (int i = 0; i < checkpointList.Count; i++)
+            {
+                currentScenarioCheckpoint[i] = Common.CalculateSHA256Hash(checkpointList[i]);
+            }
         }
 
         public void AutoSendScenariosReply()
@@ -759,21 +782,9 @@ namespace SyncrioClientSide
             {
                 if (GroupSystem.playerGroupAssigned)
                 {
-                    scenarioSync(true, false, true, true);
+                    ScenarioSync(true, false, true, true);
                 }
             }
-        }
-
-        public void InitialScenarioDataRequest()
-        {
-            ClientMessage newMessage = new ClientMessage();
-            newMessage.type = ClientMessageType.INITIAL_SCENARIO_DATA_REQUEST;
-            using (MessageWriter mw = new MessageWriter())
-            {
-                mw.Write<string>(Settings.fetch.playerName);
-                newMessage.data = mw.GetMessageBytes();
-            }
-            NetworkWorker.fetch.SendScenarioCommand(newMessage, true);
         }
 
         public static void Reset()

@@ -69,6 +69,7 @@ namespace SyncrioServer
         public static object ScenarioSizeLock = new object();
         private static int day;
         private static bool syncing = false;
+        private static bool syncDequeued = false;
         private static int numberOfClientsInGroupsAtSync = 0;
 
         public static void Main()
@@ -103,7 +104,12 @@ namespace SyncrioServer
 
                 long autoSyncScenariosWaitInterval = Settings.settingsStore.autoSyncScenariosWaitInterval * 60000;
 
-                //Set Scenario directory and modfile path
+                //Periodic send progress
+                long lastProgressSendTime = 0;
+
+                long autoSendProgressWaitInterval = Settings.settingsStore.autoSendProgressWaitInterval * 1000;
+
+                //Set Scenario directory
                 ScenarioDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scenarios");
 
                 if (!Directory.Exists(configDirectory))
@@ -206,9 +212,10 @@ namespace SyncrioServer
                     StartHTTPServer();
 
                     GroupSystem.fetch.ServerStarting();
+                    ScenarioHandler.SetAllGroupsProgress(ScenarioHandler.LoadAllGroupsProgress());
                     while (!GroupSystem.fetch.groupsLoaded)
                     {
-                        Thread.Sleep(500);
+                        Thread.Sleep(50);
                     }
 
                     SyncrioLog.Normal("Ready!");
@@ -261,7 +268,10 @@ namespace SyncrioServer
                                         numberOfClientsInGroupsAtSync += 1;
                                     }
                                 }
-                                syncing = true;
+                                if (ScenarioSystem.fetch.numberOfPlayersSyncing > 0)
+                                {
+                                    syncing = true;
+                                }
                             }
 
                             if (syncing)
@@ -278,7 +288,12 @@ namespace SyncrioServer
                         }
                         if (syncing && ScenarioSystem.fetch.numberOfPlayersSyncing == 0)
                         {
+                            syncDequeued = ScenarioSystem.fetch.DequeueAllScenarioData();
                             syncing = false;
+                        }
+                        if (syncDequeued)
+                        {
+                            syncDequeued = false;
                             foreach (ClientObject client in ClientHandler.GetClients())
                             {
                                 if (GroupSystem.fetch.PlayerIsInGroup(client.playerName))
@@ -286,6 +301,12 @@ namespace SyncrioServer
                                     Messages.ScenarioData.SendScenarioGroupModules(client, GroupSystem.fetch.GetPlayerGroup(client.playerName));
                                 }
                             }
+                        }
+
+                        if ((serverClock.ElapsedMilliseconds - lastProgressSendTime) > autoSendProgressWaitInterval)
+                        {
+                            lastProgressSendTime = serverClock.ElapsedMilliseconds;
+                            Messages.Group.SendGroupProgress();
                         }
 
                         Thread.Sleep(500);
@@ -358,13 +379,21 @@ namespace SyncrioServer
             {
                 Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Kerbals"));
             }
-            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "Groups")))
+            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData")))
             {
-                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Groups"));
+                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData"));
             }
-            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "Groups", "Initial")))
+            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData", "Groups")))
             {
-                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Groups", "Initial"));
+                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "Groups"));
+            }
+            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData", "InitialGroup")))
+            {
+                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "InitialGroup"));
+            }
+            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData", "GroupScenarios")))
+            {
+                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "GroupScenarios"));
             }
             if (!Directory.Exists(Path.Combine(ScenarioDirectory, "Players")))
             {
@@ -374,6 +403,12 @@ namespace SyncrioServer
             {
                 Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Players", "Initial"));
             }
+            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "Vessels")))
+            {
+                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Vessels"));
+            }
+
+            ScenarioSystem.CreateDefaultScenario();
         }
         //Shutdown
         public static void ShutDown(string commandArgs)

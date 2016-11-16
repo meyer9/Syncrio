@@ -55,7 +55,7 @@ namespace SyncrioClientSide
 
         public static void GenerateScenario(string saveName)
         {
-            string ScenarioFolder = Path.Combine(KSPUtil.ApplicationRootPath, "Generated Scenario");
+            string ScenarioFolder = Path.Combine(KSPUtil.ApplicationRootPath, "Scenarios");
             if (Directory.Exists(ScenarioFolder))
             {
                 Directory.Delete(ScenarioFolder, true);
@@ -134,8 +134,8 @@ namespace SyncrioClientSide
                     kerbalIndex++;
                 }
             }
-            SyncrioLog.Debug("Generated KSP_folder/Scenario from " + saveName);
-            ScreenMessages.PostScreenMessage("Generated KSP_folder/Scenario from " + saveName, 5f, ScreenMessageStyle.UPPER_CENTER);
+            SyncrioLog.Debug("Generated \"KSP_folder/Scenarios\" from " + saveName);
+            ScreenMessages.PostScreenMessage("Generated \"KSP_folder/Scenarios\" from " + saveName, 5f, ScreenMessageStyle.UPPER_CENTER);
         }
 
         public static string[] GetSavedNames()

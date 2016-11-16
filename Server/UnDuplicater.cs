@@ -50,7 +50,7 @@ namespace SyncrioServer
 
             List<KeyValuePair<int, int>> ranges = new List<KeyValuePair<int, int>>();
 
-            int cursor = 2;
+            int cursor = 2;//KEEP ME AT 2!!! Or you Will get a "stack overflow exception"!
             while (cursor < lines.Count())
             {
                 // Find a single word with a single "{" on the next line
@@ -116,7 +116,7 @@ namespace SyncrioServer
 
             int preResultNumber = 0;
             string[] preResult = new string[lines.Count];
-            int cursor = 2;
+            int cursor = 2;//KEEP ME AT 2!!! Or you Will get a "stack overflow exception"!
             while (cursor < lines.Count())
             {
                 // Find a single word with a single "{" on the next line

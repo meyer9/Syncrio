@@ -69,6 +69,12 @@ namespace SyncrioServer
             get;
         }
 
+        public string groupScenariosDirectory
+        {
+            private set;
+            get;
+        }
+
         public string playerDirectory
         {
             private set;
@@ -77,8 +83,10 @@ namespace SyncrioServer
 
         public GroupSystem()
         {
-            groupDirectory = Path.Combine(Server.ScenarioDirectory, "Groups");
+            groupDirectory = Path.Combine(Server.ScenarioDirectory, "GroupData", "Groups");
+            groupScenariosDirectory = Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupScenarios");
             playerDirectory = Path.Combine(Server.ScenarioDirectory, "Players");
+            ScenarioSystem.LoadGroupSubspaceFile();
             LoadGroups();
         }
 
@@ -104,7 +112,6 @@ namespace SyncrioServer
             Dictionary<string, GroupObject> returnDictionary = new Dictionary<string, GroupObject>();
             lock (groups)
             {
-
                 foreach (KeyValuePair<string, GroupObject> kvp in groups)
                 {
                     GroupObject newGroupObject = new GroupObject();
@@ -126,82 +133,91 @@ namespace SyncrioServer
             string[] groupPaths = Directory.GetDirectories(groupDirectory);
             foreach (string groupPath in groupPaths)
             {
-                if (Path.GetFileName(groupPath) != "Initial")
+                string groupName = Path.GetFileName(groupPath);
+                GroupObject newGroup = new GroupObject();
+                string thisGroupDirectory = Path.Combine(groupDirectory, groupName);
+                string groupScenariosThisGroupDirectory = Path.Combine(groupScenariosDirectory, groupName);
+                if (!Directory.Exists(groupScenariosThisGroupDirectory))
                 {
-                    string groupName = Path.GetFileName(groupPath);
-                    GroupObject newGroup = new GroupObject();
-                    string thisGroupDirectory = Path.Combine(groupDirectory, groupName);
-                    string thisGroupScenarioDirectory = Path.Combine(thisGroupDirectory, "Scenario");
+                    Directory.CreateDirectory(groupScenariosThisGroupDirectory);
+                }
+                for (int i = 0; i < ScenarioSystem.subspaceList.Subspaces.Count; i++)
+                {
+                    int subspaceNumber = ScenarioSystem.subspaceList.Subspaces[i].SubspaceNumber;
+                    if (!Directory.Exists(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber)))
+                    {
+                        Directory.CreateDirectory(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber));
+                    }
+                    string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber, "Scenario");
                     if (!Directory.Exists(thisGroupScenarioDirectory))
                     {
                         Directory.CreateDirectory(thisGroupScenarioDirectory);
-                        foreach (string file in Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Groups", "Initial")))
-                        {
-                            File.Copy(file, Path.Combine(thisGroupScenarioDirectory, Path.GetFileName(file)));
-                        }
                     }
+                }
 
-                    string membersFile = Path.Combine(thisGroupDirectory, "members.txt");
-                    string settingsFile = Path.Combine(thisGroupDirectory, "settings.txt");
-                    if (!File.Exists(membersFile))
+                string membersFile = Path.Combine(thisGroupDirectory, "members.txt");
+                string settingsFile = Path.Combine(thisGroupDirectory, "settings.txt");
+                if (!File.Exists(membersFile))
+                {
+                    SyncrioLog.Error("Group " + groupName + " is broken (members file), skipping!");
+                    continue;
+                }
+                if (!File.Exists(settingsFile))
+                {
+                    SyncrioLog.Error("Group " + groupName + " is broken (settings file), skipping!");
+                    continue;
+                }
+                using (StreamReader sr = new StreamReader(membersFile))
+                {
+                    string currentLine = null;
+                    while ((currentLine = sr.ReadLine()) != null)
                     {
-                        SyncrioLog.Error("Group " + groupName + " is broken (members file), skipping!");
-                        continue;
+                        newGroup.members.Add(currentLine);
                     }
-                    if (!File.Exists(settingsFile))
+                }
+                int lineIndex = 0;
+                using (StreamReader sr = new StreamReader(settingsFile))
+                {
+                    string currentLine = null;
+                    while ((currentLine = sr.ReadLine()) != null)
                     {
-                        SyncrioLog.Error("Group " + groupName + " is broken (settings file), skipping!");
-                        continue;
-                    }
-                    using (StreamReader sr = new StreamReader(membersFile))
-                    {
-                        string currentLine = null;
-                        while ((currentLine = sr.ReadLine()) != null)
+                        switch (lineIndex)
                         {
-                            newGroup.members.Add(currentLine);
+                            case 0:
+                                newGroup.privacy = (GroupPrivacy)Enum.Parse(typeof(GroupPrivacy), currentLine);
+                                break;
+                            case 1:
+                                newGroup.passwordSalt = currentLine;
+                                break;
+                            case 2:
+                                newGroup.passwordHash = currentLine;
+                                break;
+                            case 3:
+                                newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine);
+                                break;
                         }
+                        lineIndex++;
                     }
-                    int lineIndex = 0;
-                    using (StreamReader sr = new StreamReader(settingsFile))
-                    {
-                        string currentLine = null;
-                        while ((currentLine = sr.ReadLine()) != null)
-                        {
-                            switch (lineIndex)
-                            {
-                                case 0:
-                                    newGroup.privacy = (GroupPrivacy)Enum.Parse(typeof(GroupPrivacy), currentLine);
-                                    break;
-                                case 1:
-                                    newGroup.passwordSalt = currentLine;
-                                    break;
-                                case 2:
-                                    newGroup.passwordHash = currentLine;
-                                    break;
-                                case 3:
-                                    newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine);
-                                    break;
-                            }
-                            lineIndex++;
-                        }
-                    }
-                    if (newGroup.members.Count > 0)
-                    {
-                        groups.Add(groupName, newGroup);
-                    }
-                    else
-                    {
-                        SyncrioLog.Error("Group " + groupName + " is broken (no members), skipping!");
-                    }
+                }
+                if (newGroup.members.Count > 0)
+                {
+                    groups.Add(groupName, newGroup);
                 }
                 else
                 {
-                    SyncrioLog.Debug("Skipping Initial Group Scenario as it is not a group");
+                    SyncrioLog.Error("Group " + groupName + " is broken (no members), skipping!");
                 }
             }
             groupsLoaded = true;
-            SyncrioLog.Debug("Groups Loaded");
             groupCount = groups.Count;
+            if (groupCount > 0)
+            {
+                SyncrioLog.Debug(groupCount + " Groups Loaded");
+            }
+            else
+            {
+                SyncrioLog.Debug("No Groups Loaded");
+            }
             SetKickPlayerVotes();
         }
 
@@ -215,17 +231,34 @@ namespace SyncrioServer
             SyncrioLog.Debug("Saving " + groupName);
             GroupObject saveGroup = groups[groupName];
             string thisGroupDirectory = Path.Combine(groupDirectory, groupName);
-            string thisGroupScenarioDirectory = Path.Combine(thisGroupDirectory, "Scenario");
+            string groupScenariosThisGroupDirectory = Path.Combine(groupScenariosDirectory, groupName);
             if (!Directory.Exists(thisGroupDirectory))
             {
                 Directory.CreateDirectory(thisGroupDirectory);
             }
-            if (!Directory.Exists(thisGroupScenarioDirectory))
+            if (!Directory.Exists(groupScenariosThisGroupDirectory))
             {
-                Directory.CreateDirectory(thisGroupScenarioDirectory);
-                foreach (string file in Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Groups", "Initial")))
+                Directory.CreateDirectory(groupScenariosThisGroupDirectory);
+            }
+
+            for (int i = 0; i < ScenarioSystem.subspaceList.Subspaces.Count; i++)
+            {
+                int subspaceNumber = ScenarioSystem.subspaceList.Subspaces[i].SubspaceNumber;
+                if (!Directory.Exists(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber)))
                 {
-                    File.Copy(file, Path.Combine(thisGroupScenarioDirectory, Path.GetFileName(file)));
+                    Directory.CreateDirectory(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber));
+                }
+                string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber, "Scenario");
+                if (!Directory.Exists(thisGroupScenarioDirectory))
+                {
+                    Directory.CreateDirectory(thisGroupScenarioDirectory);
+                    if (subspaceNumber == 0)
+                    {
+                        foreach (string file in Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "GroupData", "InitialGroup")))
+                        {
+                            File.Copy(file, Path.Combine(thisGroupScenarioDirectory, Path.GetFileName(file)));
+                        }
+                    }
                 }
             }
 
@@ -660,7 +693,9 @@ namespace SyncrioServer
                     }
                     GroupObject go = groups[groupName];
                     string thisGroupDirectory = Path.Combine(groupDirectory, groupName);
-                    Directory.Delete(thisGroupDirectory, true);
+                    string thisGroupScenarioDirectory = Path.Combine(groupScenariosDirectory, groupName);
+                    SyncrioUtil.FileHandler.DeleteDirectory(thisGroupDirectory);
+                    SyncrioUtil.FileHandler.DeleteDirectory(thisGroupScenarioDirectory);
                     groups.Remove(groupName);
                     SyncrioLog.Debug("Deleted group " + groupName);
                     Messages.Chat.SendChatMessageToClient(callingClient, "You deleted " + groupName);
@@ -683,7 +718,9 @@ namespace SyncrioServer
                 }
                 GroupObject go = groups[groupName];
                 string thisGroupDirectory = Path.Combine(groupDirectory, groupName);
-                Directory.Delete(thisGroupDirectory, true);
+                string thisGroupScenarioDirectory = Path.Combine(groupScenariosDirectory, groupName);
+                SyncrioUtil.FileHandler.DeleteDirectory(thisGroupDirectory);
+                SyncrioUtil.FileHandler.DeleteDirectory(thisGroupScenarioDirectory);
                 groups.Remove(groupName);
                 SyncrioLog.Debug("Deleted group " + groupName);
                 Messages.Chat.SendChatMessageToClient(callingClient, "You deleted " + groupName);
@@ -959,7 +996,6 @@ namespace SyncrioServer
                         GroupObject go = groups[senderGroup];
                         go.members.Add(playerName);
                         SyncrioLog.Debug(playerName + " was add to " + senderGroup);
-                        Messages.Chat.SendChatMessageToClient(invitePlayer, "You were invited to " + senderGroup);
                         Messages.Group.SendGroupToAll(senderGroup, go);
                         SaveGroup(senderGroup);
                         return true;
@@ -1075,7 +1111,7 @@ namespace SyncrioServer
                 if (IsGroupMemberOnline(groupName, member))
                 {
                     ClientObject client = ClientHandler.GetClientByName(member);
-                    Messages.ScenarioData.SendScenarioGroupModules(client, groupName);
+                    Messages.ScenarioData.SendResetScenarioGroupModules(client, groupName);
                     if (client != clientWhoReset)
                     {
                         Messages.Chat.SendChatMessageToClient(client, clientWhoReset.playerName + " has reset the group scenario!");
@@ -1177,26 +1213,6 @@ namespace SyncrioServer
         }
 
         /// <summary>
-        /// Sets the group privacy. Set SHAPassword to null to remove the password. Returns true on success
-        /// </summary>
-        public bool SetGroupPrivacy(ClientObject callingClient, string groupName, GroupPrivacy groupPrivacy)
-        {
-            lock (groups)
-            {
-                if (!GroupExists(groupName))
-                {
-                    SyncrioLog.Debug("Cannot set group privacy, " + groupName + " doesn't exist");
-                    return false;
-                }
-                GroupObject go = groups[groupName];
-                go.privacy = groupPrivacy;
-                Messages.Group.SendGroupToAll(groupName, go);
-                SaveGroup(groupName);
-                return true;
-            }
-        }
-
-        /// <summary>
         /// Checks the group password for a match (Raw password). Returns true on success. Always returns false if the group password is not set.
         /// </summary>
         public bool CheckGroupPasswordRaw(string groupName, string rawPassword)
@@ -1266,21 +1282,6 @@ namespace SyncrioServer
                     return false;
                 }
                 return (go.passwordSalt == saltSHA256 && go.passwordHash == saltedPasswordSHA256);
-            }
-        }
-
-        /// <summary>
-        /// Returns the group privacy. If the group does not exist, returns PUBLIC
-        /// </summary>
-        public GroupPrivacy GetGroupPrivacy(string groupName)
-        {
-            lock (groups)
-            {
-                if (!GroupExists(groupName))
-                {
-                    return GroupPrivacy.PUBLIC;
-                }
-                return groups[groupName].privacy;
             }
         }
 

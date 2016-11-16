@@ -137,7 +137,7 @@ namespace SyncrioClientSide
             {
                 GUILayout.Label(vectorText, labelStyle);
             }
-            displayNTP = GUILayout.Toggle(displayNTP, "Display NTP statistics", buttonStyle);
+            displayNTP = GUILayout.Toggle(displayNTP, "Display NTP/Subspace statistics", buttonStyle);
             if (displayNTP)
             {
                 GUILayout.Label(ntpText, labelStyle);
@@ -189,7 +189,8 @@ namespace SyncrioClientSide
                 {
                     lastUpdateTime = UnityEngine.Time.realtimeSinceStartup;
                     //Vector text
-                    if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready && FlightGlobals.fetch.activeVessel != null) {
+                    if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready && FlightGlobals.fetch.activeVessel != null)
+                    {
                         Vessel ourVessel = FlightGlobals.fetch.activeVessel;
                         vectorText = "Forward vector: " + ourVessel.GetFwdVector() + "\n";
                         vectorText += "Up vector: " + (Vector3)ourVessel.upAxis + "\n";
@@ -208,9 +209,27 @@ namespace SyncrioClientSide
                         vectorText += "Angular Velocity: " + ourVessel.angularVelocity + ", |v|: " + ourVessel.angularVelocity.magnitude + "\n";
                         vectorText += "World Pos: " + (Vector3)ourVessel.GetWorldPos3D() + ", |pos|: " + ourVessel.GetWorldPos3D().magnitude + "\n";
                     }
-                    else {
+                    else
+                    {
                         vectorText = "You have to be in flight";
                     }
+
+                    //NTP text
+                    ntpText = "Warp rate: " + Math.Round(Time.timeScale, 3) + "x.\n";
+                    ntpText += "Current subspace: " + TimeSyncer.fetch.currentSubspace + ".\n";
+                    if (TimeSyncer.fetch.locked)
+                    {
+                        ntpText += "Current subspace rate: " + Math.Round(TimeSyncer.fetch.lockedSubspace.subspaceSpeed, 3) + "x.\n";
+                    }
+                    else
+                    {
+                        ntpText += "Current subspace rate: " + Math.Round(TimeSyncer.fetch.requestedRate, 3) + "x.\n";
+                    }
+                    ntpText += "Current Error: " + Math.Round((TimeSyncer.fetch.GetCurrentError() * 1000), 0) + " ms.\n";
+                    ntpText += "Current universe time: " + Math.Round(Planetarium.GetUniversalTime(), 3) + " UT\n";
+                    ntpText += "Network latency: " + Math.Round((TimeSyncer.fetch.networkLatencyAverage / 10000f), 3) + " ms\n";
+                    ntpText += "Server clock difference: " + Math.Round((TimeSyncer.fetch.clockOffsetAverage / 10000f), 3) + " ms\n";
+                    ntpText += "Server lag: " + Math.Round((TimeSyncer.fetch.serverLag / 10000f), 3) + " ms\n";
 
                     //Connection queue text
                     connectionText = "Last send time: " + NetworkWorker.fetch.GetStatistics("LastSendTime") + "ms.\n";
@@ -225,6 +244,13 @@ namespace SyncrioClientSide
                     //Dynamic tick text
                     dynamicTickText = "Current tick rate: " + DynamicTickWorker.fetch.sendTickRate + "hz.\n";
                     dynamicTickText += "Current max secondry vessels: " + DynamicTickWorker.fetch.maxSecondryVesselsPerTick + ".\n";
+
+                    //Requested rates text
+                    requestedRateText = Settings.fetch.playerName + ": " + Math.Round(TimeSyncer.fetch.requestedRate, 3) + "x.\n";
+                    foreach (KeyValuePair<string, float> playerEntry in WarpWorker.fetch.clientSkewList)
+                    {
+                        requestedRateText += playerEntry.Key + ": " + Math.Round(playerEntry.Value, 3) + "x.\n";
+                    }
 
                     profilerText = "Update: \n" + Profiler.updateData;
                     profilerText += "Fixed Update: \n" + Profiler.fixedUpdateData;

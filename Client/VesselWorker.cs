@@ -48,6 +48,7 @@ using System.IO;
 using System.Reflection;
 using UnityEngine;
 using SyncrioCommon;
+using MessageStream2;
 
 namespace SyncrioClientSide
 {
@@ -56,42 +57,21 @@ namespace SyncrioClientSide
         public bool workerEnabled;
         //Hooks enabled
         private static VesselWorker singleton;
-        //Update frequency
-        private const float VESSEL_PROTOVESSEL_UPDATE_INTERVAL = 30f;
-        public float safetyBubbleDistance = 100f;
-        //Spectate stuff
-        private const string Syncrio_SPECTATE_LOCK = "Syncrio_Spectating";
-        private const float UPDATE_SCREEN_MESSAGE_INTERVAL = 1f;
         //Incoming queue
         private object updateQueueLock = new object();
         private Dictionary<string, Queue<KerbalEntry>> kerbalProtoQueue = new Dictionary<string, Queue<KerbalEntry>>();
         //Incoming revert support
         private Dictionary<string, List<KerbalEntry>> kerbalProtoHistory = new Dictionary<string, List<KerbalEntry>>();
         private Dictionary<string, double> kerbalProtoHistoryTime = new Dictionary<string, double>();
-        //Vessel tracking
-        private HashSet<Guid> serverVessels = new HashSet<Guid>();
-        private Dictionary<Guid, bool> vesselPartsOk = new Dictionary<Guid, bool>();
-        //Vessel state tracking
-        private Dictionary<Guid, int> vesselPartCount = new Dictionary<Guid, int>();
-        private Dictionary<Guid, string> vesselNames = new Dictionary<Guid, string>();
-        private Dictionary<Guid, VesselType> vesselTypes = new Dictionary<Guid, VesselType>();
-        private Dictionary<Guid, Vessel.Situations> vesselSituations = new Dictionary<Guid, Vessel.Situations>();
+        private double lastUniverseTime = double.NegativeInfinity;
         //Known kerbals
         private Dictionary<string, string> serverKerbals = new Dictionary<string, string>();
-        //Known vessels and last send/receive time
-        private Dictionary<Guid, float> serverVesselsProtoUpdate = new Dictionary<Guid, float>();
-        private Dictionary<Guid, float> serverVesselsPositionUpdate = new Dictionary<Guid, float>();
-        //Track when the vessel was last controlled.
-        private Dictionary<Guid, double> latestVesselUpdate = new Dictionary<Guid, double>();
-        private Dictionary<Guid, double> latestUpdateSent = new Dictionary<Guid, double>();
-        //KillVessel tracking
-        private Dictionary<Guid, double> lastKillVesselDestroy = new Dictionary<Guid, double>();
-        private Dictionary<Guid, double> lastLoadVessel = new Dictionary<Guid, double>();
-        private List<Vessel> delayKillVessels = new List<Vessel>();
         //System.Reflection hackiness for loading kerbals into the crew roster:
         private delegate bool AddCrewMemberToRosterDelegate(ProtoCrewMember pcm);
 
         private AddCrewMemberToRosterDelegate AddCrewMemberToRoster;
+
+        public byte[] startingVesselsMessage = null;
 
         public static VesselWorker fetch
         {
@@ -99,6 +79,59 @@ namespace SyncrioClientSide
             {
                 return singleton;
             }
+        }
+
+        public void DetectReverting()
+        {
+            double newUniverseTime = Planetarium.GetUniversalTime();
+            //10 second fudge to ignore TimeSyncer skips
+            if (newUniverseTime < (lastUniverseTime - 10f))
+            {
+                int updatesReverted = 0;
+                SyncrioLog.Debug("Revert detected!");
+                TimeSyncer.fetch.UnlockSubspace();
+                if (!Settings.fetch.revertEnabled)
+                {
+                    SyncrioLog.Debug("Unsafe revert detected!");
+                    ScreenMessages.PostScreenMessage("Unsafe revert detected!", 5f, ScreenMessageStyle.UPPER_CENTER);
+                }
+                else
+                {
+                    kerbalProtoQueue.Clear();
+                    //Kerbal queue
+                    KerbalEntry lastKerbalEntry = null;
+                    foreach (KeyValuePair<string, List<KerbalEntry>> kvp in kerbalProtoHistory)
+                    {
+                        bool adding = false;
+                        kerbalProtoQueue.Add(kvp.Key, new Queue<KerbalEntry>());
+                        foreach (KerbalEntry ke in kvp.Value)
+                        {
+                            if (ke.planetTime > newUniverseTime)
+                            {
+                                if (!adding)
+                                {
+                                    //One shot - add the previous update before the time to apply instantly
+                                    if (lastKerbalEntry != null)
+                                    {
+                                        kerbalProtoQueue[kvp.Key].Enqueue(lastKerbalEntry);
+                                        updatesReverted++;
+                                    }
+                                }
+                                adding = true;
+                            }
+                            if (adding)
+                            {
+                                kerbalProtoQueue[kvp.Key].Enqueue(ke);
+                                updatesReverted++;
+                            }
+                            lastKerbalEntry = ke;
+                        }
+                    }
+                }
+                SyncrioLog.Debug("Reverted " + updatesReverted + " updates");
+                ScreenMessages.PostScreenMessage("Reverted " + updatesReverted + " updates", 5f, ScreenMessageStyle.UPPER_CENTER);
+            }
+            lastUniverseTime = newUniverseTime;
         }
 
         public void SendKerbalIfDifferent(ProtoCrewMember pcm)
@@ -167,10 +200,13 @@ namespace SyncrioClientSide
             }
 
             int generateKerbals = 0;
-            if (serverKerbals.Count < 20)
+            if (Settings.fetch.numberOfKerbalToSpawn != 0)
             {
-                generateKerbals = 20 - serverKerbals.Count;
-                SyncrioLog.Debug("Generating " + generateKerbals + " new kerbals");
+                if (serverKerbals.Count < Settings.fetch.numberOfKerbalToSpawn)
+                {
+                    generateKerbals = Settings.fetch.numberOfKerbalToSpawn - serverKerbals.Count;
+                    SyncrioLog.Debug("Generating " + generateKerbals + " new kerbals");
+                }
             }
 
             while (generateKerbals > 0)
@@ -245,38 +281,6 @@ namespace SyncrioClientSide
                 HighLogic.CurrentGame.CrewRoster[protoCrew.name].stupidity = protoCrew.stupidity;
                 HighLogic.CurrentGame.CrewRoster[protoCrew.name].UTaR = protoCrew.UTaR;
             }
-        }
-
-        private void DodgeVesselLandedStatus(ConfigNode vesselNode)
-        {
-            if (vesselNode != null)
-            {
-                string situation = vesselNode.GetValue("sit");
-                switch (situation)
-                {
-                    case "LANDED":
-                        vesselNode.SetValue("landed", "True");
-                        vesselNode.SetValue("splashed", "False");
-                        break;
-                    case "SPLASHED":
-                        vesselNode.SetValue("splashed", "True");
-                        vesselNode.SetValue("landed", "False");
-                        break;
-                }
-            }
-        }
-
-        private string DodgeValueIfNeeded(string input)
-        {
-            string boolValue = input.Substring(0, input.IndexOf(", "));
-            string timeValue = input.Substring(input.IndexOf(", ") + 1);
-            double vesselPlanetTime = Double.Parse(timeValue);
-            double currentPlanetTime = Planetarium.GetUniversalTime();
-            if (vesselPlanetTime > currentPlanetTime)
-            {
-                return boolValue + ", " + currentPlanetTime;
-            }
-            return input;
         }
 
         public void SendKerbalsInVessel(ProtoVessel vessel)
@@ -385,6 +389,76 @@ namespace SyncrioClientSide
                 }
                 kerbalProtoHistoryTime[kerbalName] = planetTime;
             }
+        }
+        public void SendVessels()
+        {
+            List<byte[]> vesselsToSend = new List<byte[]>();
+
+            foreach (ProtoVessel ProtoVessel in HighLogic.CurrentGame.flightState.protoVessels)
+            {
+                ConfigNode vesselNode = new ConfigNode();
+
+                ProtoVessel.Save(vesselNode);
+
+                vesselsToSend.Add(ConfigNodeSerializer.fetch.Serialize(vesselNode));
+            }
+
+            using (MessageWriter mw = new MessageWriter())
+            {
+                mw.Write<int>(vesselsToSend.Count);
+                for (int i = 0; i < vesselsToSend.Count; i++)
+                {
+                    mw.Write<byte[]>(vesselsToSend[i]);
+                }
+
+                ClientMessage newMessage = new ClientMessage();
+
+                newMessage.type = ClientMessageType.SEND_VESSELS;
+
+                newMessage.data = mw.GetMessageBytes();
+
+                NetworkWorker.fetch.SendVessels(newMessage);
+            }
+        }
+        public void HandleVessels()
+        {
+            if (startingVesselsMessage == null)
+            {
+                return;
+            }
+            using (MessageReader mr = new MessageReader(startingVesselsMessage))
+            {
+                int numberOfVessels = mr.Read<int>();
+
+                if (numberOfVessels != 0)
+                {
+                    int numberOfLoads = 0;
+
+                    for (int i = 0; i < numberOfVessels; i++)
+                    {
+                        byte[] vesselBytes = mr.Read<byte[]>();
+
+                        ConfigNode vesselNode = ConfigNodeSerializer.fetch.Deserialize(vesselBytes);
+
+                        ProtoVessel newProtoVessel = new ProtoVessel(vesselNode, HighLogic.CurrentGame);
+
+                        ConfigNode tempNode = new ConfigNode();
+
+                        newProtoVessel.Save(tempNode);
+
+                        HighLogic.CurrentGame.flightState.protoVessels.Add(newProtoVessel);
+
+                        numberOfLoads++;
+                    }
+
+                    SyncrioLog.Debug("Loaded " + numberOfLoads + " vessels into the game");
+                }
+            }
+            startingVesselsMessage = null;
+        }
+        public void HandleStartingVesselsMessage(byte[] messageData)
+        {
+            startingVesselsMessage = messageData;
         }
         public static void Reset()
         {

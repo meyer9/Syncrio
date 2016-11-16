@@ -28,6 +28,8 @@
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -92,6 +94,7 @@
     <Compile Include="ToolbarSupport.cs" />
     <Compile Include="KerbalReassigner.cs" />
     <Compile Include="VesselWorker.cs" />
+    <Compile Include="WarpWorker.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\SyncrioCommon.csproj">

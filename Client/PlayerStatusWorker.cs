@@ -109,16 +109,16 @@ namespace SyncrioClientSide
                                     }
                                     break;
                                 case (Vessel.Situations.FLYING):
-                                        myPlayerStatus.statusText = "Flying above " + bodyName;
+                                    myPlayerStatus.statusText = "Flying above " + bodyName;
                                     break;
                                 case (Vessel.Situations.LANDED):
-                                        myPlayerStatus.statusText = "Landed on " + bodyName;
+                                    myPlayerStatus.statusText = "Landed on " + bodyName;
                                     break;
                                 case (Vessel.Situations.ORBITING):
                                     myPlayerStatus.statusText = "Orbiting " + bodyName;
                                     break;
                                 case (Vessel.Situations.PRELAUNCH):
-                                        myPlayerStatus.statusText = "Launching from " + bodyName;
+                                    myPlayerStatus.statusText = "Launching from " + bodyName;
                                     break;
                                 case (Vessel.Situations.SPLASHED):
                                     myPlayerStatus.statusText = "Splashed on " + bodyName;

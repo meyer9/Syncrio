@@ -66,12 +66,24 @@ namespace SyncrioClientSide
 
         public bool workerEnabled;
 
+        public int currentSubspace
+        {
+            get;
+            private set;
+        }
+
         public bool locked
         {
             get
             {
-                return true;
+                return lockedSubspace != null;
             }
+        }
+
+        public Subspace lockedSubspace
+        {
+            get;
+            private set;
         }
 
         public long clockOffsetAverage
@@ -92,7 +104,15 @@ namespace SyncrioClientSide
             private set;
         }
 
+        public float requestedRate
+        {
+            get;
+            private set;
+        }
+
         private const float MAX_CLOCK_SKEW = 5f;
+        private const float MAX_SUBSPACE_RATE = 1f;
+        private const float MIN_SUBSPACE_RATE = 0.3f;
         private const float MIN_CLOCK_RATE = 0.3f;
         private const float MAX_CLOCK_RATE = 1.5f;
         private const float SYNC_TIME_INTERVAL = 30f;
@@ -103,7 +123,15 @@ namespace SyncrioClientSide
         private float lastClockSkew = 0f;
         private List<long> clockOffset = new List<long>();
         private List<long> networkLatency = new List<long>();
+        private List<float> requestedRatesList = new List<float>();
+        private Dictionary<int, Subspace> subspaces = new Dictionary<int, Subspace>();
         private static TimeSyncer singleton;
+
+        public TimeSyncer()
+        {
+            currentSubspace = -1;
+            requestedRate = 1f;
+        }
 
         public static TimeSyncer fetch
         {
@@ -128,7 +156,10 @@ namespace SyncrioClientSide
             if ((UnityEngine.Time.realtimeSinceStartup - lastSyncTime) > SYNC_TIME_INTERVAL)
             {
                 lastSyncTime = UnityEngine.Time.realtimeSinceStartup;
-                NetworkWorker.fetch.SendTimeSync();
+                if (NetworkWorker.fetch.state != ClientState.DISCONNECTING)
+                {
+                    NetworkWorker.fetch.SendTimeSync();
+                }
             }
 
             //Mod API to disable the time syncer
@@ -139,6 +170,10 @@ namespace SyncrioClientSide
             
             if (locked)
             {
+                if (WarpWorker.fetch.warpMode == WarpMode.SUBSPACE)
+                {
+                    VesselWorker.fetch.DetectReverting();
+                }
                 //Set the Scenario time here
                 SyncTime();
             }
@@ -147,6 +182,15 @@ namespace SyncrioClientSide
         //Skew or set the clock
         private void SyncTime()
         {
+            if (HighLogic.LoadedScene != GameScenes.FLIGHT)
+            {
+                if (requestedRatesList.Count > 0)
+                {
+                    requestedRatesList.Clear();
+                    requestedRate = 1f;
+                }
+            }
+
             if (Time.timeSinceLevelLoad < 1f)
             {
                 return;
@@ -169,7 +213,16 @@ namespace SyncrioClientSide
                 lastClockSkew = UnityEngine.Time.realtimeSinceStartup;
                 if (CanSyncTime())
                 {
-                    //No Subspace Timewarp!
+                    double targetTime = GetUniverseTime();
+                    double currentError = GetCurrentError();
+                    if (Math.Abs(currentError) > MAX_CLOCK_SKEW)
+                    {
+                        StepClock(targetTime);
+                    }
+                    else
+                    {
+                        SkewClock(currentError);
+                    }
                 }
                 else
                 {
@@ -255,16 +308,106 @@ namespace SyncrioClientSide
             }
         }
 
-        private bool SituationIsGrounded(Vessel.Situations situation)
+        private void SkewClock(double currentError)
         {
-            switch (situation)
+            float timeWarpRate = (float)Math.Pow(2, -currentError);
+            if (timeWarpRate > MAX_CLOCK_RATE)
             {
-                case Vessel.Situations.LANDED:
-                case Vessel.Situations.PRELAUNCH:
-                case Vessel.Situations.SPLASHED:
-                    return true;
+                timeWarpRate = MAX_CLOCK_RATE;
             }
-            return false;
+            if (timeWarpRate < MIN_CLOCK_RATE)
+            {
+                timeWarpRate = MIN_CLOCK_RATE;
+            }
+            //Request how fast we *think* we can run (The reciporical of the current warp rate)
+            float tempRequestedRate = lockedSubspace.subspaceSpeed * (1 / timeWarpRate);
+            if (tempRequestedRate > MAX_SUBSPACE_RATE)
+            {
+                tempRequestedRate = MAX_SUBSPACE_RATE;
+            }
+            requestedRatesList.Add(tempRequestedRate);
+            //Delete entries if there are too many
+            while (requestedRatesList.Count > 50)
+            {
+                requestedRatesList.RemoveAt(0);
+            }
+            //Set the average requested rate
+            float requestedRateTotal = 0f;
+            foreach (float requestedRateEntry in requestedRatesList)
+            {
+                requestedRateTotal += requestedRateEntry;
+            }
+            requestedRate = requestedRateTotal / requestedRatesList.Count;
+
+            //Set the physwarp rate
+            Time.timeScale = timeWarpRate;
+        }
+
+        public void AddNewSubspace(int subspaceID, long serverTime, double planetariumTime, float subspaceSpeed)
+        {
+            Subspace newSubspace = new Subspace();
+            newSubspace.serverClock = serverTime;
+            newSubspace.planetTime = planetariumTime;
+            newSubspace.subspaceSpeed = subspaceSpeed;
+            subspaces[subspaceID] = newSubspace;
+            if (currentSubspace == subspaceID)
+            {
+                LockSubspace(currentSubspace);
+            }
+            SyncrioLog.Debug("Subspace " + subspaceID + " locked to server, time: " + planetariumTime);
+        }
+
+        public void LockTemporarySubspace(long serverClock, double planetTime, float subspaceSpeed)
+        {
+            Subspace tempSubspace = new Subspace();
+            tempSubspace.serverClock = serverClock;
+            tempSubspace.planetTime = planetTime;
+            tempSubspace.subspaceSpeed = subspaceSpeed;
+            lockedSubspace = tempSubspace;
+        }
+
+        public void LockSubspace(int subspaceID)
+        {
+            if (subspaces.ContainsKey(subspaceID))
+            {
+                TimeWarp.SetRate(0, true);
+                lockedSubspace = subspaces[subspaceID];
+                SyncrioLog.Debug("Locked to subspace " + subspaceID + ", time: " + GetUniverseTime());
+                using (MessageWriter mw = new MessageWriter())
+                {
+                    mw.Write<int>((int)WarpMessageType.CHANGE_SUBSPACE);
+                    mw.Write<int>(subspaceID);
+                    NetworkWorker.fetch.SendWarpMessage(mw.GetMessageBytes());
+                }
+            }
+            currentSubspace = subspaceID;
+        }
+
+        public void UnlockSubspace()
+        {
+            currentSubspace = -1;
+            lockedSubspace = null;
+            Time.timeScale = 1f;
+            using (MessageWriter mw = new MessageWriter())
+            {
+                mw.Write<int>((int)WarpMessageType.CHANGE_SUBSPACE);
+                mw.Write<int>(currentSubspace);
+                NetworkWorker.fetch.SendWarpMessage(mw.GetMessageBytes());
+            }
+        }
+
+        public void RelockSubspace(int subspaceID, long serverClock, double planetTime, float subspaceSpeed)
+        {
+            if (subspaces.ContainsKey(subspaceID))
+            {
+                subspaces[subspaceID].serverClock = serverClock;
+                subspaces[subspaceID].planetTime = planetTime;
+                subspaces[subspaceID].subspaceSpeed = subspaceSpeed;
+            }
+            else
+            {
+                SyncrioLog.Debug("Failed to relock non-existant subspace " + subspaceID);
+            }
         }
 
         public long GetServerClock()
@@ -274,6 +417,79 @@ namespace SyncrioClientSide
                 return DateTime.UtcNow.Ticks + clockOffsetAverage;
             }
             return 0;
+        }
+
+        public double GetUniverseTime()
+        {
+            if (synced && locked)
+            {
+                return GetUniverseTime(lockedSubspace);
+            }
+            return 0;
+        }
+
+        public double GetUniverseTime(int subspace)
+        {
+            if (subspaces.ContainsKey(subspace))
+            {
+                return GetUniverseTime(subspaces[subspace]);
+            }
+            else
+            {
+                return 0;
+            }
+        }
+
+        public double GetUniverseTime(Subspace subspace)
+        {
+            long realTimeSinceLock = GetServerClock() - subspace.serverClock;
+            double realTimeSinceLockSeconds = realTimeSinceLock / 10000000d;
+            double adjustedTimeSinceLockSeconds = realTimeSinceLockSeconds * subspace.subspaceSpeed;
+            return subspace.planetTime + adjustedTimeSinceLockSeconds;
+        }
+
+        public double GetCurrentError()
+        {
+            if (synced && locked)
+            {
+                double currentTime = Planetarium.GetUniversalTime();
+                double targetTime = GetUniverseTime();
+                return (currentTime - targetTime);
+            }
+            return 0;
+        }
+
+        public bool SubspaceExists(int subspaceID)
+        {
+            return subspaces.ContainsKey(subspaceID);
+        }
+
+        public Subspace GetSubspace(int subspaceID)
+        {
+            Subspace ss = new Subspace();
+            if (subspaces.ContainsKey(subspaceID))
+            {
+                ss.serverClock = subspaces[subspaceID].serverClock;
+                ss.planetTime = subspaces[subspaceID].planetTime;
+                ss.subspaceSpeed = subspaces[subspaceID].subspaceSpeed;
+            }
+            return ss;
+        }
+
+        public int GetMostAdvancedSubspace()
+        {
+            double highestTime = double.NegativeInfinity;
+            int retVal = -1;
+            foreach (int subspaceID in subspaces.Keys)
+            {
+                double testTime = GetUniverseTime(subspaceID);
+                if (testTime > highestTime)
+                {
+                    highestTime = testTime;
+                    retVal = subspaceID;
+                }
+            }
+            return retVal;
         }
 
         private bool CanSyncTime()

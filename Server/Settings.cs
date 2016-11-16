@@ -78,6 +78,15 @@ namespace SyncrioServer
         {
             serverSettings.SaveSettings();
         }
+
+        private static void CheckForCareerMode()
+        {
+            if (serverSettings.Settings.gameMode == GameMode.CAREER)
+            {
+                serverSettings.Settings.numberOfKerbals = 0;
+                Save();
+            }
+        }
     }
 
     public class SettingsStore
@@ -86,6 +95,8 @@ namespace SyncrioServer
         public string address = "0.0.0.0";
         [Description("The port the server listens on.")]
         public int port = 7776;
+        [Description("Specify the warp type.")]
+        public WarpMode warpMode = WarpMode.SUBSPACE;
         [Description("Specify the game type.")]
         public GameMode gameMode = GameMode.CAREER;
         [Description("Specify the gameplay difficulty of the server.")]
@@ -96,6 +107,8 @@ namespace SyncrioServer
         public bool whitelisted = false;
         [Description("Specify if the the server Scenario 'ticks' while nobody is connected or the server is shut down.")]
         public bool keepTickingWhileOffline = true;
+        [Description("If true, sends the player to the latest subspace upon connecting. If false, sends the player to the previous subspace they were in.\n# NOTE: This may cause time-paradoxes, and will not work across server restarts.")]
+        public bool sendPlayerToLatestSubspace = true;
         [Description("Use UTC instead of system time in the log.")]
         public bool useUTCTimeInLog = false;
         [Description("Minimum log level.")]
@@ -110,6 +123,8 @@ namespace SyncrioServer
         public int httpPort = 0;
         [Description("Name of the server.")]
         public string serverName = "Syncrio Server";
+        [Description("Base number of kerbals Syncrio generates. 0 = Disabled.\n# -Note! If DarkMultiPlayer Cooperative Mode is on then this will do nothing.\n# -Note! If the game mode is set to career then this is automaticly set to 0.")]
+        public int numberOfKerbals = 0;
         [Description("Maximum amount of players that can join the server.")]
         public int maxPlayers = 20;
         [Description("Maximum amount of player scenario groups that can be exist on the server.")]
@@ -119,7 +134,9 @@ namespace SyncrioServer
         [Description("Specify if the server is to automatically sync the player's scenario data.")]
         public bool autoSyncScenarios = true;
         [Description("Specify the amount of time the server is to wait between automatic scenario syncs.\n# -Note! The time is in minutes.\n# -Note! This only matters if you set 'autoSyncScenarios' to true.")]
-        public int autoSyncScenariosWaitInterval = 1;
+        public int autoSyncScenariosWaitInterval = 2;
+        [Description("Specify the amount of time the server is to wait between automaticly sending group progress.\n# -Note! The time is in seconds.")]
+        public int autoSendProgressWaitInterval = 30;
         [Description("Specify if players can have saved scenarios when they're not in a group.\n# -Note! If false, any player who is not in a group will not have their scenario saved.")]
         public bool nonGroupScenarios = true;
         [Description("Specify if players can reset their scenario to the default settings.\n# WARNING: Using this command will override your/the player's scenario(or your/the player's group's scenario, if you/the player are in a group) using the initial scenario set by you!\n# WARNING: If you are in a group this will override everyone of the group's member's scenario!\n# -Note! If the initial scenario is not set this will do nothing.")]

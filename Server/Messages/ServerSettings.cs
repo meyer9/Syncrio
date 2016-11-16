@@ -53,8 +53,7 @@ namespace SyncrioServer.Messages
     {
         public static void SendServerSettings(ClientObject client)
         {
-            int numberOfKerbals = Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Kerbals")).Length;
-            int numberOfScenarioModules = Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Players", client.playerName)).Length;
+            int numberOfServerKerbals = Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "Kerbals")).Length;
             ServerMessage newMessage = new ServerMessage();
             newMessage.type = ServerMessageType.SERVER_SETTINGS;
             using (MessageWriter mw = new MessageWriter())
@@ -62,9 +61,9 @@ namespace SyncrioServer.Messages
                 mw.Write<bool>(Settings.settingsStore.DarkMultiPlayerCoopMode);
                 mw.Write<int>((int)Settings.settingsStore.gameMode);
                 mw.Write<bool>(Settings.settingsStore.cheats);
-                //Tack the amount of kerbals and scenario modules onto this message
-                mw.Write<int>(numberOfKerbals);
-                //mw.Write<int>(numberOfScenarioModules);
+                //Tack the amount of Server kerbals and the amount of kerbals allowed onto this message
+                mw.Write<int>(numberOfServerKerbals);
+                mw.Write<int>(Settings.settingsStore.numberOfKerbals);
                 //Send scenario settings
                 mw.Write<bool>(Settings.settingsStore.autoSyncScenarios);
                 mw.Write<bool>(Settings.settingsStore.nonGroupScenarios); 
@@ -93,16 +92,21 @@ namespace SyncrioServer.Messages
                     mw.Write<float>(GameplaySettings.settingsStore.startingReputation);
                     mw.Write<float>(GameplaySettings.settingsStore.startingScience);
                     //New KSP 1.2 Settings
-                    mw.Write<float>(GameplaySettings.settingsStore.respwanTime);
+                    mw.Write<float>(GameplaySettings.settingsStore.respawnTime);
                     mw.Write<bool>(GameplaySettings.settingsStore.commNetwork);
                     mw.Write<bool>(GameplaySettings.settingsStore.kerbalExp);
                     mw.Write<bool>(GameplaySettings.settingsStore.immediateLevelUp);
-                    mw.Write<bool>(GameplaySettings.settingsStore.allowNegativeFunds);
-                    mw.Write<bool>(GameplaySettings.settingsStore.allowNegativeScience);
+                    mw.Write<bool>(GameplaySettings.settingsStore.allowNegativeCurrency);
+                    mw.Write<bool>(GameplaySettings.settingsStore.partPressureLimit);
+                    mw.Write<bool>(GameplaySettings.settingsStore.partGForceLimit);
+                    mw.Write<bool>(GameplaySettings.settingsStore.kerbalGForceLimit);
+                    mw.Write<float>(GameplaySettings.settingsStore.kerbalGForceTolerance);
                     mw.Write<bool>(GameplaySettings.settingsStore.obeyCrossfeedRules);
+                    mw.Write<bool>(GameplaySettings.settingsStore.alwaysAllowActionGroups);
                     mw.Write<float>(GameplaySettings.settingsStore.buildingDamageMultiplier);
                     mw.Write<bool>(GameplaySettings.settingsStore.partUpgrades);
                     mw.Write<bool>(GameplaySettings.settingsStore.requireSignalForControl);
+                    mw.Write<bool>(GameplaySettings.settingsStore.plasmaBlackout);
                     mw.Write<float>(GameplaySettings.settingsStore.rangeModifier);
                     mw.Write<float>(GameplaySettings.settingsStore.dsnModifier);
                     mw.Write<float>(GameplaySettings.settingsStore.occlusionModifierVac);

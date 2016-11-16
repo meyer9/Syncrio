@@ -264,7 +264,8 @@ namespace SyncrioClientSide
                 GUILayout.Label("(None - Add a server first)");
             }
 
-            scrollPos = GUILayout.BeginScrollView(scrollPos, GUILayout.Width(WINDOW_WIDTH - 5), GUILayout.Height(WINDOW_HEIGHT - 100));
+            //scrollPos = GUILayout.BeginScrollView(scrollPos, GUILayout.Width(WINDOW_WIDTH - 5), GUILayout.Height(WINDOW_HEIGHT - 100));
+            scrollPos = GUILayout.BeginScrollView(scrollPos);
 
             for (int serverPos = 0; serverPos < Settings.fetch.servers.Count; serverPos++)
             {

@@ -44,8 +44,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
 using SyncrioCommon;
 using MessageStream2;
 
@@ -55,8 +53,9 @@ namespace SyncrioClientSide
     {
         private static GroupSystem singleton;
         public Dictionary<string, GroupObject> groups = new Dictionary<string, GroupObject>();
+        public Dictionary<string, Dictionary<int, GroupProgress>> allGroupProgressList = new Dictionary<string, Dictionary<int, GroupProgress>>();
         private object groupLock = new object();
-        public static string playerGroupName = null;
+        public static string playerGroupName = string.Empty;
         public static bool playerGroupAssigned = false;
         public static bool playerCreatingGroup = false;
         public static bool playerIsGroupLeader = false;
@@ -64,10 +63,11 @@ namespace SyncrioClientSide
         public static bool setIfGroupIsFreeToInvite = true;
         public static bool kickPlayerButtons = false;
         public static bool invitePlayerButtons = false;
+        public static bool groupProgressButtons = false;
         public static bool newGroupPrivacy_PUBLIC = false;
         public static bool newGroupPrivacy_PASSWORD = false;
         public static bool newGroupPrivacy_INVITE_ONLY = false;
-        public static string groupCreationError;
+        public static string groupCreationError = string.Empty;
         public static bool isGroupCreationResponseError = false;
         public static bool joinGroupPrivacy_PASSWORD = false;
         public static bool disbandGroupButtonPressed = false;
@@ -228,7 +228,7 @@ namespace SyncrioClientSide
 
         public void RemoveGroup()
         {
-            if (playerGroupName != null)
+            if (!string.IsNullOrEmpty(playerGroupName))
             {
                 byte[] messageBytes;
                 ClientMessage newMessage = new ClientMessage();
@@ -338,7 +338,7 @@ namespace SyncrioClientSide
             string sender = Settings.fetch.playerName;
             if (pi != null)
             {
-                if (senderGroup != null)
+                if (!string.IsNullOrEmpty(senderGroup))
                 {
                     byte[] messageBytes;
                     ClientMessage newMessage = new ClientMessage();
@@ -346,6 +346,7 @@ namespace SyncrioClientSide
                     newMessage.type = ClientMessageType.INVITE_PLAYER;
                     using (MessageWriter mw = new MessageWriter())
                     {
+                        mw.Write<bool>(false);//Is Reply
                         mw.Write<string>(pi);
                         mw.Write<string>(senderGroup);
                         mw.Write<string>(sender);
@@ -471,6 +472,7 @@ namespace SyncrioClientSide
             using (MessageReader mr = new MessageReader(messageData))
             {
                 playerGroupName = mr.Read<string>();
+                PlayerStatusWorker.fetch.myPlayerStatus.groupName = playerGroupName;
                 groupFreeToInvite = mr.Read<bool>();
                 playerCreatingGroup = false;
                 playerGroupAssigned = true;
@@ -541,6 +543,7 @@ namespace SyncrioClientSide
             newMessage.type = ClientMessageType.INVITE_PLAYER;
             using (MessageWriter mw = new MessageWriter())
             {
+                mw.Write<bool>(true);//Is Reply
                 mw.Write<bool>(yesOrNo);
                 mw.Write<string>(invitedPlayer);
                 mw.Write<string>(groupnameInvite);
@@ -599,6 +602,206 @@ namespace SyncrioClientSide
             return returnGroup;
         }
 
+        public void HandleGroupProgress(byte[] messageData)
+        {
+            using (MessageReader mr = new MessageReader(messageData))
+            {
+                int numberOfProgess = mr.Read<int>();
+
+                for (int i = 0; i < numberOfProgess; i++)
+                {
+                    List<string> groupProgressList = new List<string>(mr.Read<string[]>());
+
+                    string groupName = groupProgressList[0];
+                    int groupSubspace = Convert.ToInt32(groupProgressList[1]);
+
+                    string funds = groupProgressList[2];
+                    string rep = groupProgressList[3];
+                    string sci = groupProgressList[4];
+
+                    List<string> techs = new List<string>();
+                    List<string> progress = new List<string>();
+                    List<List<string>> celestialProgress = new List<List<string>>();
+                    List<string> secrets = new List<string>();
+
+                    int cursor = 2;
+                    while (cursor < groupProgressList.Count)
+                    {
+                        bool increment = true;
+
+                        if (groupProgressList[cursor] == "Techs" && (groupProgressList[cursor + 1] == "{"))
+                        {
+                            increment = false;
+
+                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
+                            {
+                                techs = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                            else
+                            {
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                        }
+
+                        if (cursor > groupProgressList.Count - 1)
+                        {
+                            break;
+                        }
+
+                        if (groupProgressList[cursor] == "Progress" && (groupProgressList[cursor + 1] == "{"))
+                        {
+                            increment = false;
+
+                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
+                            {
+                                progress = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                            else
+                            {
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                        }
+
+                        if (cursor > groupProgressList.Count - 1)
+                        {
+                            break;
+                        }
+
+                        if (groupProgressList[cursor] == "CelestialProgressList" && (groupProgressList[cursor + 1] == "{"))
+                        {
+                            increment = false;
+
+                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
+                            {
+                                List<string> celestialProgressLines = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+
+                                int subCursor = 0;
+                                while (subCursor < celestialProgressLines.Count)
+                                {
+                                    if (celestialProgressLines[subCursor] == "CelestialProgress" && (celestialProgressLines[subCursor + 1] == "{"))
+                                    {
+                                        int subMatchBracketIdx = FindMatchingBracket(celestialProgressLines, subCursor + 1);
+                                        KeyValuePair<int, int> subRange = new KeyValuePair<int, int>(subCursor, (subMatchBracketIdx - subCursor + 1));
+
+                                        if (subRange.Key + 2 < celestialProgressLines.Count && subRange.Value - 3 > 0)
+                                        {
+                                            celestialProgress.Add(celestialProgressLines.GetRange(subRange.Key + 2, subRange.Value - 3));//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
+                                            celestialProgressLines.RemoveRange(subRange.Key, subRange.Value);
+                                        }
+                                        else
+                                        {
+                                            celestialProgressLines.RemoveRange(subRange.Key, subRange.Value);
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                        }
+
+                        if (cursor > groupProgressList.Count - 1)
+                        {
+                            break;
+                        }
+
+                        if (groupProgressList[cursor] == "Secrets" && (groupProgressList[cursor + 1] == "{"))
+                        {
+                            increment = false;
+
+                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
+                            {
+                                secrets = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                            else
+                            {
+                                groupProgressList.RemoveRange(range.Key, range.Value);
+                            }
+                        }
+
+                        if (increment)
+                        {
+                            cursor++;
+                        }
+                    }
+
+                    if (allGroupProgressList.ContainsKey(groupName))
+                    {
+                        if (allGroupProgressList[groupName].ContainsKey(groupSubspace))
+                        {
+                            GroupProgress editGroupProgress = allGroupProgressList[groupName][groupSubspace];
+
+                            editGroupProgress.Funds = funds;
+                            editGroupProgress.Rep = rep;
+                            editGroupProgress.Sci = sci;
+
+                            editGroupProgress.Techs = techs;
+                            editGroupProgress.Progress = progress;
+                            editGroupProgress.CelestialProgress = celestialProgress;
+                            editGroupProgress.Secrets = secrets;
+
+                            allGroupProgressList[groupName][groupSubspace] = editGroupProgress;
+                        }
+                        else
+                        {
+                            GroupProgress newGroupProgress = new GroupProgress();
+
+                            newGroupProgress.GroupName = groupName;
+                            newGroupProgress.GroupSubspace = groupSubspace;
+
+                            newGroupProgress.Funds = funds;
+                            newGroupProgress.Rep = rep;
+                            newGroupProgress.Sci = sci;
+
+                            newGroupProgress.Techs = techs;
+                            newGroupProgress.Progress = progress;
+                            newGroupProgress.CelestialProgress = celestialProgress;
+                            newGroupProgress.Secrets = secrets;
+
+                            allGroupProgressList[groupName].Add(groupSubspace, newGroupProgress);
+                        }
+                    }
+                    else
+                    {
+                        GroupProgress newGroupProgress = new GroupProgress();
+
+                        newGroupProgress.GroupName = groupName;
+                        newGroupProgress.GroupSubspace = groupSubspace;
+
+                        newGroupProgress.Funds = funds;
+                        newGroupProgress.Rep = rep;
+                        newGroupProgress.Sci = sci;
+
+                        newGroupProgress.Techs = techs;
+                        newGroupProgress.Progress = progress;
+                        newGroupProgress.CelestialProgress = celestialProgress;
+                        newGroupProgress.Secrets = secrets;
+
+                        allGroupProgressList.Add(groupName, new Dictionary<int, GroupProgress>());
+
+                        allGroupProgressList[groupName].Add(groupSubspace, newGroupProgress);
+                    }
+                }
+            }
+        }
+
         public void HandleGroupMessage(byte[] messageData)
         {
             lock (groupLock)
@@ -630,7 +833,7 @@ namespace SyncrioClientSide
                                 }
                                 else
                                 {
-                                    if (playerGroupName != null)
+                                    if (!string.IsNullOrEmpty(playerGroupName))
                                     {
                                         if (groupName == playerGroupName)
                                         {
@@ -697,6 +900,7 @@ namespace SyncrioClientSide
                                 GroupWindow.fetch.AssignPlayerGroup();
                                 GroupWindow.fetch.SetJoinGroupButton();
                                 GroupWindow.fetch.SetInvitePlayerButton();
+                                GroupWindow.fetch.CheckInvitePlayerButton();
                                 SyncrioLog.Debug("Group " + groupName + " updated");
                             }
                             break;
@@ -710,6 +914,7 @@ namespace SyncrioClientSide
                                     GroupWindow.fetch.SetJoinGroupButton();
                                     GroupWindow.fetch.SetInvitePlayerButton();
                                     GroupWindow.fetch.SetKickOrSelectPlayerButton();
+                                    GroupWindow.fetch.CheckInvitePlayerButton();
                                     SyncrioLog.Debug("Group " + groupName + " removed");
                                 }
                             }
@@ -722,12 +927,74 @@ namespace SyncrioClientSide
             }
         }
 
+        private static void ResetGroupValues()
+        {
+            GroupSystem.fetch.groups = new Dictionary<string, GroupObject>();
+            GroupSystem.fetch.allGroupProgressList = new Dictionary<string, Dictionary<int, GroupProgress>>();
+            playerGroupName = string.Empty;
+            playerGroupAssigned = false;
+            playerCreatingGroup = false;
+            playerIsGroupLeader = false;
+            groupFreeToInvite = false;
+            setIfGroupIsFreeToInvite = true;
+            kickPlayerButtons = false;
+            invitePlayerButtons = false;
+            groupProgressButtons = false;
+            newGroupPrivacy_PUBLIC = false;
+            newGroupPrivacy_PASSWORD = false;
+            newGroupPrivacy_INVITE_ONLY = false;
+            groupCreationError = string.Empty;
+            isGroupCreationResponseError = false;
+            joinGroupPrivacy_PASSWORD = false;
+            disbandGroupButtonPressed = false;
+            groupLeaderChange = string.Empty;
+            groupnameChange = string.Empty;
+            requestedLeader = string.Empty;
+            groupChangeLeaderWindowDisplay = false;
+            stepDownButton = false;
+            inviteSender = string.Empty;
+            groupnameInvite = string.Empty;
+            invitedPlayer = string.Empty;
+            displayInvite = false;
+            renameGroupButtonPressed = false;
+            changeGroupPrivacyButtonPressed = false;
+        }
+
         public static void Reset()
         {
             lock (Client.eventLock)
             {
                 singleton = new GroupSystem();
+                ResetGroupValues();
             }
+        }
+
+        public static int FindMatchingBracket(List<string> lines, int startFrom)
+        {
+            int brackets = 0;
+            for (int i = startFrom; i < lines.Count; i++)
+            {
+                if (lines[i].Trim() == "{") brackets++;
+                if (lines[i].Trim() == "}") brackets--;
+
+                if (brackets == 0)
+                    return i;
+            }
+
+            throw new ArgumentOutOfRangeException("Could not find a matching bracket!");
+        }
+
+        public struct GroupProgress
+        {
+            public string GroupName;
+            public int GroupSubspace;
+            public string Funds;
+            public string Rep;
+            public string Sci;
+            public List<string> Techs;
+            public List<string> Progress;
+            public List<List<string>> CelestialProgress;
+            public List<string> Secrets;
         }
     }
 }

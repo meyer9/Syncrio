@@ -23,3 +23,7 @@ bld/
 .vs/
 *.cache
 Client/obj/Release/SyncrioClientSide.csproj.FileListAbsolute.txt
+Common/obj/Release/SyncrioCommon.csproj.FileListAbsolute.txt
+Client/obj/Release/SyncrioClientSide.csprojResolveAssemblyReference.cache
+Server/obj/Release/SyncrioServer.csprojResolveAssemblyReference.cache
+Server/obj/Release/DesignTimeResolveAssemblyReferences.cache

@@ -50,117 +50,243 @@ namespace SyncrioServer
             {
                 case "name = CommNetScenario":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'CommNetScenario' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ContractSystem":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
-                        result.Add(lines[2]);
-                        result.Add(lines[3]);
+                        if (lines.Count > 3)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                            result.Add(lines[3]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ContractSystem' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = Funding":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
-                        result.Add(lines[2]);
+                        if (lines.Count > 2)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'Funding' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = PartUpgradeManager":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'PartUpgradeManager' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ProgressTracking":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ProgressTracking' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = Reputation":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
-                        result.Add(lines[2]);
+                        if (lines.Count > 2)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'Reputation' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ResearchAndDevelopment":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
-                        result.Add(lines[2]);
+                        if (lines.Count > 2)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ResearchAndDevelopment' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ResourceScenario":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ResourceScenario' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ScenarioAchievements":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioAchievements' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ScenarioContractEvents":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
-                        result.Add(lines[2]);
+                        if (lines.Count > 2)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioContractEvents' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ScenarioCustomWaypoints":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioCustomWaypoints' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ScenarioDestructibles":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioDestructibles' Scenario Data is bad!");
+                        }
+                    }
+                    break;
+                case "name = ScenarioDiscoverableObjects":
+                    {
+                        if (lines.Count > 2)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioDiscoverableObjects' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ScenarioNewGameIntro":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
-                        result.Add(lines[2]);
-                        result.Add(lines[3]);
-                        result.Add(lines[4]);
+                        if (lines.Count > 4)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                            result.Add(lines[2]);
+                            result.Add(lines[3]);
+                            result.Add(lines[4]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioNewGameIntro' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = ScenarioUpgradeableFacilities":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'ScenarioUpgradeableFacilities' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = StrategySystem":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'StrategySystem' Scenario Data is bad!");
+                        }
                     }
                     break;
                 case "name = VesselRecovery":
                     {
-                        result.Add(lines[0]);
-                        result.Add(lines[1]);
+                        if (lines.Count > 1)
+                        {
+                            result.Add(lines[0]);
+                            result.Add(lines[1]);
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("'VesselRecovery' Scenario Data is bad!");
+                        }
                     }
                     break;
                 default:
                     {
-                        SyncrioLog.Debug("Unknowen Scenario Data Type!");
+                        SyncrioLog.Debug("Unknowen Scenario Data Type! Returning the whole list.");
+                        return stringList;
                     }
-                    break;
             }
 
-            int cursor = 2;
+            int cursor = 2;//KEEP ME AT 2!!! Or you Will get a "stack overflow exception"!
             while (cursor < lines.Count())
             {
                 // Find a single word with a single "{" on the next line
@@ -207,9 +333,16 @@ namespace SyncrioServer
             {
                 case "name = CommNetScenario":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -218,9 +351,16 @@ namespace SyncrioServer
                     }
                 case "name = ContractSystem":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]) && wordRegex.IsMatch(lines[3]))
+                        if (lines.Count > 3)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]) && !wordRegex.IsMatch(lines[3]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -229,9 +369,16 @@ namespace SyncrioServer
                     }
                 case "name = Funding":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 2)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -240,9 +387,16 @@ namespace SyncrioServer
                     }
                 case "name = PartUpgradeManager":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -251,9 +405,16 @@ namespace SyncrioServer
                     }
                 case "name = ProgressTracking":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -262,9 +423,16 @@ namespace SyncrioServer
                     }
                 case "name = Reputation":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 2)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -273,9 +441,16 @@ namespace SyncrioServer
                     }
                 case "name = ResearchAndDevelopment":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 2)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -284,9 +459,16 @@ namespace SyncrioServer
                     }
                 case "name = ResourceScenario":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -295,9 +477,16 @@ namespace SyncrioServer
                     }
                 case "name = ScenarioAchievements":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -306,9 +495,16 @@ namespace SyncrioServer
                     }
                 case "name = ScenarioContractEvents":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 2)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -317,9 +513,16 @@ namespace SyncrioServer
                     }
                 case "name = ScenarioCustomWaypoints":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -328,9 +531,34 @@ namespace SyncrioServer
                     }
                 case "name = ScenarioDestructibles":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                case "name = ScenarioDiscoverableObjects":
+                    {
+                        if (lines.Count > 2)
+                        {
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -339,9 +567,16 @@ namespace SyncrioServer
                     }
                 case "name = ScenarioNewGameIntro":
                     {
-                        if (wordRegex.IsMatch(lines[1]) && wordRegex.IsMatch(lines[2]) && wordRegex.IsMatch(lines[3]) && wordRegex.IsMatch(lines[4]))
+                        if (lines.Count > 4)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]) && !wordRegex.IsMatch(lines[2]) && !wordRegex.IsMatch(lines[3]) && !wordRegex.IsMatch(lines[4]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -350,9 +585,16 @@ namespace SyncrioServer
                     }
                 case "name = ScenarioUpgradeableFacilities":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -361,9 +603,16 @@ namespace SyncrioServer
                     }
                 case "name = StrategySystem":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -372,9 +621,16 @@ namespace SyncrioServer
                     }
                 case "name = VesselRecovery":
                     {
-                        if (wordRegex.IsMatch(lines[1]))
+                        if (lines.Count > 1)
                         {
-                            return true;
+                            if (!wordRegex.IsMatch(lines[1]))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
                         }
                         else
                         {
@@ -383,6 +639,7 @@ namespace SyncrioServer
                     }
                 default:
                     {
+                        SyncrioLog.Debug("Unknowen Scenario Data Type!");
                         return false;
                     }
             }

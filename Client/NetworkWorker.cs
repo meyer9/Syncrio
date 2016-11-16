@@ -104,7 +104,6 @@ namespace SyncrioClientSide
         private Thread sendThread;
         private string serverMotd;
         private bool displayMotd;
-        private bool makeInitialScenarioSync = false;
 
         public NetworkWorker()
         {
@@ -128,6 +127,11 @@ namespace SyncrioClientSide
             {
                 terminateThreadsOnNextUpdate = false;
                 TerminateThreads();
+            }
+
+            if (state == ClientState.DISCONNECTED)
+            {
+                Client.fetch.toolbarShowGUI = true;
             }
 
             if (state == ClientState.CONNECTED)
@@ -171,23 +175,43 @@ namespace SyncrioClientSide
             {
                 if (!Settings.fetch.DarkMultiPlayerCoopMode)
                 {
-                    Client.fetch.status = "Syncing Scenario time";
-                    state = ClientState.TIME_LOCKING;
-                    TimeSyncer.fetch.workerEnabled = true;
-                    ChatWorker.fetch.workerEnabled = true;
-                    PlayerColorWorker.fetch.workerEnabled = true;
-                    FlagSyncer.fetch.workerEnabled = true;
-                    FlagSyncer.fetch.SendFlagList();
-                    PlayerColorWorker.fetch.SendPlayerColorToServer();
-                    KerbalReassigner.fetch.RegisterGameHooks();
+                    if (!Settings.fetch.serverDMPCoopMode)
+                    {
+                        Client.fetch.status = "Syncing Scenario time";
+                        state = ClientState.TIME_LOCKING;
+                        //The subspaces are held in the warp control messages, but the warp worker will create a new subspace if we aren't locked.
+                        //Process the messages so we get the subspaces, but don't enable the worker until the game is started.
+                        WarpWorker.fetch.ProcessWarpMessages();
+                        TimeSyncer.fetch.workerEnabled = true;
+                        ChatWorker.fetch.workerEnabled = true;
+                        PlayerColorWorker.fetch.workerEnabled = true;
+                        FlagSyncer.fetch.workerEnabled = true;
+                        FlagSyncer.fetch.SendFlagList();
+                        PlayerColorWorker.fetch.SendPlayerColorToServer();
+                        KerbalReassigner.fetch.RegisterGameHooks();
+                    }
+                    else
+                    {
+                        Disconnect("The Server is in DMP mode and the Client is not!");
+                    }
                 }
                 else
                 {
-                    Client.fetch.status = "Syncing Scenario time";
-                    state = ClientState.TIME_LOCKING;
-                    TimeSyncer.fetch.workerEnabled = true;
-                    PlayerColorWorker.fetch.workerEnabled = true;
-                    PlayerColorWorker.fetch.SendPlayerColorToServer();
+                    if (Settings.fetch.serverDMPCoopMode)
+                    {
+                        Client.fetch.status = "Syncing Scenario time";
+                        state = ClientState.TIME_LOCKING;
+                        //The subspaces are held in the warp control messages, but the warp worker will create a new subspace if we aren't locked.
+                        //Process the messages so we get the subspaces, but don't enable the worker until the game is started.
+                        WarpWorker.fetch.ProcessWarpMessages();
+                        TimeSyncer.fetch.workerEnabled = true;
+                        PlayerColorWorker.fetch.workerEnabled = true;
+                        PlayerColorWorker.fetch.SendPlayerColorToServer();
+                    }
+                    else
+                    {
+                        Disconnect("The Client is in DMP mode and the Server is not!");
+                    }
                 }
             }
             if (state == ClientState.TIME_LOCKING)
@@ -217,13 +241,13 @@ namespace SyncrioClientSide
                 {
                     if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
                     {
-                        makeInitialScenarioSync = true;
                         state = ClientState.RUNNING;
                         Client.fetch.status = "Running";
                         Client.fetch.gameRunning = true;
                         PlayerStatusWorker.fetch.workerEnabled = true;
                         ScenarioWorker.fetch.workerEnabled = true;
                         DynamicTickWorker.fetch.workerEnabled = true;
+                        WarpWorker.fetch.workerEnabled = true;
                         CraftLibraryWorker.fetch.workerEnabled = true;
                         ScreenshotWorker.fetch.workerEnabled = true;
                         SendMotdRequest();
@@ -232,28 +256,19 @@ namespace SyncrioClientSide
                 }
                 else
                 {
-                    makeInitialScenarioSync = true;
                     state = ClientState.RUNNING;
                     Client.fetch.status = "Running";
                     Client.fetch.gameRunning = true;
                     PlayerStatusWorker.fetch.workerEnabled = true;
                     ScenarioWorker.fetch.workerEnabled = true;
                     DynamicTickWorker.fetch.workerEnabled = true;
+                    WarpWorker.fetch.workerEnabled = true;
                     ToolbarSupport.fetch.EnableToolbar();
-                }
-            }
-            if (state == ClientState.RUNNING && makeInitialScenarioSync)
-            {
-                if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
-                {
-                    makeInitialScenarioSync = false;
-                    ScenarioWorker.fetch.InitialScenarioDataRequest();
                 }
             }
             if (displayMotd && (HighLogic.LoadedScene != GameScenes.LOADING) && (Time.timeSinceLevelLoad > 2f))
             {
                 displayMotd = false;
-                ScenarioWorker.fetch.UpgradeTheAstronautComplexSoTheGameDoesntBugOut();
                 ScreenMessages.PostScreenMessage(serverMotd, 10f, ScreenMessageStyle.UPPER_CENTER);
                 //Control locks will bug out the space centre sceen, so remove them before starting.
                 DeleteAllTheControlLocksSoTheSpaceCentreBugGoesAway();
@@ -879,8 +894,14 @@ namespace SyncrioClientSide
                         case ServerMessageType.SCENARIO_DATA:
                             HandleScenarioModuleData(message.data);
                             break;
+                        case ServerMessageType.SEND_VESSELS:
+                            VesselWorker.fetch.HandleStartingVesselsMessage(message.data);
+                            break;
                         case ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST:
                             ScenarioWorker.fetch.AutoSendScenariosReply();
+                            break;
+                        case ServerMessageType.AUTO_SEND_GROUP_PROGRESS:
+                            GroupSystem.fetch.HandleGroupProgress(message.data);
                             break;
                         case ServerMessageType.KERBAL_REPLY:
                             HandleKerbalReply(message.data);
@@ -897,6 +918,9 @@ namespace SyncrioClientSide
                         case ServerMessageType.FLAG_SYNC:
                             FlagSyncer.fetch.HandleMessage(message.data);
                             break;
+                        case ServerMessageType.SET_SUBSPACE:
+                            WarpWorker.fetch.HandleSetSubspace(message.data);
+                            break;
                         case ServerMessageType.SYNC_TIME_REPLY:
                             HandleSyncTimeReply(message.data);
                             break;
@@ -905,6 +929,9 @@ namespace SyncrioClientSide
                             break;
                         case ServerMessageType.MOTD_REPLY:
                             HandleMotdReply(message.data);
+                            break;
+                        case ServerMessageType.WARP_CONTROL:
+                            HandleWarpControl(message.data);
                             break;
                         case ServerMessageType.ADMIN_SYSTEM:
                             AdminSystem.fetch.HandleAdminMessage(message.data);
@@ -974,11 +1001,20 @@ namespace SyncrioClientSide
                         case ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST:
                             ScenarioWorker.fetch.AutoSendScenariosReply();
                             break;
+                        case ServerMessageType.AUTO_SEND_GROUP_PROGRESS:
+                            GroupSystem.fetch.HandleGroupProgress(message.data);
+                            break;
+                        case ServerMessageType.SET_SUBSPACE:
+                            WarpWorker.fetch.HandleSetSubspace(message.data);
+                            break;
                         case ServerMessageType.SYNC_TIME_REPLY:
                             HandleSyncTimeReply(message.data);
                             break;
                         case ServerMessageType.PING_REPLY:
                             HandlePingReply(message.data);
+                            break;
+                        case ServerMessageType.WARP_CONTROL:
+                            HandleWarpControl(message.data);
                             break;
                         case ServerMessageType.ADMIN_SYSTEM:
                             AdminSystem.fetch.HandleAdminMessage(message.data);
@@ -1203,6 +1239,7 @@ namespace SyncrioClientSide
                 Client.fetch.gameMode = (GameMode)mr.Read<int>();
                 Client.fetch.serverAllowCheats = mr.Read<bool>();
                 numberOfKerbals = mr.Read<int>();
+                Settings.fetch.numberOfKerbalToSpawn = mr.Read<int>();
                 ScenarioWorker.fetch.autoSendScenarios = mr.Read<bool>();
                 ScenarioWorker.fetch.nonGroupScenarios = mr.Read<bool>();
                 ScenarioWorker.fetch.canResetScenario = mr.Read<bool>();
@@ -1216,8 +1253,6 @@ namespace SyncrioClientSide
                 else
                 {
                     GameParameters newParameters = new GameParameters();
-                    GameParameters.AdvancedParams newAdvancedParameters = new GameParameters.AdvancedParams();
-                    CommNet.CommNetParams newCommNetParameters = new CommNet.CommNetParams();
                     newParameters.Difficulty.AllowStockVessels = mr.Read<bool>();
                     newParameters.Difficulty.AutoHireCrews = mr.Read<bool>();
                     newParameters.Difficulty.BypassEntryPurchaseAfterResearch = mr.Read<bool>();
@@ -1238,23 +1273,26 @@ namespace SyncrioClientSide
                     //New KSP 1.2 Settings
                     newParameters.Difficulty.RespawnTimer = mr.Read<float>();
                     newParameters.Difficulty.EnableCommNet = mr.Read<bool>();
-                    newAdvancedParameters.EnableKerbalExperience = mr.Read<bool>();
-                    newAdvancedParameters.ImmediateLevelUp = mr.Read<bool>();
-                    newAdvancedParameters.AllowNegativeFunds = mr.Read<bool>();
-                    newAdvancedParameters.AllowNegativeScience = mr.Read<bool>();
-                    newAdvancedParameters.ResourceTransferObeyCrossfeed = mr.Read<bool>();
-                    newAdvancedParameters.BuildingImpactDamageMult = mr.Read<float>();
-                    newAdvancedParameters.PartUpgradesInCareer = newAdvancedParameters.PartUpgradesInSandbox = mr.Read<bool>();
-                    newCommNetParameters.requireSignalForControl = mr.Read<bool>();
-                    newCommNetParameters.rangeModifier = mr.Read<float>();
-                    newCommNetParameters.DSNModifier = mr.Read<float>();
-                    newCommNetParameters.occlusionMultiplierVac = mr.Read<float>();
-                    newCommNetParameters.occlusionMultiplierAtm = mr.Read<float>();
-                    newCommNetParameters.enableGroundStations = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().EnableKerbalExperience = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().ImmediateLevelUp = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().AllowNegativeCurrency = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().PressurePartLimits = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().GPartLimits = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().GKerbalLimits = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().KerbalGToleranceMult = mr.Read<float>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().ResourceTransferObeyCrossfeed = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().ActionGroupsAlways = mr.Read<bool>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().BuildingImpactDamageMult = mr.Read<float>();
+                    newParameters.CustomParams<GameParameters.AdvancedParams>().PartUpgradesInCareer = newParameters.CustomParams<GameParameters.AdvancedParams>().PartUpgradesInSandbox = mr.Read<bool>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().requireSignalForControl = mr.Read<bool>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().plasmaBlackout = mr.Read<bool>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().rangeModifier = mr.Read<float>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().DSNModifier = mr.Read<float>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().occlusionMultiplierVac = mr.Read<float>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().occlusionMultiplierAtm = mr.Read<float>();
+                    newParameters.CustomParams<CommNet.CommNetParams>().enableGroundStations = mr.Read<bool>();
 
                     Client.fetch.serverParameters = newParameters;
-                    Client.fetch.serverAdvancedParameters = newAdvancedParameters;
-                    Client.fetch.serverCommNetParameters = newCommNetParameters;
                 }
             }
         }
@@ -1266,10 +1304,12 @@ namespace SyncrioClientSide
                 string playerName = mr.Read<string>();
                 string vesselText = mr.Read<string>();
                 string statusText = mr.Read<string>();
+                string groupName = mr.Read<string>();
                 PlayerStatus newStatus = new PlayerStatus();
                 newStatus.playerName = playerName;
                 newStatus.vesselText = vesselText;
                 newStatus.statusText = statusText;
+                newStatus.groupName = groupName;
                 PlayerStatusWorker.fetch.AddPlayerStatus(newStatus);
             }
         }
@@ -1293,6 +1333,7 @@ namespace SyncrioClientSide
                 using (MessageReader mr = new MessageReader(messageData))
                 {
                     string playerName = mr.Read<string>();
+                    WarpWorker.fetch.RemovePlayer(playerName);
                     PlayerStatusWorker.fetch.RemovePlayerStatus(playerName);
                     ChatWorker.fetch.QueueRemovePlayer(playerName);
                     LockSystem.fetch.ReleasePlayerLocks(playerName);
@@ -1304,6 +1345,7 @@ namespace SyncrioClientSide
                 using (MessageReader mr = new MessageReader(messageData))
                 {
                     string playerName = mr.Read<string>();
+                    WarpWorker.fetch.RemovePlayer(playerName);
                     PlayerStatusWorker.fetch.RemovePlayerStatus(playerName);
                 }
             }
@@ -1325,10 +1367,6 @@ namespace SyncrioClientSide
             using (MessageReader mr = new MessageReader(messageData))
             {
                 string[] scenarioName = mr.Read<string[]>();
-                string[] scenarioFundsHistory = mr.Read<string[]>();
-                string[] scenarioRepHistory = mr.Read<string[]>();
-                string[] scenarioSciHistory = mr.Read<string[]>();
-                ScenarioWorker.fetch.ScenatioVersionHistoryFromGroup(scenarioFundsHistory, scenarioRepHistory, scenarioSciHistory);
                 for (int i = 0; i < scenarioName.Length; i++)
                 {
                     byte[] scenarioData = Compression.DecompressIfNeeded(mr.Read<byte[]>());
@@ -1342,6 +1380,10 @@ namespace SyncrioClientSide
                         SyncrioLog.Debug("Scenario data has been lost for " + scenarioName[i]);
                         ScreenMessages.PostScreenMessage("Scenario data has been lost for " + scenarioName[i], 5f, ScreenMessageStyle.UPPER_CENTER);
                     }
+                }
+                if (Client.fetch.gameRunning)
+                {
+                    ScenarioWorker.fetch.LoadScenarioData();
                 }
             }
         }
@@ -1549,6 +1591,11 @@ namespace SyncrioClientSide
             }
         }
 
+        private void HandleWarpControl(byte[] messageData)
+        {
+            WarpWorker.fetch.QueueWarpMessage(messageData);
+        }
+
         private void HandleSplitMessage(byte[] messageData)
         {
             if (!isReceivingSplitMessage)
@@ -1643,6 +1690,7 @@ namespace SyncrioClientSide
                 mw.Write<string>(playerStatus.playerName);
                 mw.Write<string>(playerStatus.vesselText);
                 mw.Write<string>(playerStatus.statusText);
+                mw.Write<string>(playerStatus.groupName);
                 messageBytes = mw.GetMessageBytes();
             }
             ClientMessage newMessage = new ClientMessage();
@@ -1672,14 +1720,13 @@ namespace SyncrioClientSide
             newMessage.data = messageBytes;
             QueueOutgoingMessage(newMessage, true);
         }
-
         private void SendKerbalsRequest()
         {
             ClientMessage newMessage = new ClientMessage();
             newMessage.type = ClientMessageType.KERBALS_REQUEST;
             QueueOutgoingMessage(newMessage, true);
         }
-        //Called fro craftLibraryWorker
+        //Called from craftLibraryWorker
         public void SendCraftLibraryMessage(byte[] messageData)
         {
             ClientMessage newMessage = new ClientMessage();
@@ -1695,7 +1742,7 @@ namespace SyncrioClientSide
             newMessage.data = messageData;
             QueueOutgoingMessage(newMessage, false);
         }
-
+        //Called from VesselWorker
         public void SendKerbalProtoMessage(string kerbalName, byte[] kerbalBytes)
         {
             if (kerbalBytes != null && kerbalBytes.Length > 0)
@@ -1716,6 +1763,10 @@ namespace SyncrioClientSide
             {
                 SyncrioLog.Debug("Failed to create byte[] data for kerbal " + kerbalName);
             }
+        }
+        public void SendVessels(ClientMessage message)
+        {
+            QueueOutgoingMessage(message, false);
         }
         //Called from chatWorker
         public void SendPingRequest()
@@ -1743,6 +1794,14 @@ namespace SyncrioClientSide
             newMessage.type = ClientMessageType.FLAG_SYNC;
             newMessage.data = messageData;
             QueueOutgoingMessage(newMessage, false);
+        }
+        //Called from warpWorker
+        public void SendWarpMessage(byte[] messageData)
+        {
+            ClientMessage newMessage = new ClientMessage();
+            newMessage.type = ClientMessageType.WARP_CONTROL;
+            newMessage.data = messageData;
+            QueueOutgoingMessage(newMessage, true);
         }
         //Called from lockSystem
         public void SendLockSystemMessage(byte[] messageData)
