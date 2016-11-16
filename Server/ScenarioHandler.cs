@@ -794,77 +794,110 @@ namespace SyncrioServer
                 {
                     editingProgress.basicProgress.altitudeRecord = pt.basicProgress.altitudeRecord;
 
-                    newGP.Progress.Add("altitudeRecord");
+                    if (pt.basicProgress.altitudeRecord.Count > 0)
+                    {
+                        newGP.Progress.Add("altitudeRecord");
+                    }
                 }
 
                 if (editingProgress.basicProgress.depthRecord.Count == 0)
                 {
                     editingProgress.basicProgress.depthRecord = pt.basicProgress.depthRecord;
 
-                    newGP.Progress.Add("depthRecord");
+                    if (pt.basicProgress.depthRecord.Count > 0)
+                    {
+                        newGP.Progress.Add("depthRecord");
+                    }
                 }
 
                 if (editingProgress.basicProgress.distanceRecord.Count == 0)
                 {
                     editingProgress.basicProgress.distanceRecord = pt.basicProgress.distanceRecord;
 
-                    newGP.Progress.Add("distanceRecord");
+                    if (pt.basicProgress.distanceRecord.Count > 0)
+                    {
+                        newGP.Progress.Add("distanceRecord");
+                    }
                 }
 
                 if (editingProgress.basicProgress.firstCrewToSurvive.Count == 0)
                 {
                     editingProgress.basicProgress.firstCrewToSurvive = pt.basicProgress.firstCrewToSurvive;
 
-                    newGP.Progress.Add("firstCrewToSurvive");
+                    if (pt.basicProgress.firstCrewToSurvive.Count > 0)
+                    {
+                        newGP.Progress.Add("firstCrewToSurvive");
+                    }
                 }
 
                 if (editingProgress.basicProgress.firstLaunch.Count == 0)
                 {
                     editingProgress.basicProgress.firstLaunch = pt.basicProgress.firstLaunch;
 
-                    newGP.Progress.Add("firstLaunch");
+                    if (pt.basicProgress.firstLaunch.Count > 0)
+                    {
+                        newGP.Progress.Add("firstLaunch");
+                    }
                 }
 
                 if (editingProgress.basicProgress.KSCLanding.Count == 0)
                 {
                     editingProgress.basicProgress.KSCLanding = pt.basicProgress.KSCLanding;
 
-                    newGP.Progress.Add("KSCLanding");
+                    if (pt.basicProgress.KSCLanding.Count > 0)
+                    {
+                        newGP.Progress.Add("KSCLanding");
+                    }
                 }
 
                 if (editingProgress.basicProgress.launchpadLanding.Count == 0)
                 {
                     editingProgress.basicProgress.launchpadLanding = pt.basicProgress.launchpadLanding;
 
-                    newGP.Progress.Add("launchpadLanding");
+                    if (pt.basicProgress.launchpadLanding.Count > 0)
+                    {
+                        newGP.Progress.Add("launchpadLanding");
+                    }
                 }
 
                 if (editingProgress.basicProgress.reachSpace.Count == 0)
                 {
                     editingProgress.basicProgress.reachSpace = pt.basicProgress.reachSpace;
 
-                    newGP.Progress.Add("reachSpace");
+                    if (pt.basicProgress.reachSpace.Count > 0)
+                    {
+                        newGP.Progress.Add("reachSpace");
+                    }
                 }
 
                 if (editingProgress.basicProgress.runwayLanding.Count == 0)
                 {
                     editingProgress.basicProgress.runwayLanding = pt.basicProgress.runwayLanding;
 
-                    newGP.Progress.Add("runwayLanding");
+                    if (pt.basicProgress.runwayLanding.Count > 0)
+                    {
+                        newGP.Progress.Add("runwayLanding");
+                    }
                 }
 
                 if (editingProgress.basicProgress.speedRecord.Count == 0)
                 {
                     editingProgress.basicProgress.speedRecord = pt.basicProgress.speedRecord;
 
-                    newGP.Progress.Add("speedRecord");
+                    if (pt.basicProgress.speedRecord.Count > 0)
+                    {
+                        newGP.Progress.Add("speedRecord");
+                    }
                 }
 
                 if (editingProgress.basicProgress.towerBuzz.Count == 0)
                 {
                     editingProgress.basicProgress.towerBuzz = pt.basicProgress.towerBuzz;
 
-                    newGP.Progress.Add("towerBuzz");
+                    if (pt.basicProgress.towerBuzz.Count > 0)
+                    {
+                        newGP.Progress.Add("towerBuzz");
+                    }
                 }
 
                 //Celestial Progress
@@ -890,133 +923,190 @@ namespace SyncrioServer
                             {
                                 editingCelestialProgress.baseConstruction = pt.celestialProgress[i].baseConstruction;
 
-                                newCP.Add("baseConstruction");
+                                if (pt.celestialProgress[i].baseConstruction.Count > 0)
+                                {
+                                    newCP.Add("baseConstruction");
+                                }
                             }
 
                             if (editingCelestialProgress.crewTransfer.Count == 0)
                             {
                                 editingCelestialProgress.crewTransfer = pt.celestialProgress[i].crewTransfer;
 
-                                newCP.Add("crewTransfer");
+                                if (pt.celestialProgress[i].crewTransfer.Count > 0)
+                                {
+                                    newCP.Add("crewTransfer");
+                                }
                             }
 
                             if (editingCelestialProgress.docking.Count == 0)
                             {
                                 editingCelestialProgress.docking = pt.celestialProgress[i].docking;
 
-                                newCP.Add("docking");
+                                if (pt.celestialProgress[i].docking.Count > 0)
+                                {
+                                    newCP.Add("docking");
+                                }
                             }
 
                             if (editingCelestialProgress.escape.Count == 0)
                             {
                                 editingCelestialProgress.escape = pt.celestialProgress[i].escape;
 
-                                newCP.Add("escape");
+                                if (pt.celestialProgress[i].escape.Count > 0)
+                                {
+                                    newCP.Add("escape");
+                                }
                             }
 
                             if (editingCelestialProgress.flagPlant.Count == 0)
                             {
                                 editingCelestialProgress.flagPlant = pt.celestialProgress[i].flagPlant;
 
-                                newCP.Add("flagPlant");
+                                if (pt.celestialProgress[i].flagPlant.Count > 0)
+                                {
+                                    newCP.Add("flagPlant");
+                                }
                             }
 
                             if (editingCelestialProgress.flight.Count == 0)
                             {
                                 editingCelestialProgress.flight = pt.celestialProgress[i].flight;
 
-                                newCP.Add("flight");
+                                if (pt.celestialProgress[i].flight.Count > 0)
+                                {
+                                    newCP.Add("flight");
+                                }
                             }
 
                             if (editingCelestialProgress.flyBy.Count == 0)
                             {
                                 editingCelestialProgress.flyBy = pt.celestialProgress[i].flyBy;
 
-                                newCP.Add("flyBy");
+                                if (pt.celestialProgress[i].flyBy.Count > 0)
+                                {
+                                    newCP.Add("flyBy");
+                                }
                             }
 
                             if (editingCelestialProgress.landing.Count == 0)
                             {
                                 editingCelestialProgress.landing = pt.celestialProgress[i].landing;
 
-                                newCP.Add("landing");
+                                if (pt.celestialProgress[i].landing.Count > 0)
+                                {
+                                    newCP.Add("landing");
+                                }
                             }
 
                             if (editingCelestialProgress.orbit.Count == 0)
                             {
                                 editingCelestialProgress.orbit = pt.celestialProgress[i].orbit;
 
-                                newCP.Add("orbit");
+                                if (pt.celestialProgress[i].orbit.Count > 0)
+                                {
+                                    newCP.Add("orbit");
+                                }
                             }
 
                             if (editingCelestialProgress.rendezvous.Count == 0)
                             {
                                 editingCelestialProgress.rendezvous = pt.celestialProgress[i].rendezvous;
 
-                                newCP.Add("rendezvous");
+                                if (pt.celestialProgress[i].rendezvous.Count > 0)
+                                {
+                                    newCP.Add("rendezvous");
+                                }
                             }
 
                             if (editingCelestialProgress.returnFromFlyby.Count == 0)
                             {
                                 editingCelestialProgress.returnFromFlyby = pt.celestialProgress[i].returnFromFlyby;
 
-                                newCP.Add("returnFromFlyby");
+                                if (pt.celestialProgress[i].returnFromFlyby.Count > 0)
+                                {
+                                    newCP.Add("returnFromFlyby");
+                                }
                             }
 
                             if (editingCelestialProgress.returnFromOrbit.Count == 0)
                             {
                                 editingCelestialProgress.returnFromOrbit = pt.celestialProgress[i].returnFromOrbit;
 
-                                newCP.Add("returnFromOrbit");
+                                if (pt.celestialProgress[i].returnFromOrbit.Count > 0)
+                                {
+                                    newCP.Add("returnFromOrbit");
+                                }
                             }
 
                             if (editingCelestialProgress.returnFromSurface.Count == 0)
                             {
                                 editingCelestialProgress.returnFromSurface = pt.celestialProgress[i].returnFromSurface;
 
-                                newCP.Add("returnFromSurface");
+                                if (pt.celestialProgress[i].returnFromSurface.Count > 0)
+                                {
+                                    newCP.Add("returnFromSurface");
+                                }
                             }
 
                             if (editingCelestialProgress.science.Count == 0)
                             {
                                 editingCelestialProgress.science = pt.celestialProgress[i].science;
 
-                                newCP.Add("science");
+                                if (pt.celestialProgress[i].science.Count > 0)
+                                {
+                                    newCP.Add("science");
+                                }
                             }
 
                             if (editingCelestialProgress.spacewalk.Count == 0)
                             {
                                 editingCelestialProgress.spacewalk = pt.celestialProgress[i].spacewalk;
 
-                                newCP.Add("spacewalk");
+                                if (pt.celestialProgress[i].spacewalk.Count > 0)
+                                {
+                                    newCP.Add("spacewalk");
+                                }
                             }
 
                             if (editingCelestialProgress.splashdown.Count == 0)
                             {
                                 editingCelestialProgress.splashdown = pt.celestialProgress[i].splashdown;
 
-                                newCP.Add("splashdown");
+                                if (pt.celestialProgress[i].splashdown.Count > 0)
+                                {
+                                    newCP.Add("splashdown");
+                                }
                             }
 
                             if (editingCelestialProgress.stationConstruction.Count == 0)
                             {
                                 editingCelestialProgress.stationConstruction = pt.celestialProgress[i].stationConstruction;
 
-                                newCP.Add("stationConstruction");
+                                if (pt.celestialProgress[i].stationConstruction.Count > 0)
+                                {
+                                    newCP.Add("stationConstruction");
+                                }
                             }
 
                             if (editingCelestialProgress.suborbit.Count == 0)
                             {
                                 editingCelestialProgress.suborbit = pt.celestialProgress[i].suborbit;
 
-                                newCP.Add("suborbit");
+                                if (pt.celestialProgress[i].suborbit.Count > 0)
+                                {
+                                    newCP.Add("suborbit");
+                                }
                             }
 
                             if (editingCelestialProgress.surfaceEVA.Count == 0)
                             {
                                 editingCelestialProgress.surfaceEVA = pt.celestialProgress[i].surfaceEVA;
 
-                                newCP.Add("surfaceEVA");
+                                if (pt.celestialProgress[i].surfaceEVA.Count > 0)
+                                {
+                                    newCP.Add("surfaceEVA");
+                                }
                             }
 
                             editingProgress.celestialProgress[key] = editingCelestialProgress;
@@ -1044,259 +1134,370 @@ namespace SyncrioServer
                 {
                     editingProgress.secrets.POIBopDeadKraken = pt.secrets.POIBopDeadKraken;
 
-                    newGP.Secrets.Add("POIBopDeadKraken");
+                    if (pt.secrets.POIBopDeadKraken.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIBopDeadKraken");
+                    }
                 }
 
                 if (editingProgress.secrets.POIBopRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIBopRandolith = pt.secrets.POIBopRandolith;
 
-                    newGP.Secrets.Add("POIBopRandolith");
+                    if (pt.secrets.POIBopRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIBopRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIDresRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIDresRandolith = pt.secrets.POIDresRandolith;
 
-                    newGP.Secrets.Add("POIDresRandolith");
+                    if (pt.secrets.POIDresRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIDresRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIDunaFace.Count == 0)
                 {
                     editingProgress.secrets.POIDunaFace = pt.secrets.POIDunaFace;
 
-                    newGP.Secrets.Add("POIDunaFace");
+                    if (pt.secrets.POIDunaFace.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIDunaFace");
+                    }
                 }
 
                 if (editingProgress.secrets.POIDunaMSL.Count == 0)
                 {
                     editingProgress.secrets.POIDunaMSL = pt.secrets.POIDunaMSL;
 
-                    newGP.Secrets.Add("POIDunaMSL");
+                    if (pt.secrets.POIDunaMSL.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIDunaMSL");
+                    }
                 }
 
                 if (editingProgress.secrets.POIDunaPyramid.Count == 0)
                 {
                     editingProgress.secrets.POIDunaPyramid = pt.secrets.POIDunaPyramid;
 
-                    newGP.Secrets.Add("POIDunaPyramid");
+                    if (pt.secrets.POIDunaPyramid.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIDunaPyramid");
+                    }
                 }
 
                 if (editingProgress.secrets.POIDunaRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIDunaRandolith = pt.secrets.POIDunaRandolith;
 
-                    newGP.Secrets.Add("POIDunaRandolith");
+                    if (pt.secrets.POIDunaRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIDunaRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIEelooRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIEelooRandolith = pt.secrets.POIEelooRandolith;
 
-                    newGP.Secrets.Add("POIEelooRandolith");
+                    if (pt.secrets.POIEelooRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIEelooRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIEveRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIEveRandolith = pt.secrets.POIEveRandolith;
 
-                    newGP.Secrets.Add("POIEveRandolith");
+                    if (pt.secrets.POIEveRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIEveRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIGillyRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIGillyRandolith = pt.secrets.POIGillyRandolith;
 
-                    newGP.Secrets.Add("POIGillyRandolith");
+                    if (pt.secrets.POIGillyRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIGillyRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIIkeRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIIkeRandolith = pt.secrets.POIIkeRandolith;
 
-                    newGP.Secrets.Add("POIIkeRandolith");
+                    if (pt.secrets.POIIkeRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIIkeRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinIslandAirfield.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinIslandAirfield = pt.secrets.POIKerbinIslandAirfield;
 
-                    newGP.Secrets.Add("POIKerbinIslandAirfield");
+                    if (pt.secrets.POIKerbinIslandAirfield.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinIslandAirfield");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinKSC2.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinKSC2 = pt.secrets.POIKerbinKSC2;
 
-                    newGP.Secrets.Add("POIKerbinKSC2");
+                    if (pt.secrets.POIKerbinKSC2.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinKSC2");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinMonolith00.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinMonolith00 = pt.secrets.POIKerbinMonolith00;
 
-                    newGP.Secrets.Add("POIKerbinMonolith00");
+                    if (pt.secrets.POIKerbinMonolith00.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinMonolith00");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinMonolith01.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinMonolith01 = pt.secrets.POIKerbinMonolith01;
 
-                    newGP.Secrets.Add("POIKerbinMonolith01");
+                    if (pt.secrets.POIKerbinMonolith01.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinMonolith01");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinMonolith02.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinMonolith02 = pt.secrets.POIKerbinMonolith02;
 
-                    newGP.Secrets.Add("POIKerbinMonolith02");
+                    if (pt.secrets.POIKerbinMonolith02.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinMonolith02");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinPyramids.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinPyramids = pt.secrets.POIKerbinPyramids;
 
-                    newGP.Secrets.Add("POIKerbinPyramids");
+                    if (pt.secrets.POIKerbinPyramids.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinPyramids");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinRandolith = pt.secrets.POIKerbinRandolith;
 
-                    newGP.Secrets.Add("POIKerbinRandolith");
+                    if (pt.secrets.POIKerbinRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIKerbinUFO.Count == 0)
                 {
                     editingProgress.secrets.POIKerbinUFO = pt.secrets.POIKerbinUFO;
 
-                    newGP.Secrets.Add("POIKerbinUFO");
+                    if (pt.secrets.POIKerbinUFO.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIKerbinUFO");
+                    }
                 }
 
                 if (editingProgress.secrets.POILaytheRandolith.Count == 0)
                 {
                     editingProgress.secrets.POILaytheRandolith = pt.secrets.POILaytheRandolith;
 
-                    newGP.Secrets.Add("POILaytheRandolith");
+                    if (pt.secrets.POILaytheRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POILaytheRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMinmusMonolith00.Count == 0)
                 {
                     editingProgress.secrets.POIMinmusMonolith00 = pt.secrets.POIMinmusMonolith00;
 
-                    newGP.Secrets.Add("POIMinmusMonolith00");
+                    if (pt.secrets.POIMinmusMonolith00.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMinmusMonolith00");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMinmusRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIMinmusRandolith = pt.secrets.POIMinmusRandolith;
 
-                    newGP.Secrets.Add("POIMinmusRandolith");
+                    if (pt.secrets.POIMinmusRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMinmusRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMohoRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIMohoRandolith = pt.secrets.POIMohoRandolith;
 
-                    newGP.Secrets.Add("POIMohoRandolith");
+                    if (pt.secrets.POIMohoRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMohoRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunArmstrongMemorial.Count == 0)
                 {
                     editingProgress.secrets.POIMunArmstrongMemorial = pt.secrets.POIMunArmstrongMemorial;
 
-                    newGP.Secrets.Add("POIMunArmstrongMemorial");
+                    if (pt.secrets.POIMunArmstrongMemorial.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunArmstrongMemorial");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunMonolith00.Count == 0)
                 {
                     editingProgress.secrets.POIMunMonolith00 = pt.secrets.POIMunMonolith00;
 
-                    newGP.Secrets.Add("POIMunMonolith00");
+                    if (pt.secrets.POIMunMonolith00.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunMonolith00");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunMonolith01.Count == 0)
                 {
                     editingProgress.secrets.POIMunMonolith01 = pt.secrets.POIMunMonolith01;
 
-                    newGP.Secrets.Add("POIMunMonolith01");
+                    if (pt.secrets.POIMunMonolith01.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunMonolith01");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunMonolith02.Count == 0)
                 {
                     editingProgress.secrets.POIMunMonolith02 = pt.secrets.POIMunMonolith02;
 
-                    newGP.Secrets.Add("POIMunMonolith02");
+                    if (pt.secrets.POIMunMonolith02.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunMonolith02");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIMunRandolith = pt.secrets.POIMunRandolith;
 
-                    newGP.Secrets.Add("POIMunRandolith");
+                    if (pt.secrets.POIMunRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunRockArch00.Count == 0)
                 {
                     editingProgress.secrets.POIMunRockArch00 = pt.secrets.POIMunRockArch00;
 
-                    newGP.Secrets.Add("POIMunRockArch00");
+                    if (pt.secrets.POIMunRockArch00.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunRockArch00");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunRockArch01.Count == 0)
                 {
                     editingProgress.secrets.POIMunRockArch01 = pt.secrets.POIMunRockArch01;
 
-                    newGP.Secrets.Add("POIMunRockArch01");
+                    if (pt.secrets.POIMunRockArch01.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunRockArch01");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunRockArch02.Count == 0)
                 {
                     editingProgress.secrets.POIMunRockArch02 = pt.secrets.POIMunRockArch02;
 
-                    newGP.Secrets.Add("POIMunRockArch02");
+                    if (pt.secrets.POIMunRockArch02.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunRockArch02");
+                    }
                 }
 
                 if (editingProgress.secrets.POIMunUFO.Count == 0)
                 {
                     editingProgress.secrets.POIMunUFO = pt.secrets.POIMunUFO;
 
-                    newGP.Secrets.Add("POIMunUFO");
+                    if (pt.secrets.POIMunUFO.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIMunUFO");
+                    }
                 }
 
                 if (editingProgress.secrets.POIPolRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIPolRandolith = pt.secrets.POIPolRandolith;
 
-                    newGP.Secrets.Add("POIPolRandolith");
+                    if (pt.secrets.POIPolRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIPolRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POITyloCave.Count == 0)
                 {
                     editingProgress.secrets.POITyloCave = pt.secrets.POITyloCave;
 
-                    newGP.Secrets.Add("POITyloCave");
+                    if (pt.secrets.POITyloCave.Count > 0)
+                    {
+                        newGP.Secrets.Add("POITyloCave");
+                    }
                 }
 
                 if (editingProgress.secrets.POITyloRandolith.Count == 0)
                 {
                     editingProgress.secrets.POITyloRandolith = pt.secrets.POITyloRandolith;
 
-                    newGP.Secrets.Add("POITyloRandolith");
+                    if (pt.secrets.POITyloRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POITyloRandolith");
+                    }
                 }
 
                 if (editingProgress.secrets.POIVallIcehenge.Count == 0)
                 {
                     editingProgress.secrets.POIVallIcehenge = pt.secrets.POIVallIcehenge;
 
-                    newGP.Secrets.Add("POIVallIcehenge");
+                    if (pt.secrets.POIVallIcehenge.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIVallIcehenge");
+                    }
                 }
 
                 if (editingProgress.secrets.POIVallRandolith.Count == 0)
                 {
                     editingProgress.secrets.POIVallRandolith = pt.secrets.POIVallRandolith;
 
-                    newGP.Secrets.Add("POIVallRandolith");
+                    if (pt.secrets.POIVallRandolith.Count > 0)
+                    {
+                        newGP.Secrets.Add("POIVallRandolith");
+                    }
                 }
                 /*                            *\
                  * -------------------------- *
@@ -3884,29 +4085,38 @@ namespace SyncrioServer
             {
                 List<string> subOutput = ByteArraySerializer.Deserialize(FileHandler.ReadFromFile(Path.Combine(Server.ScenarioDirectory, "GroupData", "AllGroupProgress.txt")));
 
-                int cursor = 0;
-                while (cursor < subOutput.Count)
+                if (subOutput != null)
                 {
-                    if (subOutput[cursor] == "GroupProgress" && subOutput[cursor + 1] == "{")
+                    int cursor = 0;
+                    while (cursor < subOutput.Count)
                     {
-                        int matchBracketIdx = DataCleaner.FindMatchingBracket(subOutput, cursor + 1);
-                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                        if (range.Key + 2 < subOutput.Count && range.Value - 3 > 0)
+                        if (subOutput[cursor] == "GroupProgress" && subOutput[cursor + 1] == "{")
                         {
-                            output.Add(subOutput.GetRange(range.Key + 2, range.Value - 3));
+                            int matchBracketIdx = DataCleaner.FindMatchingBracket(subOutput, cursor + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
 
-                            subOutput.RemoveRange(range.Key, range.Value);
+                            if (range.Key + 2 < subOutput.Count && range.Value - 3 > 0)
+                            {
+                                output.Add(subOutput.GetRange(range.Key + 2, range.Value - 3));
+
+                                subOutput.RemoveRange(range.Key, range.Value);
+                            }
+                            else
+                            {
+                                subOutput.RemoveRange(range.Key, range.Value);
+                            }
                         }
                         else
                         {
-                            subOutput.RemoveRange(range.Key, range.Value);
+                            cursor++;
                         }
                     }
-                    else
-                    {
-                        cursor++;
-                    }
+                }
+                else
+                {
+                    output = GetAllGroupsProgress();
+
+                    SaveAllGroupsProgress(output);
                 }
             }
             else

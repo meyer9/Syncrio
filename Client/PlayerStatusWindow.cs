@@ -243,93 +243,89 @@ namespace SyncrioClientSide
             }
             GUILayout.EndHorizontal();
             scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
-
-            //Draw subspaces
-            double ourTime = TimeSyncer.fetch.locked ? TimeSyncer.fetch.GetUniverseTime() : Planetarium.GetUniversalTime();
-            long serverClock = TimeSyncer.fetch.GetServerClock();
-            foreach (SubspaceDisplayEntry currentEntry in subspaceDisplay)
+            if (!Settings.fetch.DarkMultiPlayerCoopMode)
             {
-                double currentTime = 0;
-                double diffTime = 0;
-                string diffState = "Unknown";
-                if (!currentEntry.isUs)
+                //Draw subspaces
+                double ourTime = TimeSyncer.fetch.locked ? TimeSyncer.fetch.GetUniverseTime() : Planetarium.GetUniversalTime();
+                long serverClock = TimeSyncer.fetch.GetServerClock();
+                foreach (SubspaceDisplayEntry currentEntry in subspaceDisplay)
                 {
-                    if (!currentEntry.isWarping)
+                    double currentTime = 0;
+                    double diffTime = 0;
+                    string diffState = "Unknown";
+                    if (!currentEntry.isUs)
                     {
-                        //Subspace entry
-                        if (currentEntry.subspaceEntry != null)
+                        if (!currentEntry.isWarping)
                         {
-                            long serverClockDiff = serverClock - currentEntry.subspaceEntry.serverClock;
-                            double secondsDiff = serverClockDiff / 10000000d;
-                            currentTime = currentEntry.subspaceEntry.planetTime + (currentEntry.subspaceEntry.subspaceSpeed * secondsDiff);
-                            diffTime = currentTime - ourTime;
-                            diffState = (diffTime > 0) ? SecondsToVeryShortString((int)diffTime) + " in the future" : SecondsToVeryShortString(-(int)diffTime) + " in the past";
-                        }
-                    }
-                    else
-                    {
-                        //Warp entry
-                        if (currentEntry.warpingEntry != null)
-                        {
-                            float[] warpRates = TimeWarp.fetch.warpRates;
-                            if (currentEntry.warpingEntry.isPhysWarp)
+                            //Subspace entry
+                            if (currentEntry.subspaceEntry != null)
                             {
-                                warpRates = TimeWarp.fetch.physicsWarpRates;
+                                long serverClockDiff = serverClock - currentEntry.subspaceEntry.serverClock;
+                                double secondsDiff = serverClockDiff / 10000000d;
+                                currentTime = currentEntry.subspaceEntry.planetTime + (currentEntry.subspaceEntry.subspaceSpeed * secondsDiff);
+                                diffTime = currentTime - ourTime;
+                                diffState = (diffTime > 0) ? SecondsToVeryShortString((int)diffTime) + " in the future" : SecondsToVeryShortString(-(int)diffTime) + " in the past";
                             }
-                            long serverClockDiff = serverClock - currentEntry.warpingEntry.serverClock;
-                            double secondsDiff = serverClockDiff / 10000000d;
-                            currentTime = currentEntry.warpingEntry.planetTime + (warpRates[currentEntry.warpingEntry.rateIndex] * secondsDiff);
-                            diffTime = currentTime - ourTime;
-                            diffState = (diffTime > 0) ? SecondsToVeryShortString((int)diffTime) + " in the future" : SecondsToVeryShortString(-(int)diffTime) + " in the past";
                         }
-                    }
-                }
-                else
-                {
-                    currentTime = ourTime;
-                    diffState = "NOW";
-                }
-
-                //Draw the subspace black bar.
-                GUILayout.BeginHorizontal(subspaceStyle);
-                GUILayout.Label("T+ " + SecondsToShortString((int)currentTime) + " - " + diffState);
-                GUILayout.FlexibleSpace();
-                //Draw the sync button if needed
-                if ((WarpWorker.fetch.warpMode == WarpMode.SUBSPACE) && !currentEntry.isUs && !currentEntry.isWarping && (currentEntry.subspaceEntry != null) && (diffTime > 0))
-                {
-                    if (GUILayout.Button("Sync", buttonStyle))
-                    {
-                        TimeSyncer.fetch.LockSubspace(currentEntry.subspaceID);
-                    }
-                }
-                GUILayout.EndHorizontal();
-
-                foreach (string currentPlayer in currentEntry.players)
-                {
-                    if (currentPlayer == Settings.fetch.playerName)
-                    {
-                        DrawPlayerEntry(PlayerStatusWorker.fetch.myPlayerStatus);
+                        else
+                        {
+                            //Warp entry
+                            if (currentEntry.warpingEntry != null)
+                            {
+                                float[] warpRates = TimeWarp.fetch.warpRates;
+                                if (currentEntry.warpingEntry.isPhysWarp)
+                                {
+                                    warpRates = TimeWarp.fetch.physicsWarpRates;
+                                }
+                                long serverClockDiff = serverClock - currentEntry.warpingEntry.serverClock;
+                                double secondsDiff = serverClockDiff / 10000000d;
+                                currentTime = currentEntry.warpingEntry.planetTime + (warpRates[currentEntry.warpingEntry.rateIndex] * secondsDiff);
+                                diffTime = currentTime - ourTime;
+                                diffState = (diffTime > 0) ? SecondsToVeryShortString((int)diffTime) + " in the future" : SecondsToVeryShortString(-(int)diffTime) + " in the past";
+                            }
+                        }
                     }
                     else
                     {
-                        DrawPlayerEntry(PlayerStatusWorker.fetch.GetPlayerStatus(currentPlayer));
+                        currentTime = ourTime;
+                        diffState = "NOW";
+                    }
+
+                    //Draw the subspace black bar.
+                    GUILayout.BeginHorizontal(subspaceStyle);
+                    GUILayout.Label("T+ " + SecondsToShortString((int)currentTime) + " - " + diffState);
+                    GUILayout.FlexibleSpace();
+                    //Draw the sync button if needed
+                    if ((WarpWorker.fetch.warpMode == WarpMode.SUBSPACE) && !currentEntry.isUs && !currentEntry.isWarping && (currentEntry.subspaceEntry != null) && (diffTime > 0))
+                    {
+                        if (GUILayout.Button("Sync", buttonStyle))
+                        {
+                            TimeSyncer.fetch.LockSubspace(currentEntry.subspaceID);
+                        }
+                    }
+                    GUILayout.EndHorizontal();
+
+                    foreach (string currentPlayer in currentEntry.players)
+                    {
+                        if (currentPlayer == Settings.fetch.playerName)
+                        {
+                            DrawPlayerEntry(PlayerStatusWorker.fetch.myPlayerStatus);
+                        }
+                        else
+                        {
+                            DrawPlayerEntry(PlayerStatusWorker.fetch.GetPlayerStatus(currentPlayer));
+                        }
                     }
                 }
             }
-            /*
-            foreach (PlayerStatus currentPlayer in PlayerStatusWorker.fetch.playerStatusList)
+            else
             {
-                string currentPlayerName = currentPlayer.playerName;
-                if (currentPlayerName == Settings.fetch.playerName)
+                DrawPlayerEntry(PlayerStatusWorker.fetch.myPlayerStatus);
+                foreach (PlayerStatus currentPlayer in PlayerStatusWorker.fetch.playerStatusList)
                 {
-                    DrawPlayerEntry(PlayerStatusWorker.fetch.myPlayerStatus);
-                }
-                else
-                {
-                    DrawPlayerEntry(PlayerStatusWorker.fetch.GetPlayerStatus(currentPlayerName));
+                    DrawPlayerEntry(currentPlayer);
                 }
             }
-            */
             GUILayout.EndScrollView();
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();

@@ -55,6 +55,7 @@ namespace SyncrioClientSide
     public class VesselWorker
     {
         public bool workerEnabled;
+        public bool isDMPWarping = false;
         //Hooks enabled
         private static VesselWorker singleton;
         //Incoming queue
@@ -130,6 +131,30 @@ namespace SyncrioClientSide
                 }
                 SyncrioLog.Debug("Reverted " + updatesReverted + " updates");
                 ScreenMessages.PostScreenMessage("Reverted " + updatesReverted + " updates", 5f, ScreenMessageStyle.UPPER_CENTER);
+            }
+            lastUniverseTime = newUniverseTime;
+        }
+
+        public void DetectDMPSync()
+        {
+            double newUniverseTime = Planetarium.GetUniversalTime();
+            //10 second fudge to ignore TimeSyncer skips
+            if (newUniverseTime < (lastUniverseTime - 10f) || newUniverseTime > (lastUniverseTime + 10f))
+            {
+                if ((TimeWarp.CurrentRateIndex > 0) && (TimeWarp.CurrentRate > 1.1f) && TimeSyncer.fetch.locked && !isDMPWarping)
+                {
+                    SyncrioLog.Debug("Unlocking from subspace");
+                    TimeSyncer.fetch.UnlockSubspace();
+                    isDMPWarping = true;
+                }
+            }
+            else
+            {
+                if ((TimeWarp.CurrentRateIndex == 0) && (TimeWarp.CurrentRate < 1.1f) && !TimeSyncer.fetch.locked && (TimeSyncer.fetch.currentSubspace == -1) && isDMPWarping)
+                {
+                    WarpWorker.SendNewSubspace();
+                    isDMPWarping = false;
+                }
             }
             lastUniverseTime = newUniverseTime;
         }

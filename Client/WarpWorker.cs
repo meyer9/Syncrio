@@ -401,9 +401,12 @@ namespace SyncrioClientSide
                 SyncrioLog.Debug("Unlocking from subspace");
                 TimeSyncer.fetch.UnlockSubspace();
             }
-            if ((TimeWarp.CurrentRateIndex == 0) && (TimeWarp.CurrentRate < 1.1f) && !TimeSyncer.fetch.locked && ((warpMode == WarpMode.SUBSPACE) || (warpMode == WarpMode.SUBSPACE_SIMPLE)) && (TimeSyncer.fetch.currentSubspace == -1))
+            if (!VesselWorker.fetch.isDMPWarping)
             {
-                SendNewSubspace();
+                if ((TimeWarp.CurrentRateIndex == 0) && (TimeWarp.CurrentRate < 1.1f) && !TimeSyncer.fetch.locked && ((warpMode == WarpMode.SUBSPACE) || (warpMode == WarpMode.SUBSPACE_SIMPLE)) && (TimeSyncer.fetch.currentSubspace == -1))
+                {
+                    SendNewSubspace();
+                }
             }
         }
 

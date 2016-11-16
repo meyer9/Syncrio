@@ -70,6 +70,7 @@ namespace SyncrioClientSide
         public bool fireReset;
         public GameMode gameMode;
         public bool serverAllowCheats = true;
+        private bool madeItToSpaceCenter = false;
         //Disconnect message
         public bool displayDisconnectMessage;
         private ScreenMessage disconnectMessage;
@@ -409,41 +410,85 @@ namespace SyncrioClientSide
                             Settings.fetch.SaveSettings();
                             FlagSyncer.fetch.flagChangeEvent = true;
                         }
-                    }
 
-                    // save every GeeASL from each body in FlightGlobals
-                    if (HighLogic.LoadedScene == GameScenes.FLIGHT && bodiesGees.Count == 0)
-                    {
-                        foreach (CelestialBody body in FlightGlobals.fetch.bodies)
+                        // save every GeeASL from each body in FlightGlobals
+                        if (HighLogic.LoadedScene == GameScenes.FLIGHT && bodiesGees.Count == 0)
                         {
-                            bodiesGees.Add(body, body.GeeASL);
+                            foreach (CelestialBody body in FlightGlobals.fetch.bodies)
+                            {
+                                bodiesGees.Add(body, body.GeeASL);
+                            }
                         }
-                    }
 
-                    //handle use of cheats
-                    if (!serverAllowCheats)
-                    {
-                        CheatOptions.InfinitePropellant = false;
-                        CheatOptions.NoCrashDamage = false;
-                        CheatOptions.IgnoreAgencyMindsetOnContracts = false;
-                        CheatOptions.IgnoreMaxTemperature = false;
-                        CheatOptions.InfiniteElectricity = false;
-                        CheatOptions.NoCrashDamage = false;
-                        CheatOptions.UnbreakableJoints = false;
-
-                        foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
+                        //handle use of cheats
+                        if (!serverAllowCheats)
                         {
-                            gravityEntry.Key.GeeASL = gravityEntry.Value;
-                        }
-                    }
+                            CheatOptions.InfinitePropellant = false;
+                            CheatOptions.NoCrashDamage = false;
+                            CheatOptions.IgnoreAgencyMindsetOnContracts = false;
+                            CheatOptions.IgnoreMaxTemperature = false;
+                            CheatOptions.InfiniteElectricity = false;
+                            CheatOptions.NoCrashDamage = false;
+                            CheatOptions.UnbreakableJoints = false;
 
-                    if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready)
-                    {
-                        HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = Settings.fetch.revertEnabled || (PauseMenu.canSaveAndExit == ClearToSaveStatus.CLEAR);
+                            foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
+                            {
+                                gravityEntry.Key.GeeASL = gravityEntry.Value;
+                            }
+                        }
+
+                        if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready)
+                        {
+                            HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = Settings.fetch.revertEnabled || (PauseMenu.canSaveAndExit == ClearToSaveStatus.CLEAR);
+                        }
+                        else
+                        {
+                            HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
+                        }
                     }
                     else
                     {
-                        HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
+                        if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
+                        {
+                            madeItToSpaceCenter = true;
+                        }
+                        if (madeItToSpaceCenter)
+                        {
+                            // save every GeeASL from each body in FlightGlobals
+                            if (HighLogic.LoadedScene == GameScenes.FLIGHT && bodiesGees.Count == 0)
+                            {
+                                foreach (CelestialBody body in FlightGlobals.fetch.bodies)
+                                {
+                                    bodiesGees.Add(body, body.GeeASL);
+                                }
+                            }
+
+                            //handle use of cheats
+                            if (!serverAllowCheats)
+                            {
+                                CheatOptions.InfinitePropellant = false;
+                                CheatOptions.NoCrashDamage = false;
+                                CheatOptions.IgnoreAgencyMindsetOnContracts = false;
+                                CheatOptions.IgnoreMaxTemperature = false;
+                                CheatOptions.InfiniteElectricity = false;
+                                CheatOptions.NoCrashDamage = false;
+                                CheatOptions.UnbreakableJoints = false;
+
+                                foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
+                                {
+                                    gravityEntry.Key.GeeASL = gravityEntry.Value;
+                                }
+                            }
+
+                            if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready)
+                            {
+                                HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = Settings.fetch.revertEnabled || (PauseMenu.canSaveAndExit == ClearToSaveStatus.CLEAR);
+                            }
+                            else
+                            {
+                                HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
+                            }
+                        }
                     }
                 }
 
@@ -451,6 +496,7 @@ namespace SyncrioClientSide
                 {
                     fireReset = false;
                     FireResetEvent();
+                    madeItToSpaceCenter = false;
                 }
 
                 if (startGame)

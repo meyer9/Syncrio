@@ -292,6 +292,7 @@ namespace SyncrioClientSide
             windowRect = new Rect(Screen.width - WINDOW_WIDTH, Screen.height / 2f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
             windowRectChangeLeader = new Rect(Screen.width * 0.5f - WINDOW_WIDTH_CHANGE_LEADER, Screen.height / 2f - WINDOW_HEIGHT_CHANGE_LEADER / 2f, WINDOW_WIDTH_CHANGE_LEADER, WINDOW_HEIGHT_CHANGE_LEADER);
             windowRectInvitePlayer = new Rect(Screen.width * 0.5f - WINDOW_WIDTH_INVITE_PLAYER, Screen.height / 2f - WINDOW_HEIGHT_INVITE_PLAYER / 2f, WINDOW_WIDTH_INVITE_PLAYER, WINDOW_HEIGHT_INVITE_PLAYER);
+            windowRectGroupProgress = new Rect(WINDOW_WIDTH * 2, Screen.height / 2f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
             moveRect = new Rect(0, 0, 10000, 20);
             windowStyle = new GUIStyle(GUI.skin.window);
             labelStyle = new GUIStyle(GUI.skin.label);
