@@ -83,13 +83,9 @@ namespace SyncrioServer
 
         public List<string> Deserialize(byte[] data)
         {
-            if (data == null)
+            if (data == null || data.Length == 0)
             {
-                return null;
-            }
-
-            if (data.Length == 0)
-            {
+                SyncrioLog.Debug("ByteArraySerializer's 'Deserialize' function was given null/empty data!");
                 return null;
             }
 

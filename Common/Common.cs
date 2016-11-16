@@ -61,9 +61,9 @@ namespace SyncrioCommon
         //Split messages into 8kb chunks to higher priority messages have more injection points into the TCP stream.
         public const int SPLIT_MESSAGE_LENGTH = 8192;
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
-        public const int PROTOCOL_VERSION = 41;
+        public const int PROTOCOL_VERSION = 43;
         //Program version. This is written in the build scripts.
-        public const string PROGRAM_VERSION = "v0.2.5.1";
+        public const string PROGRAM_VERSION = "v0.9.0.0";
         //Compression threshold
         public const int COMPRESSION_THRESHOLD = 4096;
 
@@ -153,7 +153,7 @@ namespace SyncrioCommon
         PLAYER_STATUS,
         PLAYER_COLOR,
         SYNC_SCENARIO_REQUEST,
-        INITIAL_SCENARIO_DATA_REQUEST,
+        SEND_VESSELS,
         RESET_SCENARIO,
         JOIN_GROUP_REQUEST,
         LEAVE_GROUP,
@@ -173,6 +173,7 @@ namespace SyncrioCommon
         SYNC_TIME_REQUEST,
         PING_REQUEST,
         MOTD_REQUEST,
+        WARP_CONTROL,
         LOCK_SYSTEM,
         GROUP_SYSTEM,
         MOD_DATA,
@@ -192,8 +193,9 @@ namespace SyncrioCommon
         PLAYER_JOIN,
         PLAYER_DISCONNECT,
         SCENARIO_DATA,
-        INITIAL_SCENARIO_DATA_REPLY,
         AUTO_SYNC_SCENARIO_REQUEST,
+        AUTO_SEND_GROUP_PROGRESS,
+        SEND_VESSELS,
         CREATE_GROUP_REPLY,
         CREATE_GROUP_ERROR,
         CHANGE_LEADER_REQUEST_RELAY,
@@ -204,9 +206,11 @@ namespace SyncrioCommon
         CRAFT_LIBRARY,
         SCREENSHOT_LIBRARY,
         FLAG_SYNC,
+        SET_SUBSPACE,
         SYNC_TIME_REPLY,
         PING_REPLY,
         MOTD_REPLY,
+        WARP_CONTROL,
         ADMIN_SYSTEM,
         LOCK_SYSTEM,
         GROUP_SYSTEM,
@@ -240,11 +244,41 @@ namespace SyncrioCommon
         DISCONNECTING
     }
 
+    public enum WarpMode
+    {
+        MCW_FORCE,
+        MCW_VOTE,
+        MCW_LOWEST,
+        SUBSPACE_SIMPLE,
+        SUBSPACE,
+        NONE
+    }
+
     public enum GameMode
     {
         SANDBOX,
         SCIENCE,
         CAREER
+    }
+
+    public enum WarpMessageType
+    {
+        //MCW_VOTE
+        REQUEST_VOTE,
+        REPLY_VOTE,
+        //ALL
+        CHANGE_WARP,
+        //MCW_VOTE/FORCE
+        REQUEST_CONTROLLER,
+        RELEASE_CONTROLLER,
+        //MCW_VOTE/FORCE/LOWEST
+        IGNORE_WARP,
+        SET_CONTROLLER,
+        //ALL
+        NEW_SUBSPACE,
+        CHANGE_SUBSPACE,
+        RELOCK_SUBSPACE,
+        REPORT_RATE
     }
 
     public enum CraftMessageType
@@ -334,6 +368,22 @@ namespace SyncrioCommon
         public string playerName;
         public string vesselText;
         public string statusText;
+        public string groupName;
+    }
+
+    public class Subspace
+    {
+        public long serverClock;
+        public double planetTime;
+        public float subspaceSpeed;
+    }
+
+    public class PlayerWarpRate
+    {
+        public bool isPhysWarp = false;
+        public int rateIndex = 0;
+        public long serverClock = 0;
+        public double planetTime = 0;
     }
 
     public class GroupObject

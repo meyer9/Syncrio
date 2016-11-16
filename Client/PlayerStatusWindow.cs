@@ -71,12 +71,14 @@ namespace SyncrioClientSide
         private GUILayoutOption[] minLayoutOptions;
         //Styles
         private GUIStyle windowStyle;
+        private GUIStyle subspaceStyle;
         private GUIStyle buttonStyle;
         private GUIStyle highlightStyle;
         private GUIStyle scrollStyle;
         private Dictionary<string, GUIStyle> playerNameStyle;
         private GUIStyle stateTextStyle;
         //Player status dictionaries
+        private SubspaceDisplayEntry[] subspaceDisplay;
         private double lastStatusUpdate;
         //const
         private const float WINDOW_HEIGHT = 400;
@@ -105,6 +107,10 @@ namespace SyncrioClientSide
             highlightStyle.active.textColor = Color.red;
             highlightStyle.hover.textColor = Color.red;
             scrollStyle = new GUIStyle(GUI.skin.scrollView);
+            subspaceStyle = new GUIStyle();
+            subspaceStyle.normal.background = new Texture2D(1, 1);
+            subspaceStyle.normal.background.SetPixel(0, 0, Color.black);
+            subspaceStyle.normal.background.Apply();
 
             layoutOptions = new GUILayoutOption[4];
             layoutOptions[0] = GUILayout.MinWidth(WINDOW_WIDTH);
@@ -128,6 +134,8 @@ namespace SyncrioClientSide
             stateTextStyle.fontStyle = FontStyle.Normal;
             stateTextStyle.fontSize = 12;
             stateTextStyle.stretchWidth = true;
+
+            subspaceDisplay = new SubspaceDisplayEntry[0];
         }
 
         private void Update()
@@ -140,7 +148,10 @@ namespace SyncrioClientSide
             {
                 if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
                 {
-                    displayEnable = true;
+                    if (PlayerStatusWorker.fetch.workerEnabled)
+                    {
+                        displayEnable = true;
+                    }
                 }
                 else
                 {
@@ -161,6 +172,7 @@ namespace SyncrioClientSide
                 if ((UnityEngine.Time.realtimeSinceStartup - lastStatusUpdate) > UPDATE_STATUS_INTERVAL)
                 {
                     lastStatusUpdate = UnityEngine.Time.realtimeSinceStartup;
+                    subspaceDisplay = WarpWorker.fetch.GetSubspaceDisplayEntries();
                 }
             }
         }
@@ -232,6 +244,79 @@ namespace SyncrioClientSide
             GUILayout.EndHorizontal();
             scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
 
+            //Draw subspaces
+            double ourTime = TimeSyncer.fetch.locked ? TimeSyncer.fetch.GetUniverseTime() : Planetarium.GetUniversalTime();
+            long serverClock = TimeSyncer.fetch.GetServerClock();
+            foreach (SubspaceDisplayEntry currentEntry in subspaceDisplay)
+            {
+                double currentTime = 0;
+                double diffTime = 0;
+                string diffState = "Unknown";
+                if (!currentEntry.isUs)
+                {
+                    if (!currentEntry.isWarping)
+                    {
+                        //Subspace entry
+                        if (currentEntry.subspaceEntry != null)
+                        {
+                            long serverClockDiff = serverClock - currentEntry.subspaceEntry.serverClock;
+                            double secondsDiff = serverClockDiff / 10000000d;
+                            currentTime = currentEntry.subspaceEntry.planetTime + (currentEntry.subspaceEntry.subspaceSpeed * secondsDiff);
+                            diffTime = currentTime - ourTime;
+                            diffState = (diffTime > 0) ? SecondsToVeryShortString((int)diffTime) + " in the future" : SecondsToVeryShortString(-(int)diffTime) + " in the past";
+                        }
+                    }
+                    else
+                    {
+                        //Warp entry
+                        if (currentEntry.warpingEntry != null)
+                        {
+                            float[] warpRates = TimeWarp.fetch.warpRates;
+                            if (currentEntry.warpingEntry.isPhysWarp)
+                            {
+                                warpRates = TimeWarp.fetch.physicsWarpRates;
+                            }
+                            long serverClockDiff = serverClock - currentEntry.warpingEntry.serverClock;
+                            double secondsDiff = serverClockDiff / 10000000d;
+                            currentTime = currentEntry.warpingEntry.planetTime + (warpRates[currentEntry.warpingEntry.rateIndex] * secondsDiff);
+                            diffTime = currentTime - ourTime;
+                            diffState = (diffTime > 0) ? SecondsToVeryShortString((int)diffTime) + " in the future" : SecondsToVeryShortString(-(int)diffTime) + " in the past";
+                        }
+                    }
+                }
+                else
+                {
+                    currentTime = ourTime;
+                    diffState = "NOW";
+                }
+
+                //Draw the subspace black bar.
+                GUILayout.BeginHorizontal(subspaceStyle);
+                GUILayout.Label("T+ " + SecondsToShortString((int)currentTime) + " - " + diffState);
+                GUILayout.FlexibleSpace();
+                //Draw the sync button if needed
+                if ((WarpWorker.fetch.warpMode == WarpMode.SUBSPACE) && !currentEntry.isUs && !currentEntry.isWarping && (currentEntry.subspaceEntry != null) && (diffTime > 0))
+                {
+                    if (GUILayout.Button("Sync", buttonStyle))
+                    {
+                        TimeSyncer.fetch.LockSubspace(currentEntry.subspaceID);
+                    }
+                }
+                GUILayout.EndHorizontal();
+
+                foreach (string currentPlayer in currentEntry.players)
+                {
+                    if (currentPlayer == Settings.fetch.playerName)
+                    {
+                        DrawPlayerEntry(PlayerStatusWorker.fetch.myPlayerStatus);
+                    }
+                    else
+                    {
+                        DrawPlayerEntry(PlayerStatusWorker.fetch.GetPlayerStatus(currentPlayer));
+                    }
+                }
+            }
+            /*
             foreach (PlayerStatus currentPlayer in PlayerStatusWorker.fetch.playerStatusList)
             {
                 string currentPlayerName = currentPlayer.playerName;
@@ -244,7 +329,7 @@ namespace SyncrioClientSide
                     DrawPlayerEntry(PlayerStatusWorker.fetch.GetPlayerStatus(currentPlayerName));
                 }
             }
-
+            */
             GUILayout.EndScrollView();
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();

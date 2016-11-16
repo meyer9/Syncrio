@@ -151,6 +151,7 @@ namespace SyncrioClientSide
                 resetEvent.Add(TimeSyncer.Reset);
                 resetEvent.Add(ToolbarSupport.Reset);
                 resetEvent.Add(VesselWorker.Reset);
+                resetEvent.Add(WarpWorker.Reset);
                 GameEvents.onHideUI.Add(() =>
                 {
                     showGUI = false;
@@ -272,7 +273,7 @@ namespace SyncrioClientSide
                 {
                     PlayerStatusWindow.fetch.disconnectEventHandled = true;
                     forceQuit = true;
-                    ScenarioWorker.fetch.scenarioSync(GroupSystem.playerGroupAssigned, false, true, false); // Send scenario modules before disconnecting
+                    ScenarioWorker.fetch.ScenarioSync(GroupSystem.playerGroupAssigned, false, true, false); // Send scenario modules before disconnecting
                     NetworkWorker.fetch.SendDisconnect("Quit");
                 }
                 if (!ConnectionWindow.fetch.renameEventHandled)
@@ -424,6 +425,11 @@ namespace SyncrioClientSide
                     {
                         CheatOptions.InfinitePropellant = false;
                         CheatOptions.NoCrashDamage = false;
+                        CheatOptions.IgnoreAgencyMindsetOnContracts = false;
+                        CheatOptions.IgnoreMaxTemperature = false;
+                        CheatOptions.InfiniteElectricity = false;
+                        CheatOptions.NoCrashDamage = false;
+                        CheatOptions.UnbreakableJoints = false;
 
                         foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
                         {
@@ -529,6 +535,7 @@ namespace SyncrioClientSide
             //Group Become Leader window: 7715
             //Group Invite Player window: 7716
             //Scenario window: 7717
+            //Group Progress window: 7718
             long startClock = Profiler.SyncrioReferenceTime.ElapsedTicks;
             if (showGUI && toolbarShowGUI)
             {
@@ -557,14 +564,18 @@ namespace SyncrioClientSide
 
             //Set difficulty
             HighLogic.CurrentGame.Parameters = serverParameters;
-            
+
+            //Set universe time
+            HighLogic.CurrentGame.flightState.universalTime = TimeSyncer.fetch.GetUniverseTime();
+
             //Load Syncrio stuff
             VesselWorker.fetch.LoadKerbalsIntoGame();
+            VesselWorker.fetch.HandleVessels();
 
             //Load the scenarios from the server
             ScenarioWorker.fetch.LoadScenarioDataIntoGame();
 
-            //Load the missing scenarios as well (Eg, Contracts and stuff for career mode
+            //Load the missing scenarios as well (Eg, Contracts and stuff for career mode)
             ScenarioWorker.fetch.LoadMissingScenarioDataIntoGame();
 
             //This only makes KSP complain
@@ -626,7 +637,7 @@ namespace SyncrioClientSide
             if (gameRunning && NetworkWorker.fetch.state == ClientState.RUNNING)
             {
                 Application.CancelQuit();
-                ScenarioWorker.fetch.scenarioSync(GroupSystem.playerGroupAssigned, false, true, false);
+                ScenarioWorker.fetch.ScenarioSync(GroupSystem.playerGroupAssigned, false, true, false);
                 HighLogic.LoadScene(GameScenes.MAINMENU);
             }
         }

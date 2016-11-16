@@ -55,6 +55,10 @@ namespace SyncrioClientSide
         public bool workerEnabled = false;
         public bool display = false;
         private bool initialized = false;
+        private Vector2 scrollPosition;
+        private Vector2 scrollPositionTwo;
+        private Vector2 scrollPositionInvite;
+        private Vector2 scrollPositionProgress;
         private bool isWindowLocked = false;
         private object groupWindowLock = new object();
         private Dictionary<string, PickPlayerOrGroupButtons> joinButton = new Dictionary<string, PickPlayerOrGroupButtons>();
@@ -66,6 +70,7 @@ namespace SyncrioClientSide
         private GUIStyle labelStyle;
         private GUIStyle buttonStyle;
         private GUIStyle textAreaStyle;
+        private GUIStyle scrollStyle;
         private GUILayoutOption[] labelOptions;
         private GUILayoutOption[] labelOptionsTwo;
         private GUILayoutOption[] layoutOptions;
@@ -74,6 +79,7 @@ namespace SyncrioClientSide
         private Rect windowRect;
         private Rect windowRectChangeLeader;
         private Rect windowRectInvitePlayer;
+        private Rect windowRectGroupProgress;
         private Rect moveRect;
         private const float WINDOW_HEIGHT = 400;
         private const float WINDOW_WIDTH = 300;
@@ -82,17 +88,26 @@ namespace SyncrioClientSide
         private const float WINDOW_HEIGHT_INVITE_PLAYER = 300;
         private const float WINDOW_WIDTH_INVITE_PLAYER = 250;
         public static string groupNameCreate = "Syncrio's #1 Fans!";
-        public static string groupPasswordCreate = "";
-        public static string groupNameJoin = null;
-        public static string groupPasswordJoin = "";
-        public static string chosenPlayer = null;
-        public static string chosenPlayerToKick = null;
-        public static string chosenPlayerToInvite = null;
+        public static string groupPasswordCreate = string.Empty;
+        public static string groupNameJoin = string.Empty;
+        public static string groupPasswordJoin = string.Empty;
+        public static string chosenPlayer = string.Empty;
+        public static string chosenPlayerToKick = string.Empty;
+        public static string chosenPlayerToInvite = string.Empty;
         public static bool isLeaderKickingPlayer = false;
         public static bool voteKickPlayer = false;
         public static bool voteKeepPlayer = false;
-        public static string groupNameRename = "";
-        public static string groupPasswordSet = "";
+        public static string groupNameRename = string.Empty;
+        public static string groupPasswordSet = string.Empty;
+        private bool progressButtonPressed = false;
+        private string progressButtonSelectedGroup = string.Empty;
+        private int progressButtonSelectedSubspace = -1;
+        private bool currencyViewButtonPressed = false;
+        private bool techViewButtonPressed = false;
+        private bool progressViewButtonPressed = false;
+        private bool progressBasicViewButtonPressed = false;
+        private bool celestialProgressViewButtonPressed = false;
+        private bool secretsViewButtonPressed = false;
 
         public static GroupWindow fetch
         {
@@ -106,7 +121,7 @@ namespace SyncrioClientSide
         {
             if (workerEnabled)
             {
-
+                CheckWindowLock();
             }
         }
 
@@ -123,6 +138,7 @@ namespace SyncrioClientSide
                     SetInvitePlayerButton();
                     SetKickOrSelectPlayerButton();
                     SetKickPlayerStatus();
+                    CheckInvitePlayerButton();
                 }
                 windowRect = SyncrioGuiUtil.PreventOffscreenWindow(GUILayout.Window(7714 + Client.WINDOW_OFFSET, windowRect, DrawContent, "Syncrio - Group", windowStyle, layoutOptions));
                 if (GroupSystem.groupChangeLeaderWindowDisplay)
@@ -133,6 +149,10 @@ namespace SyncrioClientSide
                 {
                     windowRectInvitePlayer = SyncrioGuiUtil.PreventOffscreenWindow(GUILayout.Window(7716 + Client.WINDOW_OFFSET, windowRectInvitePlayer, DrawContentInvitePlayer, "Syncrio - Group - Invite Player", windowStyle, layoutOptionsThree));
                 }
+                if (GroupSystem.groupProgressButtons)
+                {
+                    windowRectGroupProgress = SyncrioGuiUtil.PreventOffscreenWindow(GUILayout.Window(7718 + Client.WINDOW_OFFSET, windowRectGroupProgress, DrawContentGroupProgress, "Syncrio - Group - Progress", windowStyle, layoutOptions));
+                }
             }
         }
 
@@ -142,6 +162,7 @@ namespace SyncrioClientSide
             if (GroupSystem.playerGroupAssigned)
             {
                 GroupSystem.playerGroupName = GroupSystem.fetch.GetPlayerGroup(Settings.fetch.playerName);
+                PlayerStatusWorker.fetch.myPlayerStatus.groupName = GroupSystem.playerGroupName;
                 string groupLeader = GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[0];
                 if (groupLeader == Settings.fetch.playerName)
                 {
@@ -154,7 +175,7 @@ namespace SyncrioClientSide
             }
             else
             {
-                GroupSystem.playerGroupName = null;
+                GroupSystem.playerGroupName = string.Empty;
             }
         }
 
@@ -201,13 +222,28 @@ namespace SyncrioClientSide
             }
         }
 
+        public void CheckInvitePlayerButton()
+        {
+            lock (groupWindowLock)
+            {
+                foreach (PlayerStatus ps in PlayerStatusWorker.fetch.playerStatusList)
+                {
+                    string playerName = ps.playerName;
+                    if (GroupSystem.fetch.PlayerIsInGroup(playerName))
+                    {
+                        invitePlayerButton.Remove(playerName);
+                    }
+                }
+            }
+        }
+
         public void SetKickOrSelectPlayerButton()
         {
             lock (groupWindowLock)
             {
                 if (GroupSystem.playerGroupAssigned)
                 {
-                    if (GroupSystem.playerGroupName != null)
+                    if (!string.IsNullOrEmpty(GroupSystem.playerGroupName))
                     {
                         foreach (string member in GroupSystem.fetch.groups[GroupSystem.playerGroupName].members)
                         {
@@ -231,7 +267,7 @@ namespace SyncrioClientSide
             {
                 if (GroupSystem.playerGroupAssigned)
                 {
-                    if (GroupSystem.playerGroupName != null)
+                    if (!string.IsNullOrEmpty(GroupSystem.playerGroupName))
                     {
                         foreach (string member in GroupSystem.fetch.groups[GroupSystem.playerGroupName].members)
                         {
@@ -261,6 +297,7 @@ namespace SyncrioClientSide
             labelStyle = new GUIStyle(GUI.skin.label);
             buttonStyle = new GUIStyle(GUI.skin.button);
             textAreaStyle = new GUIStyle(GUI.skin.textArea);
+            scrollStyle = new GUIStyle(GUI.skin.scrollView);
             layoutOptions = new GUILayoutOption[4];
             layoutOptions[0] = GUILayout.MinWidth(WINDOW_WIDTH);
             layoutOptions[1] = GUILayout.MaxWidth(WINDOW_WIDTH);
@@ -311,6 +348,8 @@ namespace SyncrioClientSide
                     GUILayout.EndHorizontal();
 
                     GUILayout.Space(20);
+
+                    scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
 
                     if (GroupSystem.fetch.groups.Count > 0)
                     {
@@ -370,6 +409,7 @@ namespace SyncrioClientSide
                             GUILayout.EndHorizontal();
                         }
                     }
+                    GUILayout.EndScrollView();
                     GUILayout.BeginHorizontal();
                 }
                 else
@@ -387,7 +427,7 @@ namespace SyncrioClientSide
                         GroupSystem.invitePlayerButtons = GUILayout.Toggle(GroupSystem.invitePlayerButtons, "Invite Player", buttonStyle);
                         if (GroupSystem.invitePlayerButtons)
                         {
-
+                            //Do nothing, it is handled elsewhere
                         }
                         GroupSystem.kickPlayerButtons = GUILayout.Toggle(GroupSystem.kickPlayerButtons, "Kick Player", buttonStyle);
                         if (GroupSystem.kickPlayerButtons)
@@ -395,6 +435,7 @@ namespace SyncrioClientSide
                             if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count > 1)
                             {
                                 GUILayout.EndHorizontal();
+                                scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
                                 foreach (string member in GroupSystem.fetch.groups[GroupSystem.playerGroupName].members)
                                 {
                                     if (member != Settings.fetch.playerName && member != GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[0])
@@ -421,8 +462,9 @@ namespace SyncrioClientSide
                                         GUILayout.EndHorizontal();
                                     }
                                 }
+                                GUILayout.EndScrollView();
+                                GUILayout.BeginHorizontal();
                             }
-                            GUILayout.BeginHorizontal();
                         }
 
                         GUILayout.EndHorizontal();
@@ -537,6 +579,7 @@ namespace SyncrioClientSide
                             if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count > 1)
                             {
                                 GUILayout.EndHorizontal();
+                                scrollPositionTwo = GUILayout.BeginScrollView(scrollPositionTwo, scrollStyle);
                                 foreach (string member in GroupSystem.fetch.groups[GroupSystem.playerGroupName].members)
                                 {
                                     if (member != Settings.fetch.playerName)
@@ -562,8 +605,9 @@ namespace SyncrioClientSide
                                         GUILayout.EndHorizontal();
                                     }
                                 }
+                                GUILayout.EndScrollView();
+                                GUILayout.BeginHorizontal();
                             }
-                            GUILayout.BeginHorizontal();
                             GroupSystem.kickPlayerButtons = false;
                         }
 
@@ -576,7 +620,14 @@ namespace SyncrioClientSide
                         }
                         else
                         {
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
                             GroupSystem.kickPlayerButtons = false;
+                            GUILayout.Label("Disband " + GroupSystem.playerGroupName, labelOptionsTwo);
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
                             GUILayout.Label("Are You Sure?", labelOptions);
                             GUILayout.EndHorizontal();
 
@@ -584,6 +635,7 @@ namespace SyncrioClientSide
                             if (GUILayout.Button("Yes, I'm Sure", buttonStyle))
                             {
                                 GroupSystem.fetch.RemoveGroup();
+                                GroupSystem.disbandGroupButtonPressed = false;
                             }
                             if (GUILayout.Button("No, I'm Not", buttonStyle))
                             {
@@ -596,6 +648,7 @@ namespace SyncrioClientSide
                             if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count > 1)
                             {
                                 GUILayout.EndHorizontal();
+                                scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
                                 for (int i = 0; i < GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count; i++)
                                 {
                                     if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[i] != Settings.fetch.playerName)
@@ -613,8 +666,21 @@ namespace SyncrioClientSide
                                         GUILayout.EndHorizontal();
                                     }
                                 }
+                                GUILayout.EndScrollView();
+                                GUILayout.BeginHorizontal();
                             }
-                            GUILayout.BeginHorizontal();
+                        }
+
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.FlexibleSpace();
+
+                        GUILayout.BeginHorizontal();
+                        
+                        GroupSystem.groupProgressButtons = GUILayout.Toggle(GroupSystem.groupProgressButtons, "Progress View", buttonStyle);
+                        if (GroupSystem.groupProgressButtons)
+                        {
+                            //Do nothing, it is handled elsewhere
                         }
                     }
                     else
@@ -632,7 +698,7 @@ namespace SyncrioClientSide
                             GroupSystem.invitePlayerButtons = GUILayout.Toggle(GroupSystem.invitePlayerButtons, "Invite Player", buttonStyle);
                             if (GroupSystem.invitePlayerButtons)
                             {
-
+                                //Do nothing, it is handled elsewhere
                             }
                         }
                         if (GUILayout.Button("Leave Group", buttonStyle))
@@ -652,6 +718,7 @@ namespace SyncrioClientSide
                             if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count > 2)
                             {
                                 GUILayout.EndHorizontal();
+                                scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
                                 foreach (string member in GroupSystem.fetch.groups[GroupSystem.playerGroupName].members)
                                 {
                                     if (member != Settings.fetch.playerName && member != GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[0])
@@ -693,14 +760,16 @@ namespace SyncrioClientSide
                                         GUILayout.EndHorizontal();
                                     }
                                 }
+                                GUILayout.EndScrollView();
+                                GUILayout.BeginHorizontal();
                             }
-                            GUILayout.BeginHorizontal();
                         }
                         else
                         {
                             if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count > 1)
                             {
                                 GUILayout.EndHorizontal();
+                                scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
                                 for (int i = 0; i < GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count; i++)
                                 {
                                     if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[i] != Settings.fetch.playerName)
@@ -718,8 +787,21 @@ namespace SyncrioClientSide
                                         GUILayout.EndHorizontal();
                                     }
                                 }
+                                GUILayout.EndScrollView();
+                                GUILayout.BeginHorizontal();
                             }
-                            GUILayout.BeginHorizontal();
+                        }
+
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.FlexibleSpace();
+
+                        GUILayout.BeginHorizontal();
+
+                        GroupSystem.groupProgressButtons = GUILayout.Toggle(GroupSystem.groupProgressButtons, "Progress View", buttonStyle);
+                        if (GroupSystem.groupProgressButtons)
+                        {
+                            //Do nothing, it is handled elsewhere
                         }
                     }
                 }
@@ -872,7 +954,9 @@ namespace SyncrioClientSide
                 GroupSystem.groupChangeLeaderWindowDisplay = false;
                 GroupSystem.fetch.ChangeGroupLeaderResponse(true);
             }
+            GUILayout.FlexibleSpace();
             GUILayout.Label("Or", labelOptions);
+            GUILayout.FlexibleSpace();
             if (GUILayout.Button("No.", buttonStyle))
             {
                 GroupSystem.groupChangeLeaderWindowDisplay = false;
@@ -894,6 +978,8 @@ namespace SyncrioClientSide
                 GUILayout.EndHorizontal();
 
                 GUILayout.Space(20);
+
+                scrollPositionInvite = GUILayout.BeginScrollView(scrollPositionInvite, scrollStyle);
 
                 foreach (KeyValuePair<string, PickPlayerOrGroupButtons> kvp in invitePlayerButton)
                 {
@@ -921,7 +1007,7 @@ namespace SyncrioClientSide
                         GUILayout.EndHorizontal();
                     }
                 }
-                GUILayout.BeginHorizontal();
+                GUILayout.EndScrollView();
             }
             else
             {
@@ -929,7 +1015,7 @@ namespace SyncrioClientSide
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
-                GUILayout.Label("What is to reply?", labelOptions);
+                GUILayout.Label("What is your reply?", labelOptions);
                 GUILayout.EndHorizontal();
 
                 GUILayout.Space(20);
@@ -940,14 +1026,275 @@ namespace SyncrioClientSide
                     GroupSystem.displayInvite = false;
                     GroupSystem.fetch.InviteResponse(true);
                 }
+                GUILayout.FlexibleSpace();
                 GUILayout.Label("Or", labelOptions);
+                GUILayout.FlexibleSpace();
                 if (GUILayout.Button("No.", buttonStyle))
                 {
                     GroupSystem.displayInvite = false;
                     GroupSystem.fetch.InviteResponse(false);
                 }
+                GUILayout.EndHorizontal();
             }
-            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+        private void DrawContentGroupProgress(int windowID)
+        {
+            GUILayout.BeginVertical();
+            GUI.DragWindow(moveRect);
+            GUILayout.Space(20);
+
+            scrollPositionProgress = GUILayout.BeginScrollView(scrollPositionProgress, scrollStyle);
+
+            if (!progressButtonPressed)
+            {
+                currencyViewButtonPressed = false;
+                techViewButtonPressed = false;
+                progressViewButtonPressed = false;
+                progressBasicViewButtonPressed = false;
+                celestialProgressViewButtonPressed = false;
+                secretsViewButtonPressed = false;
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Select a group to view", labelOptionsTwo);
+                GUILayout.EndHorizontal();
+
+                foreach (string key in GroupSystem.fetch.allGroupProgressList.Keys)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(key + ":", labelOptionsTwo);
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button("View", buttonStyle))
+                    {
+                        progressButtonPressed = true;
+                        progressButtonSelectedGroup = key;
+                        scrollPositionProgress = new Vector2();
+                    }
+                    GUILayout.EndHorizontal();
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(progressButtonSelectedGroup))
+                {
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Back", buttonStyle))
+                    {
+                        if (progressButtonSelectedSubspace == -1)
+                        {
+                            progressButtonPressed = false;
+                            progressButtonSelectedGroup = string.Empty;
+                            progressButtonSelectedSubspace = -1;
+                            scrollPositionProgress = new Vector2();
+                        }
+                        else
+                        {
+                            progressButtonSelectedSubspace = -1;
+                            scrollPositionProgress = new Vector2();
+
+                            currencyViewButtonPressed = false;
+                            techViewButtonPressed = false;
+                            progressViewButtonPressed = false;
+                            progressBasicViewButtonPressed = false;
+                            celestialProgressViewButtonPressed = false;
+                            secretsViewButtonPressed = false;
+                        }
+                    }
+                    GUILayout.EndHorizontal();
+
+                    if (progressButtonSelectedSubspace == -1)
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label("Select a subspace to view", labelOptionsTwo);
+                        GUILayout.EndHorizontal();
+
+                        foreach (int subspace in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup].Keys)
+                        {
+                            if (subspace != -1)
+                            {
+                                GUILayout.BeginHorizontal();
+                                GUILayout.Label("Subspace " + subspace, labelOptions);
+                                GUILayout.FlexibleSpace();
+                                if (GUILayout.Button("Select", buttonStyle))
+                                {
+                                    progressButtonSelectedSubspace = subspace;
+                                    scrollPositionProgress = new Vector2();
+                                }
+                                GUILayout.EndHorizontal();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label("Select a something to view", labelOptionsTwo);
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.BeginHorizontal();
+                        currencyViewButtonPressed = GUILayout.Toggle(currencyViewButtonPressed, "Currencies", buttonStyle);
+                        if (currencyViewButtonPressed)
+                        {
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("Funds = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Funds, labelOptionsTwo);
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("Rep = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Rep, labelOptionsTwo);
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("Sci = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Sci, labelOptionsTwo);
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+                        }
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.BeginHorizontal();
+                        techViewButtonPressed = GUILayout.Toggle(techViewButtonPressed, "Tech", buttonStyle);
+                        if (techViewButtonPressed)
+                        {
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("Number of Techs: " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Techs.Count, labelOptionsTwo);
+                            GUILayout.EndHorizontal();
+
+                            foreach (string tech in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Techs)
+                            {
+                                GUILayout.BeginHorizontal();
+                                GUILayout.Label("Tech: " + tech, labelOptionsTwo);
+                                GUILayout.EndHorizontal();
+                            }
+                            GUILayout.BeginHorizontal();
+                        }
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.BeginHorizontal();
+                        progressViewButtonPressed = GUILayout.Toggle(progressViewButtonPressed, "Progress", buttonStyle);
+                        if (progressViewButtonPressed)
+                        {
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+                            if (GUILayout.Button("Basic", buttonStyle))
+                            {
+                                if (!progressBasicViewButtonPressed)
+                                {
+                                    progressBasicViewButtonPressed = true;
+                                }
+                                else
+                                {
+                                    progressBasicViewButtonPressed = false;
+                                }
+                                celestialProgressViewButtonPressed = false;
+                                secretsViewButtonPressed = false;
+                            }
+
+                            if (GUILayout.Button("Celestial", buttonStyle))
+                            {
+                                progressBasicViewButtonPressed = false;
+                                if (!celestialProgressViewButtonPressed)
+                                {
+                                    celestialProgressViewButtonPressed = true;
+                                }
+                                else
+                                {
+                                    celestialProgressViewButtonPressed = false;
+                                }
+                                secretsViewButtonPressed = false;
+                            }
+
+                            if (GUILayout.Button("Secrets", buttonStyle))
+                            {
+                                progressBasicViewButtonPressed = false;
+                                celestialProgressViewButtonPressed = false;
+                                if (!secretsViewButtonPressed)
+                                {
+                                    secretsViewButtonPressed = true;
+                                }
+                                else
+                                {
+                                    secretsViewButtonPressed = false;
+                                }
+                            }
+
+                            GUILayout.EndHorizontal();
+
+                            GUILayout.BeginHorizontal();
+
+                            if (progressBasicViewButtonPressed)
+                            {
+                                GUILayout.Label("Basic Progress", labelOptionsTwo);
+                                GUILayout.EndHorizontal();
+
+                                foreach (string basic in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Progress)
+                                {
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label(basic, labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+                                }
+                                GUILayout.BeginHorizontal();
+                            }
+                            if (celestialProgressViewButtonPressed)
+                            {
+                                GUILayout.Label("Celestial Progress", labelOptionsTwo);
+                                GUILayout.EndHorizontal();
+
+                                foreach (List<string> celestial in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].CelestialProgress)
+                                {
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Name:" + celestial[0], labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Reached:" + celestial[1], labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Achieved:", labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+
+                                    for (int v = 2; v < celestial.Count; v++)
+                                    {
+                                        GUILayout.BeginHorizontal();
+                                        GUILayout.Space(50);
+                                        GUILayout.Label(celestial[v], labelOptionsTwo);
+                                        GUILayout.EndHorizontal();
+                                    }
+                                }
+                                GUILayout.BeginHorizontal();
+                            }
+                            if (secretsViewButtonPressed)
+                            {
+                                GUILayout.Label("Secret Progress", labelOptionsTwo);
+                                GUILayout.EndHorizontal();
+
+                                foreach (string secret in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Secrets)
+                                {
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label(secret, labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+                                }
+                                GUILayout.BeginHorizontal();
+                            }
+                        }
+                        GUILayout.EndHorizontal();
+                    }
+                }
+                else
+                {
+                    progressButtonPressed = false;
+                    progressButtonSelectedGroup = string.Empty;
+                    progressButtonSelectedSubspace = -1;
+                    scrollPositionProgress = new Vector2();
+                }
+            }
+
+            GUILayout.EndScrollView();
+
             GUILayout.EndVertical();
         }
 
@@ -973,13 +1320,14 @@ namespace SyncrioClientSide
                 bool shouldLockWindow1 = windowRect.Contains(mousePos);
                 bool shouldLockWindow2 = windowRectInvitePlayer.Contains(mousePos);
                 bool shouldLockWindow3 = windowRectChangeLeader.Contains(mousePos);
+                bool shouldLockWindow4 = windowRectGroupProgress.Contains(mousePos);
 
-                if ((shouldLockWindow1 || shouldLockWindow2 || shouldLockWindow3) && !isWindowLocked)
+                if ((shouldLockWindow1 || shouldLockWindow2 || shouldLockWindow3 || shouldLockWindow4) && !isWindowLocked)
                 {
                     InputLockManager.SetControlLock(ControlTypes.ALLBUTCAMERAS, "Syncrio_GroupWindowLock");
                     isWindowLocked = true;
                 }
-                if (!(shouldLockWindow1 && shouldLockWindow2 && shouldLockWindow3) && isWindowLocked)
+                if (!(shouldLockWindow1 && shouldLockWindow2 && shouldLockWindow3 && shouldLockWindow4) && isWindowLocked)
                 {
                     RemoveWindowLock();
                 }

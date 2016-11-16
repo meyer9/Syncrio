@@ -55,7 +55,7 @@ namespace SyncrioClientSide
 
         public static void GenerateScenario(string saveName)
         {
-            string ScenarioFolder = Path.Combine(KSPUtil.ApplicationRootPath, "Generated Scenario");
+            string ScenarioFolder = Path.Combine(KSPUtil.ApplicationRootPath, "Scenarios");
             if (Directory.Exists(ScenarioFolder))
             {
                 Directory.Delete(ScenarioFolder, true);
@@ -78,8 +78,6 @@ namespace SyncrioClientSide
             }
 
             Directory.CreateDirectory(ScenarioFolder);
-            string vesselFolder = Path.Combine(ScenarioFolder, "Vessels");
-            Directory.CreateDirectory(vesselFolder);
             string playersFolder = Path.Combine(ScenarioFolder, "Players");
             Directory.CreateDirectory(playersFolder);
             string playerScenarioFolder = Path.Combine(playersFolder, Settings.fetch.playerName);
@@ -113,16 +111,6 @@ namespace SyncrioClientSide
                 return;
             }
 
-            ConfigNode[] vesselNodes = flightState.GetNodes("VESSEL");
-            if (vesselNodes != null)
-            {
-                foreach (ConfigNode cn in vesselNodes)
-                {
-                    string vesselID = Common.ConvertConfigStringToGUIDString(cn.GetValue("pid"));
-                    SyncrioLog.Debug("Saving vessel " + vesselID + ", name: " + cn.GetValue("name"));
-                    cn.Save(Path.Combine(vesselFolder, vesselID + ".txt"));
-                }
-            }
             //Save scenario data
             ConfigNode[] scenarioNodes = gameData.GetNodes("SCENARIO");
             if (scenarioNodes != null)
@@ -146,8 +134,8 @@ namespace SyncrioClientSide
                     kerbalIndex++;
                 }
             }
-            SyncrioLog.Debug("Generated KSP_folder/Scenario from " + saveName);
-            ScreenMessages.PostScreenMessage("Generated KSP_folder/Scenario from " + saveName, 5f, ScreenMessageStyle.UPPER_CENTER);
+            SyncrioLog.Debug("Generated \"KSP_folder/Scenarios\" from " + saveName);
+            ScreenMessages.PostScreenMessage("Generated \"KSP_folder/Scenarios\" from " + saveName, 5f, ScreenMessageStyle.UPPER_CENTER);
         }
 
         public static string[] GetSavedNames()

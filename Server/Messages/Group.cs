@@ -51,6 +51,48 @@ namespace SyncrioServer.Messages
 {
     public class Group
     {
+        public static void SendGroupProgress()
+        {
+            List<List<string>> progress = ScenarioHandler.GetAllGroupsProgress();
+
+            using (MessageWriter mw = new MessageWriter())
+            {
+                ServerMessage newMessage = new ServerMessage();
+
+                newMessage.type = ServerMessageType.AUTO_SEND_GROUP_PROGRESS;
+
+                mw.Write<int>(progress.Count);
+                foreach (List<string> list in progress)
+                {
+                    mw.Write<string[]>(list.ToArray());
+                }
+
+                newMessage.data = mw.GetMessageBytes();
+
+                ClientHandler.SendToAll(null, newMessage, false);
+            }
+        }
+        public static void SendGroupProgress(ClientObject clientToSendTo)
+        {
+            List<List<string>> progress = ScenarioHandler.GetAllGroupsProgress();
+
+            using (MessageWriter mw = new MessageWriter())
+            {
+                ServerMessage newMessage = new ServerMessage();
+
+                newMessage.type = ServerMessageType.AUTO_SEND_GROUP_PROGRESS;
+
+                mw.Write<int>(progress.Count);
+                foreach (List<string> list in progress)
+                {
+                    mw.Write<string[]>(list.ToArray());
+                }
+
+                newMessage.data = mw.GetMessageBytes();
+
+                ClientHandler.SendToClient(clientToSendTo, newMessage, false);
+            }
+        }
         public static void CreateGroupResponse(ClientObject client, string groupName, bool inviteAvailable)
         {
             using (MessageWriter mw = new MessageWriter())
@@ -100,26 +142,48 @@ namespace SyncrioServer.Messages
         }
         public static void PlayerInviteRequest(ClientObject client, byte[] messagedata)
         {
-            string invitedPlayer;
-            string groupName;
-            string sender;
-            ClientObject targetLeader;
+            string invitedPlayer = "";
+            string groupName = "";
+            string sender = "";
+            ClientObject targetPlayer;
+            bool isReply;
             using (MessageReader mr = new MessageReader(messagedata))
             {
-                invitedPlayer = mr.Read<string>();
-                groupName = mr.Read<string>();
-                sender = mr.Read<string>();
+                isReply = mr.Read<bool>();
+                if (!isReply)
+                {
+                    invitedPlayer = mr.Read<string>();
+                    groupName = mr.Read<string>();
+                    sender = mr.Read<string>();
+                }
+                else
+                {
+                    byte[] replyMessage;
+                    using (MessageWriter mw = new MessageWriter())
+                    {
+                        mw.Write<bool>(mr.Read<bool>());
+                        mw.Write<string>(mr.Read<string>());
+                        mw.Write<string>(mr.Read<string>());
+                        mw.Write<string>(mr.Read<string>());
+                        replyMessage = mw.GetMessageBytes();
+                    }
+                    GroupSystem.fetch.InvitePlayer(client, replyMessage);
+                }
             }
-            using (MessageWriter mw = new MessageWriter())
+            if (!isReply)
             {
-                mw.Write<string>(invitedPlayer);
-                mw.Write<string>(groupName);
-                mw.Write<string>(sender);
-                targetLeader = ClientHandler.GetClientByName(invitedPlayer);
-                ServerMessage newMessage = new ServerMessage();
-                newMessage.type = ServerMessageType.INVITE_PLAYER_REQUEST_RELAY;
-                newMessage.data = mw.GetMessageBytes();
-                ClientHandler.SendToClient(targetLeader, newMessage, true);
+                using (MessageWriter mw = new MessageWriter())
+                {
+                    mw.Write<string>(invitedPlayer);
+                    mw.Write<string>(groupName);
+                    mw.Write<string>(sender);
+                    targetPlayer = ClientHandler.GetClientByName(invitedPlayer);
+                    ServerMessage newMessage = new ServerMessage();
+                    newMessage.type = ServerMessageType.INVITE_PLAYER_REQUEST_RELAY;
+                    newMessage.data = mw.GetMessageBytes();
+                    ClientHandler.SendToClient(targetPlayer, newMessage, true);
+                    Messages.Chat.SendChatMessageToClient(targetPlayer, "You were invited to " + groupName);
+                }
             }
         }
         public static void SendAllGroupsToAllClients()

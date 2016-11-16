@@ -56,14 +56,11 @@ namespace SyncrioClientSide
         public bool display = false;
         private bool initialized = false;
         private bool isWindowLocked = false;
-        private object groupWindowLock = new object();
         private bool resetScenario = false;
         private bool sync = false;
         //GUI
         private GUIStyle windowStyle;
-        private GUIStyle labelStyle;
         private GUIStyle buttonStyle;
-        private GUIStyle textAreaStyle;
         private GUILayoutOption[] labelOptions;
         private GUILayoutOption[] labelOptionsTwo;
         private GUILayoutOption[] layoutOptions;
@@ -84,7 +81,7 @@ namespace SyncrioClientSide
         {
             if (workerEnabled)
             {
-
+                CheckWindowLock();
             }
         }
 
@@ -107,9 +104,7 @@ namespace SyncrioClientSide
             windowRect = new Rect(Screen.width * 0.5f - WINDOW_WIDTH, Screen.height / 2f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
             moveRect = new Rect(0, 0, 10000, 20);
             windowStyle = new GUIStyle(GUI.skin.window);
-            labelStyle = new GUIStyle(GUI.skin.label);
             buttonStyle = new GUIStyle(GUI.skin.button);
-            textAreaStyle = new GUIStyle(GUI.skin.textArea);
             layoutOptions = new GUILayoutOption[4];
             layoutOptions[0] = GUILayout.MinWidth(WINDOW_WIDTH);
             layoutOptions[1] = GUILayout.MaxWidth(WINDOW_WIDTH);
@@ -144,7 +139,7 @@ namespace SyncrioClientSide
 
                     if (GUILayout.Button("Yes", buttonStyle))
                     {
-                        ScenarioWorker.fetch.scenarioSync(isInGroup, true, true, false);
+                        ScenarioWorker.fetch.ScenarioSync(isInGroup, true, true, false);
                         sync = false;
                     }
                     if (GUILayout.Button("No", buttonStyle))
@@ -159,7 +154,7 @@ namespace SyncrioClientSide
                 {
                     if (GUILayout.Button("Sync", buttonStyle))
                     {
-                        ScenarioWorker.fetch.scenarioSync(isInGroup, false, true, false);
+                        ScenarioWorker.fetch.ScenarioSync(isInGroup, false, true, false);
                     }
                 }
                 else
@@ -186,7 +181,7 @@ namespace SyncrioClientSide
                     GUILayout.Space(20);
                     if (GUILayout.Button("Continue", buttonStyle))
                     {
-                        ScenarioWorker.fetch.resetScenatio(isInGroup);
+                        ScenarioWorker.fetch.ResetScenatio(isInGroup);
                     }
                     GUILayout.FlexibleSpace();
                     if (GUILayout.Button("Cancel", buttonStyle))

@@ -117,6 +117,5 @@ namespace SyncrioServer
 
             return sr.ReadToEnd();
         }
-        
     }
 }

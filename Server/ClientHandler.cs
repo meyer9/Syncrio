@@ -69,7 +69,8 @@ namespace SyncrioServer
             try
             {
                 clients = new List<ClientObject>().AsReadOnly();
-                
+
+                Messages.WarpControl.Reset();
                 Messages.Chat.Reset();
                 Messages.ScreenshotLibrary.Reset();
 
@@ -82,6 +83,8 @@ namespace SyncrioServer
                     {
                         Messages.Heartbeat.CheckHeartBeat(client);
                     }
+                    //Check timers
+                    Messages.WarpControl.CheckTimer();
                     //Run plugin update
                     SyncrioPluginHandler.FireOnUpdate();
                     Thread.Sleep(10);
@@ -180,6 +183,7 @@ namespace SyncrioServer
         private static void SetupClient(TcpClient newClientConnection)
         {
             ClientObject newClientObject = new ClientObject();
+            newClientObject.subspace = Messages.WarpControl.GetLatestSubspace();
             newClientObject.playerStatus = new PlayerStatus();
             newClientObject.connectionStatus = ConnectionStatus.CONNECTED;
             newClientObject.endpoint = newClientConnection.Client.RemoteEndPoint.ToString();
@@ -199,6 +203,7 @@ namespace SyncrioServer
                 Server.players = GetActivePlayerNames();
                 SyncrioLog.Debug("Online players is now: " + Server.playerCount + ", connected: " + clients.Count);
             }
+            Messages.Group.SendGroupProgress(newClientObject);
         }
 
         public static int GetActiveClientCount()
@@ -545,6 +550,11 @@ namespace SyncrioServer
                     Server.playerCount = GetActiveClientCount();
                     Server.players = GetActivePlayerNames();
                     SyncrioLog.Debug("Online players is now: " + Server.playerCount + ", connected: " + clients.Count);
+                    if (!Settings.settingsStore.keepTickingWhileOffline && clients.Count == 0)
+                    {
+                        Messages.WarpControl.HoldSubspace();
+                    }
+                    Messages.WarpControl.DisconnectPlayer(client.playerName);
                 }
                 //Disconnect
                 if (client.connectionStatus != ConnectionStatus.DISCONNECTED)
@@ -650,6 +660,9 @@ namespace SyncrioServer
                     case ClientMessageType.MOTD_REQUEST:
                         Messages.MotdRequest.HandleMotdRequest(client);  
                         break;
+                    case ClientMessageType.WARP_CONTROL:
+                        Messages.WarpControl.HandleWarpControl(client, message.data);
+                        break;
                     case ClientMessageType.LOCK_SYSTEM:
                         Messages.LockSystem.HandleLockSystemMessage(client, message.data);
                         break;
@@ -686,8 +699,8 @@ namespace SyncrioServer
                     case ClientMessageType.SYNC_SCENARIO_REQUEST:
                         ScenarioSystem.fetch.SyncScenario(client, message.data);
                         break;
-                    case ClientMessageType.INITIAL_SCENARIO_DATA_REQUEST:
-                        ScenarioSystem.fetch.ScenarioInitialSync(client, message.data);
+                    case ClientMessageType.SEND_VESSELS:
+                        Messages.Vessel.HandleVessels(client, message.data);
                         break;
                     case ClientMessageType.RESET_SCENARIO:
                         ScenarioSystem.fetch.ResetScenario(client, message.data);
@@ -720,7 +733,7 @@ namespace SyncrioServer
             #endif
         }
 
-        //Call with null client to send to all clients. Also called from Dekessler and NukeKSC.
+        //Call with null client to send to all clients.
         public static void SendToAll(ClientObject ourClient, ServerMessage message, bool highPriority)
         {
             foreach (ClientObject otherClient in clients)
@@ -895,6 +908,9 @@ namespace SyncrioServer
         public bool isBanned;
         public IPAddress ipAddress;
         public string publicKey;
+        //subspace tracking
+        public int subspace = -1;
+        public float subspaceRate = 1f;
         //vessel tracking
         public string activeVessel = "";
         //connection

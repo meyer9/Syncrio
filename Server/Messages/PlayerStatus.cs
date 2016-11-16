@@ -65,6 +65,7 @@ namespace SyncrioServer.Messages
                             mw.Write<string>(otherClient.playerName);
                             mw.Write<string>(otherClient.playerStatus.vesselText);
                             mw.Write<string>(otherClient.playerStatus.statusText);
+                            mw.Write<string>(otherClient.playerStatus.groupName);
                             newMessage.data = mw.GetMessageBytes();
                         }
                         ClientHandler.SendToClient(client, newMessage, true);
@@ -86,6 +87,7 @@ namespace SyncrioServer.Messages
                 }
                 client.playerStatus.vesselText = mr.Read<string>();
                 client.playerStatus.statusText = mr.Read<string>();
+                client.playerStatus.groupName = mr.Read<string>();
             }
             //Relay the message
             ServerMessage newMessage = new ServerMessage();

@@ -70,6 +70,7 @@ namespace SyncrioClientSide
         public SyncrioToolbarType toolbarType;
         public bool DarkMultiPlayerCoopMode;
         public bool serverDMPCoopMode;
+        public int numberOfKerbalToSpawn;
         private const string DEFAULT_PLAYER_NAME = "Player";
         private const string SETTINGS_FILE = "servers.xml";
         private const string PUBLIC_KEY_FILE = "publickey.txt";
@@ -82,9 +83,6 @@ namespace SyncrioClientSide
         private string privateKeyFile;
         private string backupPublicKeyFile;
         private string backupPrivateKeyFile;
-        private string scenarioFundsHistoryFile = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "GameData"), "Syncrio"), "Plugins"), "Data"), "SVH_funds.txt");
-        private string scenarioRepHistoryFile = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "GameData"), "Syncrio"), "Plugins"), "Data"), "SVH_rep.txt");
-        private string scenarioSciHistoryFile = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "GameData"), "Syncrio"), "Plugins"), "Data"), "SVH_sci.txt");
 
         public static Settings fetch
         {
@@ -105,18 +103,6 @@ namespace SyncrioClientSide
             if (!Directory.Exists(SyncrioSavesDirectory))
             {
                 Directory.CreateDirectory(SyncrioSavesDirectory);
-            }
-            if (!File.Exists(scenarioFundsHistoryFile))
-            {
-                File.Create(scenarioFundsHistoryFile);
-            }
-            if (!File.Exists(scenarioRepHistoryFile))
-            {
-                File.Create(scenarioRepHistoryFile);
-            }
-            if (!File.Exists(scenarioSciHistoryFile))
-            {
-                File.Create(scenarioSciHistoryFile);
             }
             dataLocation = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "Data");
             settingsFile = Path.Combine(dataLocation, SETTINGS_FILE);
@@ -180,7 +166,7 @@ namespace SyncrioClientSide
                 catch
                 {
                     SyncrioLog.Debug("Adding DarkMultiPlayer Co-op Mode to settings file");
-                    DarkMultiPlayerCoopMode = true;
+                    DarkMultiPlayerCoopMode = false;
                     saveXMLAfterLoad = true;
                 }
                 try

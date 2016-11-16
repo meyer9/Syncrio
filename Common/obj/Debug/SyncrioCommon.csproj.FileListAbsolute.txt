@@ -1,8 +1,0 @@
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\bin\Debug\SyncrioCommon.dll
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\bin\Debug\SyncrioCommon.pdb
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\bin\Debug\SyncrioCommon.dll.CodeAnalysisLog.xml
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\bin\Debug\SyncrioCommon.dll.lastcodeanalysissucceeded
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\bin\Debug\ICSharpCode.SharpZipLib.dll
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\obj\Debug\SyncrioCommon.csprojResolveAssemblyReference.cache
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\obj\Debug\SyncrioCommon.dll
-C:\Users\Huyck\Documents\Visual Studio 2015\Projects\Syncrio\Common\obj\Debug\SyncrioCommon.pdb
