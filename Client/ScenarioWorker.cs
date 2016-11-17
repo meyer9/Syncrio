@@ -461,7 +461,6 @@ namespace SyncrioClientSide
                     SyncrioLog.Debug("Loading " + listOfNewScenarioModulesToAdd.Count + " new scenario module(s)");
                     LoadNewScenarioData(listOfNewScenarioModulesToAdd);
                 }
-                HighLogic.CurrentGame.Updated();
 
                 scenarioListToAdd.Clear();
                 activeScenarioQueue.Clear();

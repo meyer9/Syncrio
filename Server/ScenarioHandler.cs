@@ -458,16 +458,13 @@ namespace SyncrioServer
                                                         }
                                                         else
                                                         {
-                                                            for (int v = 0; v < newContract.parameters[i].subParameters.Count; v++)
+                                                            if (i < oldContract.parameters.Count)
                                                             {
-                                                                ScenarioDataTypes.Param editedContractParameter = ScenarioDataConstructor.ConstructSubData(new ScenarioDataTypes.Param());
-
-                                                                editedContractParameter.nodeNumber = newContract.parameters[i].nodeNumber;
-                                                                editedContractParameter.paramLines = newContract.parameters[i].paramLines;
-
-                                                                editedContractParameter.subParameters.Add(newContract.parameters[i].subParameters[v]);
-
-                                                                editedContractParams.Add(editedContractParameter);
+                                                                editedContractParams.Add(oldContract.parameters[i]);
+                                                            }
+                                                            else
+                                                            {
+                                                                editedContractParams.Add(newContract.parameters[i]);
                                                             }
                                                         }
                                                     }
@@ -564,16 +561,13 @@ namespace SyncrioServer
                                                                 }
                                                                 else
                                                                 {
-                                                                    for (int v = 0; v < newContract.parameters[i].subParameters.Count; v++)
+                                                                    if (i < oldContract.parameters.Count)
                                                                     {
-                                                                        ScenarioDataTypes.Param editedContractParameter = ScenarioDataConstructor.ConstructSubData(new ScenarioDataTypes.Param());
-
-                                                                        editedContractParameter.nodeNumber = newContract.parameters[i].nodeNumber;
-                                                                        editedContractParameter.paramLines = newContract.parameters[i].paramLines;
-
-                                                                        editedContractParameter.subParameters.Add(newContract.parameters[i].subParameters[v]);
-
-                                                                        editedContractParams.Add(editedContractParameter);
+                                                                        editedContractParams.Add(oldContract.parameters[i]);
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        editedContractParams.Add(newContract.parameters[i]);
                                                                     }
                                                                 }
                                                             }
@@ -603,9 +597,16 @@ namespace SyncrioServer
                                         }
                                         else
                                         {
-                                            contractList.Add(oldContract);
+                                            contractList.Add(newContract);
                                         }
                                     }
+                                }
+                            }
+                            else
+                            {
+                                if (cursor < oldData.contracts.Count)
+                                {
+                                    contractList.Add(oldData.contracts[cursor]);
                                 }
                             }
                         }
@@ -661,6 +662,13 @@ namespace SyncrioServer
                                     {
                                         finishedContractList.Add(oldContract);
                                     }
+                                }
+                            }
+                            else
+                            {
+                                if (cursor < oldData.finishedContracts.Count)
+                                {
+                                    finishedContractList.Add(oldData.finishedContracts[cursor]);
                                 }
                             }
                         }
