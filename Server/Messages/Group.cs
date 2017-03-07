@@ -51,48 +51,6 @@ namespace SyncrioServer.Messages
 {
     public class Group
     {
-        public static void SendGroupProgress()
-        {
-            List<List<string>> progress = ScenarioHandler.GetAllGroupsProgress();
-
-            using (MessageWriter mw = new MessageWriter())
-            {
-                ServerMessage newMessage = new ServerMessage();
-
-                newMessage.type = ServerMessageType.AUTO_SEND_GROUP_PROGRESS;
-
-                mw.Write<int>(progress.Count);
-                foreach (List<string> list in progress)
-                {
-                    mw.Write<string[]>(list.ToArray());
-                }
-
-                newMessage.data = mw.GetMessageBytes();
-
-                ClientHandler.SendToAll(null, newMessage, false);
-            }
-        }
-        public static void SendGroupProgress(ClientObject clientToSendTo)
-        {
-            List<List<string>> progress = ScenarioHandler.GetAllGroupsProgress();
-
-            using (MessageWriter mw = new MessageWriter())
-            {
-                ServerMessage newMessage = new ServerMessage();
-
-                newMessage.type = ServerMessageType.AUTO_SEND_GROUP_PROGRESS;
-
-                mw.Write<int>(progress.Count);
-                foreach (List<string> list in progress)
-                {
-                    mw.Write<string[]>(list.ToArray());
-                }
-
-                newMessage.data = mw.GetMessageBytes();
-
-                ClientHandler.SendToClient(clientToSendTo, newMessage, false);
-            }
-        }
         public static void CreateGroupResponse(ClientObject client, string groupName, bool inviteAvailable)
         {
             using (MessageWriter mw = new MessageWriter())
@@ -237,6 +195,7 @@ namespace SyncrioServer.Messages
                 }
                 mw.Write<string[]>(group.members.ToArray());
                 mw.Write<bool>(group.settings.inviteAvailable);
+                mw.Write<bool>(group.settings.progressPublic);
                 returnBytes = mw.GetMessageBytes();
             }
             return returnBytes;

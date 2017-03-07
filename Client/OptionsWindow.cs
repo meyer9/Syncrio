@@ -55,9 +55,11 @@ namespace SyncrioClientSide
         private bool isWindowLocked = false;
         private bool safeDisplay;
         private bool initialized;
+        private bool resetScenario = false;
         //GUI Layout
         private Rect windowRect;
         private Rect moveRect;
+        private GUILayoutOption[] labelOptions;
         private GUILayoutOption[] layoutOptions;
         private GUILayoutOption[] smallOption;
         //Styles
@@ -93,7 +95,7 @@ namespace SyncrioClientSide
         private void InitGUI()
         {
             //Setup GUI stuff
-            windowRect = new Rect(Screen.width / 2f - WINDOW_WIDTH / 2f, Screen.height / 2f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
+            windowRect = new Rect(Screen.width / 2f - WINDOW_WIDTH / 2f, Screen.height / 3f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
             moveRect = new Rect(0, 0, 10000, 20);
 
             windowStyle = new GUIStyle(GUI.skin.window);
@@ -108,6 +110,9 @@ namespace SyncrioClientSide
             smallOption = new GUILayoutOption[2];
             smallOption[0] = GUILayout.Width(100);
             smallOption[1] = GUILayout.ExpandWidth(false);
+
+            labelOptions = new GUILayoutOption[1];
+            labelOptions[0] = GUILayout.Width(180);
 
             tempColor = new Color();
             tempColorLabelStyle = new GUIStyle(GUI.skin.label);
@@ -282,30 +287,75 @@ namespace SyncrioClientSide
             {
                 settingScreenshot = !settingScreenshot;
             }
-            GUILayout.Space(10);
-            ScenarioConverterWindow.fetch.display = GUILayout.Toggle(ScenarioConverterWindow.fetch.display, "Generate Scenario from saved game", buttonStyle);
-            if (GUILayout.Button("Reset disclaimer"))
+            if (!Client.fetch.gameRunning)
             {
-                Settings.fetch.disclaimerAccepted = 0;
-                Settings.fetch.SaveSettings();
+                GUILayout.Space(10);
+                GUILayout.Label("Generate a server SyncrioModControl:");
+                if (GUILayout.Button("Generate blacklist SyncrioModControl.txt"))
+                {
+                    ModWorker.fetch.GenerateModControlFile(false);
+                }
+                if (GUILayout.Button("Generate whitelist SyncrioModControl.txt"))
+                {
+                    ModWorker.fetch.GenerateModControlFile(true);
+                }
+                ScenarioConverterWindow.fetch.display = GUILayout.Toggle(ScenarioConverterWindow.fetch.display, "Generate Scenario from saved game", buttonStyle);
+                if (GUILayout.Button("Reset disclaimer"))
+                {
+                    Settings.fetch.disclaimerAccepted = 0;
+                    Settings.fetch.SaveSettings();
+                }
+                bool settingdarkmultiplayercoopmode = GUILayout.Toggle(Settings.fetch.DarkMultiPlayerCoopMode, "Enable DMP Co-op Mode", buttonStyle);
+                if (settingdarkmultiplayercoopmode != Settings.fetch.DarkMultiPlayerCoopMode)
+                {
+                    Settings.fetch.DarkMultiPlayerCoopMode = settingdarkmultiplayercoopmode;
+                    Settings.fetch.SaveSettings();
+                }
+                bool settingCompression = GUILayout.Toggle(Settings.fetch.compressionEnabled, "Enable compression", buttonStyle);
+                if (settingCompression != Settings.fetch.compressionEnabled)
+                {
+                    Settings.fetch.compressionEnabled = settingCompression;
+                    Settings.fetch.SaveSettings();
+                }
+                bool settingRevert = GUILayout.Toggle(Settings.fetch.revertEnabled, "Enable revert", buttonStyle);
+                if (settingRevert != Settings.fetch.revertEnabled)
+                {
+                    Settings.fetch.revertEnabled = settingRevert;
+                    Settings.fetch.SaveSettings();
+                }
             }
-            bool settingdarkmultiplayercoopmode = GUILayout.Toggle(Settings.fetch.DarkMultiPlayerCoopMode, "Enable DMP Co-op Mode", buttonStyle);
-            if (settingdarkmultiplayercoopmode != Settings.fetch.DarkMultiPlayerCoopMode)
+            else
             {
-                Settings.fetch.DarkMultiPlayerCoopMode = settingdarkmultiplayercoopmode;
-                Settings.fetch.SaveSettings();
-            }
-            bool settingCompression = GUILayout.Toggle(Settings.fetch.compressionEnabled, "Enable compression", buttonStyle);
-            if (settingCompression != Settings.fetch.compressionEnabled)
-            {
-                Settings.fetch.compressionEnabled = settingCompression;
-                Settings.fetch.SaveSettings();
-            }
-            bool settingRevert = GUILayout.Toggle(Settings.fetch.revertEnabled, "Enable revert", buttonStyle);
-            if (settingRevert != Settings.fetch.revertEnabled)
-            {
-                Settings.fetch.revertEnabled = settingRevert;
-                Settings.fetch.SaveSettings();
+                bool isInGroup = GroupSystem.playerGroupAssigned;
+
+                if (ScenarioWorker.fetch.canResetScenario)
+                {
+                    GUILayout.EndHorizontal();
+
+                    GUILayout.BeginHorizontal();
+                    resetScenario = GUILayout.Toggle(resetScenario, "Reset Scenario!", buttonStyle);
+                    if (resetScenario)
+                    {
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label("WARNING: You are about to reset your scenario to the default settings", labelOptions);
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Space(20);
+                        if (GUILayout.Button("Continue", buttonStyle))
+                        {
+                            ScenarioWorker.fetch.ResetScenatio(isInGroup);
+                        }
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("Cancel", buttonStyle))
+                        {
+                            resetScenario = false;
+                        }
+                        GUILayout.Space(20);
+                    }
+                }
             }
             GUILayout.BeginHorizontal();
             GUILayout.Label("Toolbar:", smallOption);
@@ -323,6 +373,12 @@ namespace SyncrioClientSide
                 ToolbarSupport.fetch.DetectSettingsChange();
             }
             GUILayout.EndHorizontal();
+            #if DEBUG
+            if (GUILayout.Button("Check Common.dll stock parts"))
+            {
+                ModWorker.fetch.CheckCommonStockParts();
+            }
+            #endif
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Close", buttonStyle))
             {

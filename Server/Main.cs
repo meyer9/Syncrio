@@ -67,10 +67,8 @@ namespace SyncrioServer
         public static string players = "";
         public static long lastPlayerActivity;
         public static object ScenarioSizeLock = new object();
+        public static string modFile;
         private static int day;
-        private static bool syncing = false;
-        private static bool syncDequeued = false;
-        private static int numberOfClientsInGroupsAtSync = 0;
 
         public static void Main()
         {
@@ -98,19 +96,11 @@ namespace SyncrioServer
 
                 //Periodic day check
                 long lastDayCheck = 0;
-
-                //Periodic scenario sync
-                long lastScenarioSendTime = 0;
-
-                long autoSyncScenariosWaitInterval = Settings.settingsStore.autoSyncScenariosWaitInterval * 60000;
-
-                //Periodic send progress
-                long lastProgressSendTime = 0;
-
-                long autoSendProgressWaitInterval = Settings.settingsStore.autoSendProgressWaitInterval * 1000;
-
+                
                 //Set Scenario directory
                 ScenarioDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scenarios");
+
+                modFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SyncrioModControl.txt");
 
                 if (!Directory.Exists(configDirectory))
                 {
@@ -119,6 +109,7 @@ namespace SyncrioServer
 
                 string oldSettingsFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SyncrioServerSettings.txt");
                 string newSettingsFile = Path.Combine(Server.configDirectory, "Settings.txt");
+                string specialSettingsFile = Path.Combine(Server.configDirectory, "SpecialSettings.txt");
                 string oldGameplayFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SyncrioGameplaySettings.txt");
                 string newGameplayFile = Path.Combine(Server.configDirectory, "GameplaySettings.txt");
 
@@ -212,8 +203,12 @@ namespace SyncrioServer
                     StartHTTPServer();
 
                     GroupSystem.fetch.ServerStarting();
-                    ScenarioHandler.SetAllGroupsProgress(ScenarioHandler.LoadAllGroupsProgress());
                     while (!GroupSystem.fetch.groupsLoaded)
+                    {
+                        Thread.Sleep(50);
+                    }
+                    
+                    while (!Messages.WarpControl.UpdateAllSubspaceClocks())
                     {
                         Thread.Sleep(50);
                     }
@@ -251,63 +246,6 @@ namespace SyncrioServer
                                 day = DateTime.Now.Day;
                             }
                         }
-                        //Auto Sync Scenarios
-                        if (Settings.settingsStore.autoSyncScenarios && autoSyncScenariosWaitInterval != 0)
-                        {
-                            if ((serverClock.ElapsedMilliseconds - lastScenarioSendTime) > autoSyncScenariosWaitInterval)
-                            {
-                                lastScenarioSendTime = serverClock.ElapsedMilliseconds;
-                                ScenarioSystem.fetch.numberOfPlayersSyncing = 0;
-                                numberOfClientsInGroupsAtSync = 0;
-                                foreach (ClientObject client in ClientHandler.GetClients())
-                                {
-                                    if (GroupSystem.fetch.PlayerIsInGroup(client.playerName))
-                                    {
-                                        ScenarioSystem.fetch.SendAutoSyncScenarioRequest(client);
-                                        ScenarioSystem.fetch.numberOfPlayersSyncing += 1;
-                                        numberOfClientsInGroupsAtSync += 1;
-                                    }
-                                }
-                                if (ScenarioSystem.fetch.numberOfPlayersSyncing > 0)
-                                {
-                                    syncing = true;
-                                }
-                            }
-
-                            if (syncing)
-                            {
-                                int playersInGroups = GroupSystem.fetch.GetNumberOfPlayersInAllGroups();
-
-                                if (numberOfClientsInGroupsAtSync > playersInGroups)
-                                {
-                                    int lostPlayers = numberOfClientsInGroupsAtSync - playersInGroups;
-                                    numberOfClientsInGroupsAtSync -= lostPlayers;
-                                    ScenarioSystem.fetch.numberOfPlayersSyncing -= lostPlayers;
-                                }
-                            }
-                        }
-                        if (syncing && ScenarioSystem.fetch.numberOfPlayersSyncing == 0)
-                        {
-                            syncDequeued = ScenarioSystem.fetch.DequeueAllScenarioData();
-                            syncing = false;
-                        }
-                        if (syncDequeued)
-                        {
-                            syncDequeued = false;
-                            foreach (ClientObject client in ClientHandler.GetClients())
-                            {
-                                if (GroupSystem.fetch.PlayerIsInGroup(client.playerName))
-                                {
-                                    Messages.ScenarioData.SendScenarioGroupModules(client, GroupSystem.fetch.GetPlayerGroup(client.playerName));
-                                }
-                            }
-                        }
-
-                        if ((serverClock.ElapsedMilliseconds - lastProgressSendTime) > autoSendProgressWaitInterval)
-                        {
-                            lastProgressSendTime = serverClock.ElapsedMilliseconds;
-                            Messages.Group.SendGroupProgress();
-                        }
 
                         Thread.Sleep(500);
                     }
@@ -334,18 +272,11 @@ namespace SyncrioServer
             {
                 long directorySize = 0;
                 string[] kerbals = Directory.GetFiles(Path.Combine(ScenarioDirectory, "Kerbals"), "*.*");
-                string[] vessels = Directory.GetFiles(Path.Combine(ScenarioDirectory, "Vessels"), "*.*");
 
                 foreach (string kerbal in kerbals)
                 {
                     FileInfo kInfo = new FileInfo(kerbal);
                     directorySize += kInfo.Length;
-                }
-
-                foreach (string vessel in vessels)
-                {
-                    FileInfo vInfo = new FileInfo(vessel);
-                    directorySize += vInfo.Length;
                 }
 
                 return directorySize;
@@ -363,6 +294,10 @@ namespace SyncrioServer
         //Create Scenario directories
         private static void CheckScenario()
         {
+            if (!File.Exists(modFile))
+            {
+                GenerateNewModFile();
+            }
             if (!Directory.Exists(ScenarioDirectory))
             {
                 Directory.CreateDirectory(ScenarioDirectory);
@@ -395,6 +330,10 @@ namespace SyncrioServer
             {
                 Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "GroupScenarios"));
             }
+            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData", "SubspaceRefs")))
+            {
+                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "SubspaceRefs"));
+            }
             if (!Directory.Exists(Path.Combine(ScenarioDirectory, "Players")))
             {
                 Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Players"));
@@ -409,6 +348,24 @@ namespace SyncrioServer
             }
 
             ScenarioSystem.CreateDefaultScenario();
+        }
+        //Get mod file SHA
+        public static string GetModControlSHA()
+        {
+            return Common.CalculateSHA256Hash(modFile);
+        }
+
+        public static void GenerateNewModFile()
+        {
+            if (File.Exists(modFile))
+            {
+                File.Move(modFile, modFile + ".bak");
+            }
+            string modFileData = Common.GenerateModFileStringData(new string[0], new string[0], false, new string[0], Common.GetStockParts().ToArray());
+            using (StreamWriter sw = new StreamWriter(modFile))
+            {
+                sw.Write(modFileData);
+            }
         }
         //Shutdown
         public static void ShutDown(string commandArgs)
@@ -553,7 +510,16 @@ namespace SyncrioServer
                 HttpListenerContext context = listener.EndGetContext(result);
                 string responseText = "";
                 bool handled = false;
-                
+
+                if (context.Request.Url.PathAndQuery.StartsWith("/modcontrol"))
+                {
+                    if (!File.Exists(modFile))
+                    {
+                        GenerateNewModFile();
+                    }
+                    responseText = File.ReadAllText(modFile);
+                    handled = true;
+                }
                 if (!handled)
                 {
                     responseText = new ServerInfo(Settings.settingsStore).GetJSON();

@@ -50,6 +50,7 @@
     <Compile Include="GroupCommand.cs" />
     <Compile Include="GroupSystem.cs" />
     <Compile Include="Messages\Group.cs" />
+    <Compile Include="Messages\KerbalRemove.cs" />
     <Compile Include="Messages\Vessel.cs" />
     <Compile Include="Messages\WarpControl.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -58,7 +59,6 @@
     <Compile Include="Main.cs" />
     <Compile Include="CommandHandler.cs" />
     <Compile Include="ClientHandler.cs" />
-    <Compile Include="ScenarioHandler.cs" />
     <Compile Include="ScenarioSystem.cs" />
     <Compile Include="ScreenshotExpire.cs" />
     <Compile Include="Settings.cs" />

@@ -312,11 +312,29 @@ namespace SyncrioServer.Messages
             }
         }
 
+        public static void HandleSubspaceRef(int parentNumber, int subspaceNumber)
+        {
+            if (!Directory.Exists(Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces")))
+            {
+                Directory.CreateDirectory(Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces"));
+            }
+
+            string path = Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces", Convert.ToString(subspaceNumber) + ".txt");
+
+            List<string> listToSave = new List<string>();
+
+            listToSave.Add(Convert.ToString(parentNumber));
+
+            SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(listToSave), path);
+        }
+
         private static void HandleNewSubspace(ClientObject client, long serverClock, double planetTime, float subspaceSpeed)
         {
             lock (createLock)
             {
-                SyncrioLog.Debug("Create subspace");
+                SyncrioLog.Debug("Creating subspace: " + freeID);
+                HandleSubspaceRef(client.lastSubspace, freeID);
+                ScenarioSystem.AddSubspace(freeID, -1);
                 //Create subspace
                 Subspace newSubspace = new Subspace();
                 newSubspace.serverClock = serverClock;
@@ -369,7 +387,13 @@ namespace SyncrioServer.Messages
                 playersInSubspaces[subspace] = 1;
             }
 
+            if (client.subspace != -1)
+            {
+                client.lastSubspace = client.subspace;
+            }
+
             client.subspace = subspace;
+
             ServerMessage newMessage = new ServerMessage();
             newMessage.type = ServerMessageType.WARP_CONTROL;
             using (MessageWriter mw = new MessageWriter())
@@ -649,6 +673,10 @@ namespace SyncrioServer.Messages
                 playersInSubspaces[subspace] = 1;
             }
             SyncrioLog.Debug("Sending " + client.playerName + " to subspace " + subspace);
+            if (client.subspace != -1)
+            {
+                client.lastSubspace = client.subspace;
+            }
             client.subspace = subspace;
             if (!Settings.settingsStore.sendPlayerToLatestSubspace)
             {
@@ -755,6 +783,16 @@ namespace SyncrioServer.Messages
             double newPlanetariumTime = subspaces[subspaceID].planetTime + (timeSinceLock * subspaces[subspaceID].subspaceSpeed);
             subspaces[subspaceID].serverClock = newServerClockTime;
             subspaces[subspaceID].planetTime = newPlanetariumTime;
+        }
+
+        public static bool UpdateAllSubspaceClocks()
+        {
+            long newServerClockTime = DateTime.UtcNow.Ticks;
+            foreach (int subspaceID in subspaces.Keys)
+            {
+                subspaces[subspaceID].serverClock = newServerClockTime;
+            }
+            return true;
         }
 
         private static void SaveSubspace(int subspaceID, Subspace subspace)

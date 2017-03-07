@@ -58,6 +58,7 @@ namespace SyncrioServer
         public int numberOfPlayersSyncing = 0;
 
         public static SubspacesList subspaceList = new SubspacesList();
+        public static List<int> subspacesToMerge = new List<int>();
         public static object subspaceListLock = new object();
         
         //Directories
@@ -130,7 +131,7 @@ namespace SyncrioServer
                 {
                     foreach (Group group in subSpace.Groups)
                     {
-                        string path = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, group.GroupName, "Subspace" + subSpace.SubspaceNumber, "Scenario", "ScenarioNewGameIntro.txt");
+                        string path = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, group.GroupName, "Scenario", "ScenarioNewGameIntro.txt");
 
                         if (!File.Exists(path))
                         {
@@ -139,100 +140,788 @@ namespace SyncrioServer
                     }
                 }
             }
+            if (!File.Exists(Path.Combine(ScenarioSystem.fetch.playerInitialScenarioDirectory, "ScenarioNewGameIntro.txt")))
+            {
+                List<string> newScenario = new List<string>();
+
+                newScenario.Add("name = ScenarioNewGameIntro");
+                newScenario.Add("scene = 5, 6, 8");
+                newScenario.Add("kscComplete = True");
+                newScenario.Add("editorComplete = True");
+                newScenario.Add("tsComplete = True");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newScenario), Path.Combine(ScenarioSystem.fetch.playerInitialScenarioDirectory, "ScenarioNewGameIntro.txt"));
+            }
         }
 
         public void SyncScenario(ClientObject callingClient, byte[] messageData)
         {
             using (MessageReader mr = new MessageReader(messageData))
             {
-                bool isAutoReply = mr.Read<bool>();
-                if (isAutoReply)
+                ScenarioDataType type = (ScenarioDataType)mr.Read<int>();
+
+                SyncrioLog.Debug(callingClient.playerName + " sent data type: " + type.ToString());
+
+                try
                 {
-                    numberOfPlayersSyncing -= 1;
-                }
-                bool toServer = mr.Read<bool>();//If we are syncing the server's copy(true) of the scenario or the player's copy(false) of the scenario.
-                bool isInGroup = mr.Read<bool>();
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    if (isInGroup)
+                    byte[] subData = mr.Read<byte[]>();
+                    using (MessageReader subDataReader = new MessageReader(subData))
                     {
-                        CheckSubspacesForPlayers();
+                        bool isInGroup = subDataReader.Read<bool>();
+                        string groupName = string.Empty;
 
-                        string groupName = mr.Read<string>();
-                        if (toServer)
+                        if (isInGroup)
                         {
-                            int subSpace = callingClient.subspace;
-                            if (subSpace == -1)
-                            {
-                                subSpace = Messages.WarpControl.GetLatestSubspace();
-                            }
-                            string[] scenarioName = mr.Read<string[]>();
-                            for (int i = 0; i < scenarioName.Length; i++)
-                            {
-                                mw.Write<byte[]>(mr.Read<byte[]>());
-                            }
-                            int subSpaceIndex = subspaceList.Subspaces.FindIndex(s => s.SubspaceNumber == subSpace);
-                            if (subSpaceIndex == -1)
-                            {
-                                lock (subspaceListLock)
-                                {
-                                    subspaceList.Subspaces.Add(new Subspace());
-                                    subSpaceIndex = subspaceList.Subspaces.Count - 1;
-                                    subspaceList.Subspaces[subSpaceIndex].SubspaceNumber = subSpace;
-                                }
+                            groupName = subDataReader.Read<string>();
+                        }
 
-                                //Save the new subspace
-                                SaveGroupSubspaceFile();
-
-                                //Creat the subspace folders
-                                foreach (string groupFolder in Directory.GetFiles(groupScenariosDirectory))
+                        switch (type)
+                        {
+                            case ScenarioDataType.CONTRACT_UPDATED:
                                 {
-                                    string currentGroupFolder = Path.Combine(groupScenariosDirectory, groupFolder);
-                                    string newSubspaceFolder = Path.Combine(currentGroupFolder, "Subspace" + subSpace);
-                                    if (!Directory.Exists(newSubspaceFolder))
+                                    byte[] cnData = subDataReader.Read<byte[]>();
+                                    List<string> cnLines = SyncrioUtil.ByteArraySerializer.Deserialize(cnData);
+
+                                    cnLines = SyncrioUtil.DataCleaner.BasicClean(cnLines);
+
+                                    if (isInGroup)
                                     {
-                                        Directory.CreateDirectory(newSubspaceFolder);
-                                        Directory.CreateDirectory(Path.Combine(newSubspaceFolder, "Scenario"));
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioUpdateContract(cnLines, groupName);
+
+                                            int number = subDataReader.Read<int>();
+
+                                            if (number != 0)
+                                            {
+                                                List<string> weightsList = new List<string>();
+
+                                                for (int i = 0; i < number; i++)
+                                                {
+                                                    string weight = subDataReader.Read<string>();
+                                                    int amount = subDataReader.Read<int>();
+
+                                                    weightsList.Add(weight + " : " + amount.ToString());
+                                                }
+
+                                                ScenarioSetWeights(weightsList, groupName);
+                                            }
+
+                                            ScenarioSendData(groupName, ScenarioDataType.CONTRACT_UPDATED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioUpdateContract(cnLines, callingClient);
+
+                                        int number = subDataReader.Read<int>();
+
+                                        if (number != 0)
+                                        {
+                                            List<string> weightsList = new List<string>();
+
+                                            for (int i = 0; i < number; i++)
+                                            {
+                                                string weight = subDataReader.Read<string>();
+                                                int amount = subDataReader.Read<int>();
+
+                                                weightsList.Add(weight + " : " + amount.ToString());
+                                            }
+
+                                            ScenarioSetWeights(weightsList, callingClient);
+                                        }
                                     }
                                 }
-                            }
-                            int groupIndex = subspaceList.Subspaces[subSpaceIndex].Groups.FindIndex(s => s.GroupName == groupName);
-                            if (groupIndex == -1)
-                            {
-                                subspaceList.Subspaces[subSpaceIndex].Groups.Add(new Group());
-                                groupIndex = subspaceList.Subspaces[subSpaceIndex].Groups.Count - 1;
-                                subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupName = groupName;
-                            }
+                                break;
+                            case ScenarioDataType.CONTRACT_OFFERED:
+                                {
+                                    byte[] cnData = subDataReader.Read<byte[]>();
+                                    List<string> cnLines = SyncrioUtil.ByteArraySerializer.Deserialize(cnData);
 
-                            EnqueueScenarioData(scenarioName, mw.GetMessageBytes(), groupIndex, subSpaceIndex);
-                            if (!isAutoReply)
-                            {
-                                DequeueScenarioData(groupIndex, subSpaceIndex);
-                            }
-                        }
-                        else
-                        {
-                            Messages.ScenarioData.SendScenarioGroupModules(callingClient, groupName);
-                        }
-                    }
-                    else
-                    {
-                        if (toServer)
-                        {
-                            string[] scenarioName = mr.Read<string[]>();
-                            mw.Write<string[]>(scenarioName);
-                            for (int i = 0; i < scenarioName.Length; i++)
-                            {
-                                mw.Write<byte[]>(mr.Read<byte[]>());
-                            }
-                            ScenarioHandler.HandleScenarioModuleData(callingClient, mw.GetMessageBytes());
-                        }
-                        else
-                        {
-                            //Dont care
+                                    cnLines = SyncrioUtil.DataCleaner.BasicClean(cnLines);
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioAddContract(cnLines, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.CONTRACT_OFFERED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioAddContract(cnLines, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.CUSTOM_WAYPOINT_LOAD:
+                                {
+                                    string wpName = subDataReader.Read<string>();
+                                    byte[] wpData = subDataReader.Read<byte[]>();
+                                    List<string> wpLines = SyncrioUtil.ByteArraySerializer.Deserialize(wpData);
+
+                                    wpLines = SyncrioUtil.DataCleaner.BasicClean(wpLines);
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioSaveLoadedWaypoint(wpName, wpLines, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.CUSTOM_WAYPOINT_LOAD, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioSaveLoadedWaypoint(wpName, wpLines, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.CUSTOM_WAYPOINT_SAVE:
+                                {
+                                    string wpName = subDataReader.Read<string>();
+                                    byte[] wpData = subDataReader.Read<byte[]>();
+                                    List<string> wpLines = SyncrioUtil.ByteArraySerializer.Deserialize(wpData);
+
+                                    wpLines = SyncrioUtil.DataCleaner.BasicClean(wpLines);
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioSaveWaypoint(wpName, wpLines, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.CUSTOM_WAYPOINT_SAVE, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioSaveWaypoint(wpName, wpLines, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.FUNDS_CHANGED:
+                                {
+                                    double value = subDataReader.Read<double>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioChangeCurrency(value, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.FUNDS_CHANGED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioChangeCurrency(value, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.REPUTATION_CHANGED:
+                                {
+                                    float value = subDataReader.Read<float>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            if (callingClient.subspace != -1)
+                                            {
+                                                ScenarioChangeCurrency(1, value, groupName);
+                                            }
+                                            else
+                                            {
+                                                if (callingClient.lastSubspace != -1)
+                                                {
+                                                    ScenarioChangeCurrency(1, value, groupName);
+                                                }
+                                            }
+
+                                            ScenarioSendData(groupName, ScenarioDataType.REPUTATION_CHANGED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioChangeCurrency(1, value, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.SCIENCE_CHANGED:
+                                {
+                                    float value = subDataReader.Read<float>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioChangeCurrency(2, value, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.SCIENCE_CHANGED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioChangeCurrency(2, value, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.KSC_FACILITY_UPGRADED:
+                                {
+                                    string facilityID = subDataReader.Read<string>();
+                                    int level = subDataReader.Read<int>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioBuildingUpgrade(facilityID, level, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.KSC_FACILITY_UPGRADED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioBuildingUpgrade(facilityID, level, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.KSC_STRUCTURE_COLLAPSED:
+                                {
+                                    string buildingID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioBuildingBreak(buildingID, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.KSC_STRUCTURE_COLLAPSED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioBuildingBreak(buildingID, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.KSC_STRUCTURE_REPAIRED:
+                                {
+                                    string buildingID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioBuildingFix(buildingID, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.KSC_STRUCTURE_REPAIRED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioBuildingFix(buildingID, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.PART_PURCHASED:
+                                {
+                                    string partID = subDataReader.Read<string>();
+                                    string techNeededID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioAddPart(partID, techNeededID, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.PART_PURCHASED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioAddPart(partID, techNeededID, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.PART_UPGRADE_PURCHASED:
+                                {
+                                    string upgradeID = subDataReader.Read<string>();
+                                    string techNeededID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioAddUpgrade(upgradeID, techNeededID, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.PART_UPGRADE_PURCHASED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioAddUpgrade(upgradeID, techNeededID, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.PROGRESS_COMPLETE:
+                                {
+                                    string progressID = subDataReader.Read<string>();
+                                    byte[] pnData = subDataReader.Read<byte[]>();
+                                    List<string> pnLines = SyncrioUtil.ByteArraySerializer.Deserialize(pnData);
+
+                                    pnLines = SyncrioUtil.DataCleaner.BasicClean(pnLines);
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioAddProgress(progressID, pnLines, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.PROGRESS_COMPLETE, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioAddProgress(progressID, pnLines, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.TECHNOLOGY_RESEARCHED:
+                                {
+                                    string techID = subDataReader.Read<string>();
+                                    List<string> techNode = SyncrioUtil.ByteArraySerializer.Deserialize(subDataReader.Read<byte[]>());
+
+                                    int numberOfParts = subDataReader.Read<int>();
+
+                                    List<string> parts = new List<string>();
+
+                                    for (int i = 0; i < numberOfParts; i++)
+                                    {
+                                        parts.Add(subDataReader.Read<string>());
+                                    }
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioAddTech(techID, techNode, parts, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.TECHNOLOGY_RESEARCHED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioAddTech(techID, techNode, parts, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.SCIENCE_RECIEVED:
+                                {
+                                    string sciID = subDataReader.Read<string>();
+                                    float dataValue = subDataReader.Read<float>();
+                                    List<string> sciNode = SyncrioUtil.ByteArraySerializer.Deserialize(subDataReader.Read<byte[]>());
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioScienceRecieved(sciID, dataValue, sciNode, groupName);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.SCIENCE_RECIEVED, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioScienceRecieved(sciID, dataValue, sciNode, callingClient);
+                                    }
+                                }
+                                break;
+                            default:
+                                {
+                                    //Nothing for now.
+                                }
+                                break;
                         }
                     }
                 }
+                catch (Exception e)
+                {
+                    SyncrioLog.Debug("Error syncing data type: " + type.ToString() + ", error: " + e);
+                }
+            }
+        }
+
+        public void ScenarioSendData(string groupName, ScenarioDataType type, ClientObject excludedClient)
+        {
+            List<byte[]> data = new List<byte[]>();
+            switch (type)
+            {
+                case ScenarioDataType.CONTRACT_UPDATED:
+                case ScenarioDataType.CONTRACT_OFFERED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Contracts");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.CUSTOM_WAYPOINT_LOAD:
+                case ScenarioDataType.CUSTOM_WAYPOINT_SAVE:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Waypoints.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Waypoints");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.FUNDS_CHANGED:
+                case ScenarioDataType.REPUTATION_CHANGED:
+                case ScenarioDataType.SCIENCE_CHANGED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Currency.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Currency");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.KSC_FACILITY_UPGRADED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "BuildingLevel.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("BuildingLevel");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.KSC_STRUCTURE_COLLAPSED:
+                case ScenarioDataType.KSC_STRUCTURE_REPAIRED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "BuildingDead.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("BuildingDead");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+
+                        string filePath2 = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+
+                        if (File.Exists(filePath2))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("BuildingAlive");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.PART_PURCHASED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Parts.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Parts");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.PART_UPGRADE_PURCHASED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Upgrades.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Upgrades");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.PROGRESS_COMPLETE:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Progress.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Progress");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.TECHNOLOGY_RESEARCHED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Tech.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Tech");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.SCIENCE_RECIEVED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "ScienceRecieved.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("ScienceRecieved");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                default:
+                    {
+
+                    }
+                    break;
+            }
+
+            Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
+
+            foreach (ClientObject client in ClientHandler.GetClients())
+            {
+                if (client != excludedClient)
+                {
+                    if (groups[groupName].members.Contains(client.playerName))
+                    {
+                        Messages.ScenarioData.SendScenarioGroupModules(client, data);
+                    }
+                }
+            }
+        }
+
+        public void ScenarioSendAllData(string groupName, ClientObject player)
+        {
+            List<byte[]> data = new List<byte[]>();
+
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+            if (File.Exists(filePath))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Contracts");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+            }
+
+            string filePath2 = Path.Combine(scenarioFolder, "Waypoints.txt");
+
+            if (File.Exists(filePath2))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Waypoints");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+            }
+
+            string filePath3 = Path.Combine(scenarioFolder, "Currency.txt");
+
+            if (File.Exists(filePath3))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Currency");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath3));
+            }
+
+            string filePath4 = Path.Combine(scenarioFolder, "BuildingLevel.txt");
+
+            if (File.Exists(filePath4))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("BuildingLevel");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath4));
+            }
+
+            string filePath5 = Path.Combine(scenarioFolder, "BuildingDead.txt");
+
+            if (File.Exists(filePath5))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("BuildingDead");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath5));
+            }
+
+            string filePath6 = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+
+            if (File.Exists(filePath6))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("BuildingAlive");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath6));
+            }
+
+            string filePath7 = Path.Combine(scenarioFolder, "Progress.txt");
+
+            if (File.Exists(filePath7))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Progress");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath7));
+            }
+
+            string filePath8 = Path.Combine(scenarioFolder, "Tech.txt");
+
+            if (File.Exists(filePath8))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Tech");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath8));
+            }
+
+            string filePath9 = Path.Combine(scenarioFolder, "ScienceRecieved.txt");
+
+            if (File.Exists(filePath9))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("ScienceRecieved");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath9));
+            }
+
+            string filePath10 = Path.Combine(scenarioFolder, "Parts.txt");
+
+            if (File.Exists(filePath10))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Parts");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath10));
+            }
+
+            string filePath11 = Path.Combine(scenarioFolder, "Upgrades.txt");
+
+            if (File.Exists(filePath11))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Upgrades");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
+            }
+
+            Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
+
+            if (groups[groupName].members.Contains(player.playerName))
+            {
+                Messages.ScenarioData.SendScenarioGroupModules(player, data);
             }
         }
 
@@ -316,123 +1005,1543 @@ namespace SyncrioServer
             }
         }
 
-        public void SendAutoSyncScenarioRequest(ClientObject targetClient)
+        private void ScenarioSetWeights(List<string> weights, string groupName)
         {
-            ServerMessage newMessage = new ServerMessage();
-            newMessage.type = ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST;
-            newMessage.data = null;
-            ClientHandler.SendToClient(targetClient, newMessage, true);
-        }
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Weights.txt");
 
-        public void EnqueueScenarioData(string[] scenarioName, byte[] scenarioDataPile, int groupIndex, int subSpaceIndex)
-        {
-            using (MessageReader mr = new MessageReader(scenarioDataPile))
+            if (!Directory.Exists(scenarioFolder))
             {
-                for (int i = 0; i < scenarioName.Length; i++)
-                {
-                    byte[] scenarioData = Compression.DecompressIfNeeded(mr.Read<byte[]>());
-
-                    if (scenarioData != null)
-                    {
-                        if (subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData.ContainsKey(scenarioName[i]))
-                        {
-                            subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData[scenarioName[i]].Add(scenarioData);
-                        }
-                        else
-                        {
-                            subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData.Add(scenarioName[i], new List<byte[]>());
-
-                            subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData[scenarioName[i]].Add(scenarioData);
-                        }
-                    }
-                }
+                Directory.CreateDirectory(scenarioFolder);
             }
+
+            SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(weights), filePath);
         }
-        
-        public bool DequeueScenarioData(int groupIndex, int subSpaceIndex)
+
+        private void ScenarioSetWeights(List<string> weights, ClientObject client)
         {
-            lock (subspaceListLock)
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Weights.txt");
+
+            if (!Directory.Exists(playerFolder))
             {
-                Dictionary<string, List<byte[]>> dequeuedScenarioDataList = new Dictionary<string, List<byte[]>>();
-
-                if (subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData.Count > 0)
-                {
-                    dequeuedScenarioDataList = subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData;
-                    subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupQueuedScenarioData = new Dictionary<string, List<byte[]>>();
-                }
-                else
-                {
-                    string groupName = subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupName;
-                    int subSpaceNumber = subspaceList.Subspaces[subSpaceIndex].SubspaceNumber;
-                    SyncrioLog.Debug("The queue for group: " + groupName + ", in subspace: " + subSpaceNumber + ", is empty.");
-                    return false;
-                }
-                
-                ScenarioHandler.HandleAllGroupScenarioData(subspaceList.Subspaces[subSpaceIndex].Groups[groupIndex].GroupName, dequeuedScenarioDataList, subspaceList.Subspaces[subSpaceIndex].SubspaceNumber);
-
-                return true;
+                Directory.CreateDirectory(playerFolder);
             }
+
+            SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(weights), filePath);
         }
-        
-        public bool DequeueAllScenarioData()
+
+        private void ScenarioUpdateContract(List<string> cnLines, string groupName)
         {
-            lock (subspaceListLock)
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
             {
-                foreach (Subspace subSpace in subspaceList.Subspaces)
-                {
-                    foreach (Group group in subSpace.Groups)
-                    {
-                        Dictionary<string, List<byte[]>> dequeuedScenarioDataList = new Dictionary<string, List<byte[]>>();
-
-                        if (group.GroupQueuedScenarioData.Count > 0)
-                        {
-                            dequeuedScenarioDataList = group.GroupQueuedScenarioData;
-                            group.GroupQueuedScenarioData = new Dictionary<string, List<byte[]>>();
-                        }
-                        else
-                        {
-                            string groupName = group.GroupName;
-                            int subSpaceNumber = subSpace.SubspaceNumber;
-                            SyncrioLog.Debug("The queue for group: " + groupName + ", in subspace: " + subSpaceNumber + ", is empty.");
-                            return false;
-                        }
-                        
-                        ScenarioHandler.HandleAllGroupScenarioData(group.GroupName, dequeuedScenarioDataList, subSpace.SubspaceNumber);
-                    }
-                }
-
-                return true;
+                Directory.CreateDirectory(scenarioFolder);
             }
-        }
 
-        public static void CheckSubspacesForPlayers()
-        {
-            lock (subspaceListLock)
+            if (File.Exists(filePath))
             {
-                SubspacesList endResult = CopySubspacesList(subspaceList);
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
 
-                foreach (int key in Messages.WarpControl.playersInSubspaces.Keys)
+                if (cnLines.Any(i => i.StartsWith("guid")))
                 {
-                    int playersInThisSubspace = 0;
-                    Messages.WarpControl.playersInSubspaces.TryGetValue(key, out playersInThisSubspace);
-                    if (playersInThisSubspace <= 0)
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (oldList.Any(i => i == cnLines[cnIndex]))
                     {
-                        for (int i = endResult.Subspaces.Count - 1; i >= 0; i--)
+                        int oldIndex = oldList.FindIndex(i => i == cnLines[cnIndex]);
+
+                        int looped = 0;
+                        while (oldList[oldIndex - looped] != "ContractNode" && looped <= 20)
                         {
-                            if (endResult.Subspaces[i].SubspaceNumber == key)
+                            looped++;
+                        }
+
+                        if (oldList[oldIndex - looped] == "ContractNode")
+                        {
+                            int tempIndex = oldIndex - looped;
+                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+
+                            if (range.Key + 2 < oldList.Count && range.Value - 3 > 0)
                             {
-                                ScenarioHandler.MergeEmptySubSpaceWithNewestOne(key);
-                                endResult.Subspaces.RemoveAt(i);
-                                break;
+                                oldList.RemoveRange(range.Key + 2, range.Value - 3);
+
+                                oldList.InsertRange(range.Key + 2, cnLines);
                             }
                         }
                     }
+                    else
+                    {
+                        oldList.Add("ContractNode");
+                        oldList.Add("{");
+                        oldList.AddRange(cnLines);
+                        oldList.Add("}");
+                    }
                 }
 
-                subspaceList = CopySubspacesList(endResult);
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (newList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        int oldIndex = newList.FindIndex(i => i == cnLines[cnIndex]);
+
+                        int looped = 0;
+                        while (newList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                        {
+                            looped++;
+                        }
+
+                        if (newList[oldIndex - looped] == "ContractNode")
+                        {
+                            int tempIndex = oldIndex - looped;
+                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, tempIndex + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+
+                            if (range.Key + 2 < newList.Count && range.Value - 3 > 0)
+                            {
+                                newList.RemoveRange(range.Key + 2, range.Value - 3);
+
+                                newList.InsertRange(range.Key + 2, cnLines);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        newList.Add("ContractNode");
+                        newList.Add("{");
+                        newList.AddRange(cnLines);
+                        newList.Add("}");
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioUpdateContract(List<string> cnLines, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Contracts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
             }
 
-            SaveGroupSubspaceFile();
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (oldList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        int oldIndex = oldList.FindIndex(i => i == cnLines[cnIndex]);
+
+                        int looped = 0;
+                        while (oldList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                        {
+                            looped++;
+                        }
+
+                        if (oldList[oldIndex - looped] == "ContractNode")
+                        {
+                            int tempIndex = oldIndex - looped;
+                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+
+                            if (range.Key + 2 < oldList.Count && range.Value - 3 > 0)
+                            {
+                                oldList.RemoveRange(range.Key + 2, range.Value - 3);
+
+                                oldList.InsertRange(range.Key + 2, cnLines);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        oldList.Add("ContractNode");
+                        oldList.Add("{");
+                        oldList.AddRange(cnLines);
+                        oldList.Add("}");
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (newList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        int oldIndex = newList.FindIndex(i => i == cnLines[cnIndex]);
+
+                        int looped = 0;
+                        while (newList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                        {
+                            looped++;
+                        }
+
+                        if (newList[oldIndex - looped] == "ContractNode")
+                        {
+                            int tempIndex = oldIndex - looped;
+                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, tempIndex + 1);
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+
+                            if (range.Key + 2 < newList.Count && range.Value - 3 > 0)
+                            {
+                                newList.RemoveRange(range.Key + 2, range.Value - 3);
+
+                                newList.InsertRange(range.Key + 2, cnLines);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        newList.Add("ContractNode");
+                        newList.Add("{");
+                        newList.AddRange(cnLines);
+                        newList.Add("}");
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddContract(List<string> cnLines, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (!oldList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        oldList.Add("ContractNode");
+                        oldList.Add("{");
+                        oldList.AddRange(cnLines);
+                        oldList.Add("}");
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (!newList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        newList.Add("ContractNode");
+                        newList.Add("{");
+                        newList.AddRange(cnLines);
+                        newList.Add("}");
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddContract(List<string> cnLines, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Contracts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (!oldList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        oldList.Add("ContractNode");
+                        oldList.Add("{");
+                        oldList.AddRange(cnLines);
+                        oldList.Add("}");
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (cnLines.Any(i => i.StartsWith("guid")))
+                {
+                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
+
+                    if (!newList.Any(i => i == cnLines[cnIndex]))
+                    {
+                        newList.Add("ContractNode");
+                        newList.Add("{");
+                        newList.AddRange(cnLines);
+                        newList.Add("}");
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioSaveLoadedWaypoint(string wpID, List<string> wpLines, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Waypoints.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Any(i => i == "Waypoint : " + wpID))
+                {
+                    oldList.Add("Waypoint : " + wpID);
+                    oldList.Add("{");
+                    oldList.AddRange(wpLines);
+                    oldList.Add("}");
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("Waypoint : " + wpID);
+                newList.Add("{");
+                newList.AddRange(wpLines);
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioSaveLoadedWaypoint(string wpID, List<string> wpLines, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Waypoints.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Any(i => i == "Waypoint : " + wpID))
+                {
+                    oldList.Add("Waypoint : " + wpID);
+                    oldList.Add("{");
+                    oldList.AddRange(wpLines);
+                    oldList.Add("}");
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("Waypoint : " + wpID);
+                newList.Add("{");
+                newList.AddRange(wpLines);
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioSaveWaypoint(string wpID, List<string> wpLines, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Waypoints.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int cursor = oldList.FindIndex(i => i == "Waypoint : " + wpID);
+
+                if (cursor != -1 && oldList[cursor + 1] == "{")
+                {
+                    List<string> newWaypointLines = new List<string>();
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, cursor + 1);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                    oldList.RemoveRange(range.Key, range.Value);
+
+                    oldList.InsertRange(range.Key, wpLines);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == "Waypoint : " + wpID);
+
+                if (cursor != -1 && newList[cursor + 1] == "{")
+                {
+                    List<string> newWaypointLines = new List<string>();
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, cursor + 1);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                    newList.RemoveRange(range.Key, range.Value);
+
+                    newList.InsertRange(range.Key, wpLines);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+        
+        private void ScenarioSaveWaypoint(string wpID, List<string> wpLines, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Waypoints.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int cursor = oldList.FindIndex(i => i == "Waypoint : " + wpID);
+
+                if (cursor != -1 && oldList[cursor + 1] == "{")
+                {
+                    List<string> newWaypointLines = new List<string>();
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, cursor + 1);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                    oldList.RemoveRange(range.Key, range.Value);
+
+                    oldList.InsertRange(range.Key, wpLines);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == "Waypoint : " + wpID);
+
+                if (cursor != -1 && newList[cursor + 1] == "{")
+                {
+                    List<string> newWaypointLines = new List<string>();
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, cursor + 1);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                    newList.RemoveRange(range.Key, range.Value);
+
+                    newList.InsertRange(range.Key, wpLines);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        /// <summary>
+        /// This version is for funds only.
+        /// </summary>
+        private void ScenarioChangeCurrency(double value, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Currency.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                oldList[0] = Convert.ToString(value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+
+                newList[0] = Convert.ToString(Convert.ToDouble(newList[0]) + value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        /// <summary>
+        /// This version is for funds only.
+        /// </summary>
+        private void ScenarioChangeCurrency(double value, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Currency.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                oldList[0] = Convert.ToString(value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+
+                newList[0] = Convert.ToString(Convert.ToDouble(newList[0]) + value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        /// <summary>
+        /// Set type to either 1 or 2. 1 == Reputation. 2 == Science.
+        /// </summary>
+        private void ScenarioChangeCurrency(int type, float value, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Currency.txt");
+
+            if (type != 1 && type != 2)
+            {
+                return;
+            }
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                oldList[type] = Convert.ToString(value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+
+                newList[type] = Convert.ToString(Convert.ToSingle(newList[type]) + value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+        
+        /// <summary>
+        /// Set type to either 1 or 2. 1 == Reputation. 2 == Science.
+        /// </summary>
+        private void ScenarioChangeCurrency(int type, float value, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Currency.txt");
+
+            if (type != 1 && type != 2)
+            {
+                return;
+            }
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                oldList[type] = Convert.ToString(value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0));
+
+                newList[type] = Convert.ToString(Convert.ToSingle(newList[type]) + value);
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+        
+        private void ScenarioBuildingUpgrade(string buliding, int level, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "BuildingLevel.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                string startString = buliding + " = ";
+
+                int cursor = oldList.FindIndex(i => i.StartsWith(startString));
+
+                if (cursor != -1)
+                {
+                    if (Convert.ToInt32(oldList[cursor].Substring(startString.Length)) < level)
+                    {
+                        oldList[cursor] = startString + level.ToString();
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    oldList.Add(startString + level.ToString());
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                string startString = buliding + " = ";
+
+                int cursor = newList.FindIndex(i => i.StartsWith(startString));
+
+                if (cursor != -1)
+                {
+                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length)) < level)
+                    {
+                        newList[cursor] = startString + level.ToString();
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    newList.Add(startString + level.ToString());
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+        
+        private void ScenarioBuildingUpgrade(string buliding, int level, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "BuildingLevel.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                string startString = buliding + " = ";
+
+                int cursor = oldList.FindIndex(i => i.StartsWith(startString));
+
+                if (cursor != -1)
+                {
+                    if (Convert.ToInt32(oldList[cursor].Substring(startString.Length)) < level)
+                    {
+                        oldList[cursor] = startString + level.ToString();
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    oldList.Add(startString + level.ToString());
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                string startString = buliding + " = ";
+
+                int cursor = newList.FindIndex(i => i.StartsWith(startString));
+
+                if (cursor != -1)
+                {
+                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length)) < level)
+                    {
+                        newList[cursor] = startString + level.ToString();
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    newList.Add(startString + level.ToString());
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+        
+        private void ScenarioBuildingBreak(string buliding, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "BuildingDead.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    oldList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    newList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+
+
+            string filePath2 = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+
+            if (File.Exists(filePath2))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    oldList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath2);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    newList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
+            }
+        }
+        
+        private void ScenarioBuildingBreak(string buliding, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "BuildingDead.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    oldList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    newList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+
+
+            string filePath2 = Path.Combine(playerFolder, "BuildingAlive.txt");
+
+            if (File.Exists(filePath2))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    oldList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath2);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    newList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
+            }
+        }
+        
+        private void ScenarioBuildingFix(string buliding, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    oldList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    newList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+
+
+            string filePath2 = Path.Combine(scenarioFolder, "BuildingDead.txt");
+
+            if (File.Exists(filePath2))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    oldList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath2);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    newList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
+            }
+        }
+        
+        private void ScenarioBuildingFix(string buliding, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "BuildingAlive.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    oldList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor == -1)
+                {
+                    newList.Add(buliding);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+
+
+            string filePath2 = Path.Combine(playerFolder, "BuildingDead.txt");
+
+            if (File.Exists(filePath2))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+
+                int cursor = oldList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    oldList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath2);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                int cursor = newList.FindIndex(i => i == buliding);
+
+                if (cursor != -1)
+                {
+                    newList.RemoveAt(cursor);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
+            }
+        }
+
+        private void ScenarioAddPart(string part, string techNeeded, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Parts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Any(i => i == part + " : " + techNeeded))
+                {
+                    oldList.Add(part + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (!newList.Any(i => i == part + " : " + techNeeded))
+                {
+                    newList.Add(part + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddPart(string part, string techNeeded, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Parts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Any(i => i == part + " : " + techNeeded))
+                {
+                    oldList.Add(part + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (!newList.Any(i => i == part + " : " + techNeeded))
+                {
+                    newList.Add(part + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddUpgrade(string upgrade, string techNeeded, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Upgrades.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Any(i => i == upgrade + " : " + techNeeded))
+                {
+                    oldList.Add(upgrade + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (!newList.Any(i => i == upgrade + " : " + techNeeded))
+                {
+                    newList.Add(upgrade + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddUpgrade(string upgrade, string techNeeded, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Upgrades.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Any(i => i == upgrade + " : " + techNeeded))
+                {
+                    oldList.Add(upgrade + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                if (!newList.Any(i => i == upgrade + " : " + techNeeded))
+                {
+                    newList.Add(upgrade + " : " + techNeeded);
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddProgress(string progressID, List<string> progressLines, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Progress.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Contains("ProgressNode : " + progressID))
+                {
+                    oldList.Add("ProgressNode : " + progressID);
+                    oldList.Add("{");
+                    oldList.AddRange(progressLines);
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("ProgressNode : " + progressID);
+                newList.Add("{");
+                newList.AddRange(progressLines);
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddProgress(string progressID, List<string> progressLines, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Progress.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Contains("ProgressNode : " + progressID))
+                {
+                    oldList.Add("ProgressNode : " + progressID);
+                    oldList.Add("{");
+                    oldList.AddRange(progressLines);
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("ProgressNode : " + progressID);
+                newList.Add("{");
+                newList.AddRange(progressLines);
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddTech(string techID, List<string> techNode, List<string> parts, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Tech.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Contains("Tech : " + techID))
+                {
+                    oldList.Add("Tech : " + techID);
+
+                    oldList.Add("TechNode");
+                    oldList.Add("{");
+                    oldList.AddRange(techNode);
+                    oldList.Add("}");
+
+                    oldList.Add("TechParts");
+                    oldList.Add("{");
+                    for (int i = 0; i < parts.Count; i++)
+                    {
+                        oldList.Add("Part : " + parts[i]);
+                    }
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("Tech : " + techID);
+
+                newList.Add("TechNode");
+                newList.Add("{");
+                newList.AddRange(techNode);
+                newList.Add("}");
+
+                newList.Add("TechParts");
+                newList.Add("{");
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    newList.Add("Part : " + parts[i]);
+                }
+                newList.Add("}");
+
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioAddTech(string techID, List<string> techNode, List<string> parts, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Tech.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Contains("Tech : " + techID))
+                {
+                    oldList.Add("Tech : " + techID);
+
+                    oldList.Add("TechNode");
+                    oldList.Add("{");
+                    oldList.AddRange(techNode);
+                    oldList.Add("}");
+
+                    oldList.Add("TechParts");
+                    oldList.Add("{");
+                    for (int i = 0; i < parts.Count; i++)
+                    {
+                        oldList.Add("Part : " + parts[i]);
+                    }
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("Tech : " + techID);
+
+                newList.Add("TechNode");
+                newList.Add("{");
+                newList.AddRange(techNode);
+                newList.Add("}");
+
+                newList.Add("TechParts");
+                newList.Add("{");
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    newList.Add("Part : " + parts[i]);
+                }
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioScienceRecieved(string sciID, float dataValue, List<string> sciNode, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "ScienceRecieved.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Contains("Sci : " + sciID))
+                {
+                    oldList.Add("Sci : " + sciID);
+
+                    oldList.Add("Value : " + Convert.ToString(dataValue));
+
+                    oldList.Add("SciNode");
+                    oldList.Add("{");
+                    oldList.AddRange(sciNode);
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+                else
+                {
+                    int index = oldList.FindIndex(i => i == "Sci : " + sciID);
+
+                    oldList[index + 1] = "Value : " + Convert.ToString(dataValue);
+
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 3);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
+
+                    oldList.RemoveRange(range.Key + 4, range.Value - 5);
+
+                    oldList.InsertRange(range.Key + 4, sciNode);
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("Sci : " + sciID);
+
+                newList.Add("Value : " + Convert.ToString(dataValue));
+
+                newList.Add("SciNode");
+                newList.Add("{");
+                newList.AddRange(sciNode);
+                newList.Add("}");
+
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioScienceRecieved(string sciID, float dataValue, List<string> sciNode, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "ScienceRecieved.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (!oldList.Contains("Sci : " + sciID))
+                {
+                    oldList.Add("Sci : " + sciID);
+
+                    oldList.Add("Value : " + Convert.ToString(dataValue));
+
+                    oldList.Add("SciNode");
+                    oldList.Add("{");
+                    oldList.AddRange(sciNode);
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+                else
+                {
+                    int index = oldList.FindIndex(i => i == "Sci : " + sciID);
+
+                    oldList[index + 1] = "Value : " + Convert.ToString(dataValue);
+
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 3);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
+
+                    oldList.RemoveRange(range.Key + 4, range.Value - 5);
+
+                    oldList.InsertRange(range.Key + 4, sciNode);
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add("Sci : " + sciID);
+
+                newList.Add("Value : " + Convert.ToString(dataValue));
+
+                newList.Add("SciNode");
+                newList.Add("{");
+                newList.AddRange(sciNode);
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
         }
 
         public static void LoadGroupSubspaceFile()
@@ -455,24 +2564,21 @@ namespace SyncrioServer
                             }
                             firstLine = sr.ReadLine().Trim();
                         }
-                        Subspace firstLineSubspace = new Subspace();
-                        firstLineSubspace.SubspaceNumber = Int32.Parse(firstLine);
-                        subspaceList.Subspaces.Add(firstLineSubspace);
-                        Messages.WarpControl.playersInSubspaces.Add(firstLineSubspace.SubspaceNumber, 0);
+                        int firstLineIndex = Int32.Parse(firstLine);
+                        AddSubspace(firstLineIndex, -1);
+                        Messages.WarpControl.playersInSubspaces.Add(firstLineIndex, 0);
                         while (!sr.EndOfStream)
                         {
-                            Subspace newSubspace = new Subspace();
-                            newSubspace.SubspaceNumber = Int32.Parse(sr.ReadLine().Trim());
-                            subspaceList.Subspaces.Add(newSubspace);
-                            Messages.WarpControl.playersInSubspaces.Add(newSubspace.SubspaceNumber, 0);
+                            int lineIndex = Int32.Parse(sr.ReadLine().Trim());
+                            AddSubspace(lineIndex, -1);
+                            Messages.WarpControl.playersInSubspaces.Add(lineIndex, 0);
                         }
                     }
                 }
                 catch
                 {
-                    Subspace newSubspace = new Subspace();
-                    newSubspace.SubspaceNumber = 0;
-                    subspaceList.Subspaces.Add(newSubspace);
+                    AddSubspace(0, -1);
+                    Messages.WarpControl.playersInSubspaces.Add(0, 0);
                     SaveGroupSubspaceFile();
                 }
             }
@@ -521,6 +2627,41 @@ namespace SyncrioServer
             }
 
             return outputList;
+        }
+
+        /// <summary>
+        /// Set 'index' to -1 to add the subspace at the end of the list.
+        /// </summary>
+        public static int AddSubspace(int number, int index)
+        {
+            lock (subspaceListLock)
+            {
+                int returnIndex = 0;
+                Subspace newSubspace = new Subspace();
+
+                newSubspace.SubspaceNumber = number;
+
+                if (index != -1)
+                {
+                    if (index < subspaceList.Subspaces.Count)
+                    {
+                        subspaceList.Subspaces.Insert(index, newSubspace);
+                        returnIndex = index;
+                    }
+                    else
+                    {
+                        subspaceList.Subspaces.Add(newSubspace);
+                        returnIndex = subspaceList.Subspaces.Count - 1;
+                    }
+                }
+                else
+                {
+                    subspaceList.Subspaces.Add(newSubspace);
+                    returnIndex = subspaceList.Subspaces.Count - 1;
+                }
+                
+                return returnIndex;
+            }
         }
 
         public class SubspacesList

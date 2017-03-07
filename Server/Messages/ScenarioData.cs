@@ -67,13 +67,14 @@ namespace SyncrioServer.Messages
                 {
                     //Remove the .txt part for the name
                     scenarioNames[currentScenarioModule] = Path.GetFileNameWithoutExtension(file);
-                    scenarioDataArray[currentScenarioModule] = File.ReadAllBytes(file);
+                    scenarioDataArray[currentScenarioModule] = SyncrioUtil.FileHandler.ReadFromFile(file);
                     currentScenarioModule++;
                 }
                 ServerMessage newMessage = new ServerMessage();
                 newMessage.type = ServerMessageType.SCENARIO_DATA;
                 using (MessageWriter mw = new MessageWriter())
                 {
+                    mw.Write<bool>(false);
                     mw.Write<string[]>(scenarioNames);
                     foreach (byte[] scenarioData in scenarioDataArray)
                     {
@@ -106,7 +107,7 @@ namespace SyncrioServer.Messages
             {
                 //Remove the .txt part for the name
                 scenarioNames[currentScenarioModule] = Path.GetFileNameWithoutExtension(file);
-                scenarioDataArray[currentScenarioModule] = File.ReadAllBytes(file);
+                scenarioDataArray[currentScenarioModule] = SyncrioUtil.FileHandler.ReadFromFile(file);
                 currentScenarioModule++;
             }
 
@@ -114,6 +115,7 @@ namespace SyncrioServer.Messages
             newMessage.type = ServerMessageType.SCENARIO_DATA;
             using (MessageWriter mw = new MessageWriter())
             {
+                mw.Write<bool>(false);
                 mw.Write<string[]>(scenarioNames);
                 foreach (byte[] scenarioData in scenarioDataArray)
                 {
@@ -131,44 +133,26 @@ namespace SyncrioServer.Messages
             ClientHandler.SendToClient(client, newMessage, true);
         }
 
-        public static void SendScenarioGroupModules(ClientObject client, string groupName)
+        public static void SendScenarioGroupModules(ClientObject client, List<byte[]> data)
         {
-            int subSpace = client.subspace;
-            if (!Directory.Exists(Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupScenarios", groupName, "Subspace" + subSpace, "Scenario")))
-            {
-                return;
-            }
-            int numberOfScenarioModules = Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupScenarios", groupName, "Subspace" + subSpace, "Scenario")).Length;
-            int currentScenarioModule = 0;
-            string[] scenarioNames = new string[numberOfScenarioModules];
-            byte[][] scenarioDataArray = new byte[numberOfScenarioModules][];
-            foreach (string file in Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupScenarios", groupName, "Subspace" + subSpace, "Scenario")))
-            {
-                //Remove the .txt part for the name
-                scenarioNames[currentScenarioModule] = Path.GetFileNameWithoutExtension(file);
-                scenarioDataArray[currentScenarioModule] = File.ReadAllBytes(file);
-                currentScenarioModule++;
-            }
-
-            KeyValuePair<int, int> keys = ScenarioHandler.GetKeys(subSpace, groupName);
-
             ServerMessage newMessage = new ServerMessage();
             newMessage.type = ServerMessageType.SCENARIO_DATA;
             using (MessageWriter mw = new MessageWriter())
             {
-                mw.Write<string[]>(scenarioNames);
+                mw.Write<int>(data.Count);
 
-                foreach (byte[] scenarioData in scenarioDataArray)
+                for (int i = 0; i < data.Count; i++)
                 {
                     if (client.compressionEnabled)
                     {
-                        mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioData));
+                        mw.Write<byte[]>(Compression.CompressIfNeeded(data[i]));
                     }
                     else
                     {
-                        mw.Write<byte[]>(Compression.AddCompressionHeader(scenarioData, false));
+                        mw.Write<byte[]>(Compression.AddCompressionHeader(data[i], false));
                     }
                 }
+
                 newMessage.data = mw.GetMessageBytes();
             }
             ClientHandler.SendToClient(client, newMessage, true);

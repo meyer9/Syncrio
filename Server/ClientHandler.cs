@@ -203,7 +203,6 @@ namespace SyncrioServer
                 Server.players = GetActivePlayerNames();
                 SyncrioLog.Debug("Online players is now: " + Server.playerCount + ", connected: " + clients.Count);
             }
-            Messages.Group.SendGroupProgress(newClientObject);
         }
 
         public static int GetActiveClientCount()
@@ -696,7 +695,7 @@ namespace SyncrioServer
                     case ClientMessageType.CHANGE_GROUP_PRIVACY_REQUEST:
                         GroupSystem.fetch.ChangeGroupPrivacyRequest(client, message.data);
                         break;
-                    case ClientMessageType.SYNC_SCENARIO_REQUEST:
+                    case ClientMessageType.SCENARIO_DATA:
                         ScenarioSystem.fetch.SyncScenario(client, message.data);
                         break;
                     case ClientMessageType.SEND_VESSELS:
@@ -707,6 +706,9 @@ namespace SyncrioServer
                         break;
                     case ClientMessageType.MOD_DATA:
                         Messages.ModData.HandleModDataMessage(client, message.data);
+                        break;
+                        case ClientMessageType.KERBAL_REMOVE:
+                        Messages.KerbalRemove.HandleKerbalRemoval(client, message.data);
                         break;
                     case ClientMessageType.SPLIT_MESSAGE:
                         Messages.SplitMessage.HandleSplitMessage(client, message.data);
@@ -910,6 +912,7 @@ namespace SyncrioServer
         public string publicKey;
         //subspace tracking
         public int subspace = -1;
+        public int lastSubspace = -1;
         public float subspaceRate = 1f;
         //vessel tracking
         public string activeVessel = "";

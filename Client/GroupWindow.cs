@@ -108,6 +108,10 @@ namespace SyncrioClientSide
         private bool progressBasicViewButtonPressed = false;
         private bool celestialProgressViewButtonPressed = false;
         private bool secretsViewButtonPressed = false;
+        private List<string> progressSubViewPressedKeys = new List<string>();
+        private List<List<string>> celestialSubViewPressedKeys = new List<List<string>>();
+        private List<List<string>> subCelestialSubViewPressedKeys = new List<List<string>>();
+        private List<string> secretsSubViewPressedKeys = new List<string>();
 
         public static GroupWindow fetch
         {
@@ -158,6 +162,13 @@ namespace SyncrioClientSide
 
         public void AssignPlayerGroup()
         {
+            bool wasPlayerInGroup = GroupSystem.playerGroupAssigned;
+            string oldGroupName = string.Empty;
+            if (wasPlayerInGroup)
+            {
+                oldGroupName = GroupSystem.playerGroupName;
+            }
+
             GroupSystem.playerGroupAssigned = GroupSystem.fetch.PlayerIsInGroup(Settings.fetch.playerName);
             if (GroupSystem.playerGroupAssigned)
             {
@@ -172,10 +183,38 @@ namespace SyncrioClientSide
                 {
                     GroupSystem.playerIsGroupLeader = false;
                 }
+
+                if (wasPlayerInGroup)
+                {
+                    if (oldGroupName != GroupSystem.playerGroupName)
+                    {
+                        if (LockSystem.fetch.LockExists("contract-spawn-" + oldGroupName))
+                        {
+                            if (LockSystem.fetch.LockIsOurs("contract-spawn-" + oldGroupName))
+                            {
+                                LockSystem.fetch.ReleaseLock("contract-spawn-" + oldGroupName);
+                            }
+                        }
+                        if (!LockSystem.fetch.LockExists("contract-spawn-" + GroupSystem.playerGroupName))
+                        {
+                            LockSystem.fetch.AcquireLock("contract-spawn-" + GroupSystem.playerGroupName, false);
+                        }
+                    }
+                }
             }
             else
             {
                 GroupSystem.playerGroupName = string.Empty;
+                if (wasPlayerInGroup)
+                {
+                    if (LockSystem.fetch.LockExists("contract-spawn-" + oldGroupName))
+                    {
+                        if (LockSystem.fetch.LockIsOurs("contract-spawn-" + oldGroupName))
+                        {
+                            LockSystem.fetch.ReleaseLock("contract-spawn-" + oldGroupName);
+                        }
+                    }
+                }
             }
         }
 
@@ -292,6 +331,7 @@ namespace SyncrioClientSide
             windowRect = new Rect(Screen.width - WINDOW_WIDTH, Screen.height / 2f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
             windowRectChangeLeader = new Rect(Screen.width * 0.5f - WINDOW_WIDTH_CHANGE_LEADER, Screen.height / 2f - WINDOW_HEIGHT_CHANGE_LEADER / 2f, WINDOW_WIDTH_CHANGE_LEADER, WINDOW_HEIGHT_CHANGE_LEADER);
             windowRectInvitePlayer = new Rect(Screen.width * 0.5f - WINDOW_WIDTH_INVITE_PLAYER, Screen.height / 2f - WINDOW_HEIGHT_INVITE_PLAYER / 2f, WINDOW_WIDTH_INVITE_PLAYER, WINDOW_HEIGHT_INVITE_PLAYER);
+            windowRectGroupProgress = new Rect(WINDOW_WIDTH, Screen.height / 2f - WINDOW_HEIGHT / 2f, WINDOW_WIDTH, WINDOW_HEIGHT);
             moveRect = new Rect(0, 0, 10000, 20);
             windowStyle = new GUIStyle(GUI.skin.window);
             labelStyle = new GUIStyle(GUI.skin.label);
@@ -763,6 +803,33 @@ namespace SyncrioClientSide
                                 GUILayout.EndScrollView();
                                 GUILayout.BeginHorizontal();
                             }
+                            else
+                            {
+                                if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count > 1)
+                                {
+                                    GUILayout.EndHorizontal();
+                                    scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
+                                    for (int i = 0; i < GroupSystem.fetch.groups[GroupSystem.playerGroupName].members.Count; i++)
+                                    {
+                                        if (GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[i] != Settings.fetch.playerName)
+                                        {
+                                            GUILayout.BeginHorizontal();
+                                            GUILayout.Label(GroupSystem.fetch.groups[GroupSystem.playerGroupName].members[i], labelOptions);
+                                            if (i == 0)
+                                            {
+                                                GUILayout.Label("Leader", labelOptions);
+                                            }
+                                            else
+                                            {
+                                                GUILayout.Label("Member", labelOptions);
+                                            }
+                                            GUILayout.EndHorizontal();
+                                        }
+                                    }
+                                    GUILayout.EndScrollView();
+                                    GUILayout.BeginHorizontal();
+                                }
+                            }
                         }
                         else
                         {
@@ -812,6 +879,7 @@ namespace SyncrioClientSide
                 {
                     GroupSystem.playerCreatingGroup = false;
                     GroupSystem.setIfGroupIsFreeToInvite = true;
+                    GroupSystem.setIfGroupProgressIsPublic = true;
                     GroupSystem.isGroupCreationResponseError = false;
                 }
                 GUILayout.EndHorizontal();
@@ -863,6 +931,17 @@ namespace SyncrioClientSide
                 else
                 {
                     GroupSystem.setIfGroupIsFreeToInvite = GUILayout.Toggle(GroupSystem.setIfGroupIsFreeToInvite, "X", buttonStyle);
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Set if Group Progress is public: ", labelOptionsTwo);
+                if (!GroupSystem.setIfGroupProgressIsPublic)
+                {
+                    GroupSystem.setIfGroupProgressIsPublic = GUILayout.Toggle(GroupSystem.setIfGroupProgressIsPublic, " ", buttonStyle);
+                }
+                else
+                {
+                    GroupSystem.setIfGroupProgressIsPublic = GUILayout.Toggle(GroupSystem.setIfGroupProgressIsPublic, "X", buttonStyle);
                 }
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
@@ -1078,210 +1157,396 @@ namespace SyncrioClientSide
             {
                 if (!string.IsNullOrEmpty(progressButtonSelectedGroup))
                 {
-                    GUILayout.BeginHorizontal();
-                    if (GUILayout.Button("Back", buttonStyle))
+                    if (GroupSystem.fetch.allGroupProgressList.ContainsKey(progressButtonSelectedGroup))
                     {
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button("Back", buttonStyle))
+                        {
+                            if (progressButtonSelectedSubspace == -1)
+                            {
+                                progressButtonPressed = false;
+                                progressButtonSelectedGroup = string.Empty;
+                                progressButtonSelectedSubspace = -1;
+                                scrollPositionProgress = new Vector2();
+                            }
+                            else
+                            {
+                                progressButtonSelectedSubspace = -1;
+                                scrollPositionProgress = new Vector2();
+
+                                currencyViewButtonPressed = false;
+                                techViewButtonPressed = false;
+                                progressViewButtonPressed = false;
+                                progressBasicViewButtonPressed = false;
+                                celestialProgressViewButtonPressed = false;
+                                secretsViewButtonPressed = false;
+                                progressSubViewPressedKeys = new List<string>();
+                                celestialSubViewPressedKeys = new List<List<string>>();
+                                subCelestialSubViewPressedKeys = new List<List<string>>();
+                                secretsSubViewPressedKeys = new List<string>();
+                            }
+                        }
+                        GUILayout.EndHorizontal();
+
                         if (progressButtonSelectedSubspace == -1)
                         {
-                            progressButtonPressed = false;
-                            progressButtonSelectedGroup = string.Empty;
-                            progressButtonSelectedSubspace = -1;
-                            scrollPositionProgress = new Vector2();
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("Select a subspace to view", labelOptionsTwo);
+                            GUILayout.EndHorizontal();
+
+                            foreach (int subspace in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup].Keys)
+                            {
+                                if (subspace != -1)
+                                {
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Subspace " + subspace, labelOptions);
+                                    GUILayout.FlexibleSpace();
+                                    if (GUILayout.Button("Select", buttonStyle))
+                                    {
+                                        progressButtonSelectedSubspace = subspace;
+                                        scrollPositionProgress = new Vector2();
+                                    }
+                                    GUILayout.EndHorizontal();
+                                }
+                            }
                         }
                         else
                         {
-                            progressButtonSelectedSubspace = -1;
-                            scrollPositionProgress = new Vector2();
-
-                            currencyViewButtonPressed = false;
-                            techViewButtonPressed = false;
-                            progressViewButtonPressed = false;
-                            progressBasicViewButtonPressed = false;
-                            celestialProgressViewButtonPressed = false;
-                            secretsViewButtonPressed = false;
-                        }
-                    }
-                    GUILayout.EndHorizontal();
-
-                    if (progressButtonSelectedSubspace == -1)
-                    {
-                        GUILayout.BeginHorizontal();
-                        GUILayout.Label("Select a subspace to view", labelOptionsTwo);
-                        GUILayout.EndHorizontal();
-
-                        foreach (int subspace in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup].Keys)
-                        {
-                            if (subspace != -1)
+                            if (GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup].ContainsKey(progressButtonSelectedSubspace))
                             {
                                 GUILayout.BeginHorizontal();
-                                GUILayout.Label("Subspace " + subspace, labelOptions);
-                                GUILayout.FlexibleSpace();
-                                if (GUILayout.Button("Select", buttonStyle))
+                                GUILayout.Label("Select a something to view", labelOptionsTwo);
+                                GUILayout.EndHorizontal();
+
+                                GUILayout.BeginHorizontal();
+                                currencyViewButtonPressed = GUILayout.Toggle(currencyViewButtonPressed, "Currencies", buttonStyle);
+                                if (currencyViewButtonPressed)
                                 {
-                                    progressButtonSelectedSubspace = subspace;
-                                    scrollPositionProgress = new Vector2();
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Funds = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Funds, labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Rep = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Rep, labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Sci = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Sci, labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
                                 }
                                 GUILayout.EndHorizontal();
+
+                                GUILayout.BeginHorizontal();
+                                techViewButtonPressed = GUILayout.Toggle(techViewButtonPressed, "Tech", buttonStyle);
+                                if (techViewButtonPressed)
+                                {
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+                                    GUILayout.Label("Number of Techs: " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Techs.Count, labelOptionsTwo);
+                                    GUILayout.EndHorizontal();
+
+                                    if (GroupSystem.showAllProgress)
+                                    {
+                                        foreach (string tech in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Techs)
+                                        {
+                                            GUILayout.BeginHorizontal();
+                                            GUILayout.Label("Tech: " + tech, labelOptionsTwo);
+                                            GUILayout.EndHorizontal();
+                                        }
+                                    }
+                                    GUILayout.BeginHorizontal();
+                                }
+                                GUILayout.EndHorizontal();
+
+                                GUILayout.BeginHorizontal();
+                                progressViewButtonPressed = GUILayout.Toggle(progressViewButtonPressed, "Progress", buttonStyle);
+                                if (progressViewButtonPressed)
+                                {
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+                                    if (GUILayout.Button("Basic", buttonStyle))
+                                    {
+                                        if (!progressBasicViewButtonPressed)
+                                        {
+                                            progressBasicViewButtonPressed = true;
+                                        }
+                                        else
+                                        {
+                                            progressBasicViewButtonPressed = false;
+                                        }
+                                        celestialProgressViewButtonPressed = false;
+                                        secretsViewButtonPressed = false;
+                                    }
+
+                                    if (GUILayout.Button("Celestial", buttonStyle))
+                                    {
+                                        progressBasicViewButtonPressed = false;
+                                        if (!celestialProgressViewButtonPressed)
+                                        {
+                                            celestialProgressViewButtonPressed = true;
+                                        }
+                                        else
+                                        {
+                                            celestialProgressViewButtonPressed = false;
+                                        }
+                                        secretsViewButtonPressed = false;
+                                    }
+
+                                    if (GUILayout.Button("Secrets", buttonStyle))
+                                    {
+                                        progressBasicViewButtonPressed = false;
+                                        celestialProgressViewButtonPressed = false;
+                                        if (!secretsViewButtonPressed)
+                                        {
+                                            secretsViewButtonPressed = true;
+                                        }
+                                        else
+                                        {
+                                            secretsViewButtonPressed = false;
+                                        }
+                                    }
+
+                                    GUILayout.EndHorizontal();
+
+                                    GUILayout.BeginHorizontal();
+
+                                    if (progressBasicViewButtonPressed)
+                                    {
+                                        GUILayout.Label("Basic Progress", labelOptionsTwo);
+                                        GUILayout.EndHorizontal();
+
+                                        if (GroupSystem.showAllProgress)
+                                        {
+                                            foreach (KeyValuePair<string, List<string>> basic in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Progress)
+                                            {
+                                                if (!progressSubViewPressedKeys.Contains(basic.Key))
+                                                {
+                                                    GUILayout.BeginHorizontal();
+                                                    if (GUILayout.Button(basic.Key, buttonStyle))
+                                                    {
+                                                        progressSubViewPressedKeys.Add(basic.Key);
+                                                    }
+                                                    GUILayout.EndHorizontal();
+                                                }
+                                                else
+                                                {
+                                                    GUILayout.BeginHorizontal();
+                                                    GUILayout.Label(basic.Key, labelOptionsTwo);
+                                                    GUILayout.FlexibleSpace();
+                                                    if (GUILayout.Button("Close", buttonStyle))
+                                                    {
+                                                        progressSubViewPressedKeys.Remove(basic.Key);
+                                                    }
+                                                    GUILayout.EndHorizontal();
+
+                                                    for (int v = 0; v < basic.Value.Count; v++)
+                                                    {
+                                                        GUILayout.BeginHorizontal();
+                                                        GUILayout.Space(50);
+                                                        GUILayout.Label(basic.Value[v], labelOptionsTwo);
+                                                        GUILayout.EndHorizontal();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            GUILayout.BeginHorizontal();
+                                            GUILayout.Label("Count:" + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Progress.Count, labelOptionsTwo);
+                                            GUILayout.EndHorizontal();
+                                        }
+                                        GUILayout.BeginHorizontal();
+                                    }
+                                    if (celestialProgressViewButtonPressed)
+                                    {
+                                        GUILayout.Label("Celestial Progress", labelOptionsTwo);
+                                        GUILayout.EndHorizontal();
+
+                                        if (GroupSystem.showAllProgress)
+                                        {
+                                            foreach (KeyValuePair<List<string>, List<List<string>>> celestialBody in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].CelestialProgress)
+                                            {
+                                                if (celestialBody.Key.Count > 0)
+                                                {
+                                                    if (!celestialSubViewPressedKeys.Contains(celestialBody.Key))
+                                                    {
+                                                        GUILayout.BeginHorizontal();
+                                                        if (GUILayout.Button(celestialBody.Key[0], buttonStyle))
+                                                        {
+                                                            celestialSubViewPressedKeys.Add(celestialBody.Key);
+                                                        }
+                                                        GUILayout.EndHorizontal();
+                                                    }
+                                                    else
+                                                    {
+                                                        GUILayout.BeginHorizontal();
+                                                        GUILayout.Label("Name:" + celestialBody.Key[0], labelOptionsTwo);
+                                                        GUILayout.FlexibleSpace();
+                                                        if (GUILayout.Button("Close", buttonStyle))
+                                                        {
+                                                            celestialSubViewPressedKeys.Remove(celestialBody.Key);
+                                                        }
+                                                        GUILayout.EndHorizontal();
+
+                                                        GUILayout.BeginHorizontal();
+                                                        GUILayout.Label("Reached:" + celestialBody.Key[1], labelOptionsTwo);
+                                                        GUILayout.EndHorizontal();
+
+                                                        GUILayout.BeginHorizontal();
+                                                        GUILayout.Label("Achieved:", labelOptionsTwo);
+                                                        GUILayout.EndHorizontal();
+
+                                                        foreach (List<string> value in celestialBody.Value)
+                                                        {
+                                                            if (value.Count > 0)
+                                                            {
+                                                                if (!subCelestialSubViewPressedKeys.Contains(value))
+                                                                {
+                                                                    GUILayout.BeginHorizontal();
+                                                                    if (GUILayout.Button(value[0], buttonStyle))
+                                                                    {
+                                                                        subCelestialSubViewPressedKeys.Add(value);
+                                                                    }
+                                                                    GUILayout.EndHorizontal();
+                                                                }
+                                                                else
+                                                                {
+                                                                    GUILayout.BeginHorizontal();
+                                                                    GUILayout.Label(value[0], labelOptionsTwo);
+                                                                    GUILayout.FlexibleSpace();
+                                                                    if (GUILayout.Button("Close", buttonStyle))
+                                                                    {
+                                                                        subCelestialSubViewPressedKeys.Remove(value);
+                                                                    }
+                                                                    GUILayout.EndHorizontal();
+
+                                                                    for (int x = 1; x < value.Count; x++)
+                                                                    {
+                                                                        GUILayout.BeginHorizontal();
+                                                                        GUILayout.Space(50);
+                                                                        GUILayout.Label(value[x], labelOptionsTwo);
+                                                                        GUILayout.EndHorizontal();
+                                                                    }
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                if (subCelestialSubViewPressedKeys.Contains(value))
+                                                                {
+                                                                    subCelestialSubViewPressedKeys.Remove(value);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    if (celestialSubViewPressedKeys.Contains(celestialBody.Key))
+                                                    {
+                                                        celestialSubViewPressedKeys.Remove(celestialBody.Key);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            GUILayout.BeginHorizontal();
+                                            GUILayout.Label("Count:" + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].CelestialProgress.Count, labelOptionsTwo);
+                                            GUILayout.EndHorizontal();
+                                        }
+                                        GUILayout.BeginHorizontal();
+                                    }
+                                    if (secretsViewButtonPressed)
+                                    {
+                                        GUILayout.Label("Secret Progress", labelOptionsTwo);
+                                        GUILayout.EndHorizontal();
+
+                                        if (GroupSystem.showAllProgress)
+                                        {
+                                            foreach (KeyValuePair<string, List<string>> secret in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Secrets)
+                                            {
+                                                if (!secretsSubViewPressedKeys.Contains(secret.Key))
+                                                {
+                                                    GUILayout.BeginHorizontal();
+                                                    if (GUILayout.Button(secret.Key, buttonStyle))
+                                                    {
+                                                        secretsSubViewPressedKeys.Add(secret.Key);
+                                                    }
+                                                    GUILayout.EndHorizontal();
+                                                }
+                                                else
+                                                {
+                                                    GUILayout.BeginHorizontal();
+                                                    GUILayout.Label(secret.Key, labelOptionsTwo);
+                                                    GUILayout.FlexibleSpace();
+                                                    if (GUILayout.Button("Close", buttonStyle))
+                                                    {
+                                                        secretsSubViewPressedKeys.Remove(secret.Key);
+                                                    }
+                                                    GUILayout.EndHorizontal();
+
+                                                    for (int v = 0; v < secret.Value.Count; v++)
+                                                    {
+                                                        GUILayout.BeginHorizontal();
+                                                        GUILayout.Space(50);
+                                                        GUILayout.Label(secret.Value[v], labelOptionsTwo);
+                                                        GUILayout.EndHorizontal();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            GUILayout.BeginHorizontal();
+                                            GUILayout.Label("Count:" + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Secrets.Count, labelOptionsTwo);
+                                            GUILayout.EndHorizontal();
+                                        }
+                                        GUILayout.BeginHorizontal();
+                                    }
+                                }
+                                GUILayout.EndHorizontal();
+                            }
+                            else
+                            {
+                                progressButtonSelectedSubspace = -1;
+                                scrollPositionProgress = new Vector2();
+
+                                currencyViewButtonPressed = false;
+                                techViewButtonPressed = false;
+                                progressViewButtonPressed = false;
+                                progressBasicViewButtonPressed = false;
+                                celestialProgressViewButtonPressed = false;
+                                secretsViewButtonPressed = false;
+                                progressSubViewPressedKeys = new List<string>();
+                                celestialSubViewPressedKeys = new List<List<string>>();
+                                subCelestialSubViewPressedKeys = new List<List<string>>();
+                                secretsSubViewPressedKeys = new List<string>();
                             }
                         }
                     }
                     else
                     {
-                        GUILayout.BeginHorizontal();
-                        GUILayout.Label("Select a something to view", labelOptionsTwo);
-                        GUILayout.EndHorizontal();
+                        progressButtonPressed = false;
+                        progressButtonSelectedGroup = string.Empty;
+                        progressButtonSelectedSubspace = -1;
+                        scrollPositionProgress = new Vector2();
 
-                        GUILayout.BeginHorizontal();
-                        currencyViewButtonPressed = GUILayout.Toggle(currencyViewButtonPressed, "Currencies", buttonStyle);
-                        if (currencyViewButtonPressed)
-                        {
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-                            GUILayout.Label("Funds = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Funds, labelOptionsTwo);
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-                            GUILayout.Label("Rep = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Rep, labelOptionsTwo);
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-                            GUILayout.Label("Sci = " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Sci, labelOptionsTwo);
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-                        }
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.BeginHorizontal();
-                        techViewButtonPressed = GUILayout.Toggle(techViewButtonPressed, "Tech", buttonStyle);
-                        if (techViewButtonPressed)
-                        {
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-                            GUILayout.Label("Number of Techs: " + GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Techs.Count, labelOptionsTwo);
-                            GUILayout.EndHorizontal();
-
-                            foreach (string tech in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Techs)
-                            {
-                                GUILayout.BeginHorizontal();
-                                GUILayout.Label("Tech: " + tech, labelOptionsTwo);
-                                GUILayout.EndHorizontal();
-                            }
-                            GUILayout.BeginHorizontal();
-                        }
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.BeginHorizontal();
-                        progressViewButtonPressed = GUILayout.Toggle(progressViewButtonPressed, "Progress", buttonStyle);
-                        if (progressViewButtonPressed)
-                        {
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-                            if (GUILayout.Button("Basic", buttonStyle))
-                            {
-                                if (!progressBasicViewButtonPressed)
-                                {
-                                    progressBasicViewButtonPressed = true;
-                                }
-                                else
-                                {
-                                    progressBasicViewButtonPressed = false;
-                                }
-                                celestialProgressViewButtonPressed = false;
-                                secretsViewButtonPressed = false;
-                            }
-
-                            if (GUILayout.Button("Celestial", buttonStyle))
-                            {
-                                progressBasicViewButtonPressed = false;
-                                if (!celestialProgressViewButtonPressed)
-                                {
-                                    celestialProgressViewButtonPressed = true;
-                                }
-                                else
-                                {
-                                    celestialProgressViewButtonPressed = false;
-                                }
-                                secretsViewButtonPressed = false;
-                            }
-
-                            if (GUILayout.Button("Secrets", buttonStyle))
-                            {
-                                progressBasicViewButtonPressed = false;
-                                celestialProgressViewButtonPressed = false;
-                                if (!secretsViewButtonPressed)
-                                {
-                                    secretsViewButtonPressed = true;
-                                }
-                                else
-                                {
-                                    secretsViewButtonPressed = false;
-                                }
-                            }
-
-                            GUILayout.EndHorizontal();
-
-                            GUILayout.BeginHorizontal();
-
-                            if (progressBasicViewButtonPressed)
-                            {
-                                GUILayout.Label("Basic Progress", labelOptionsTwo);
-                                GUILayout.EndHorizontal();
-
-                                foreach (string basic in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Progress)
-                                {
-                                    GUILayout.BeginHorizontal();
-                                    GUILayout.Label(basic, labelOptionsTwo);
-                                    GUILayout.EndHorizontal();
-                                }
-                                GUILayout.BeginHorizontal();
-                            }
-                            if (celestialProgressViewButtonPressed)
-                            {
-                                GUILayout.Label("Celestial Progress", labelOptionsTwo);
-                                GUILayout.EndHorizontal();
-
-                                foreach (List<string> celestial in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].CelestialProgress)
-                                {
-                                    GUILayout.BeginHorizontal();
-                                    GUILayout.Label("Name:" + celestial[0], labelOptionsTwo);
-                                    GUILayout.EndHorizontal();
-                                    GUILayout.BeginHorizontal();
-                                    GUILayout.Label("Reached:" + celestial[1], labelOptionsTwo);
-                                    GUILayout.EndHorizontal();
-
-                                    GUILayout.BeginHorizontal();
-                                    GUILayout.Label("Achieved:", labelOptionsTwo);
-                                    GUILayout.EndHorizontal();
-
-                                    for (int v = 2; v < celestial.Count; v++)
-                                    {
-                                        GUILayout.BeginHorizontal();
-                                        GUILayout.Space(50);
-                                        GUILayout.Label(celestial[v], labelOptionsTwo);
-                                        GUILayout.EndHorizontal();
-                                    }
-                                }
-                                GUILayout.BeginHorizontal();
-                            }
-                            if (secretsViewButtonPressed)
-                            {
-                                GUILayout.Label("Secret Progress", labelOptionsTwo);
-                                GUILayout.EndHorizontal();
-
-                                foreach (string secret in GroupSystem.fetch.allGroupProgressList[progressButtonSelectedGroup][progressButtonSelectedSubspace].Secrets)
-                                {
-                                    GUILayout.BeginHorizontal();
-                                    GUILayout.Label(secret, labelOptionsTwo);
-                                    GUILayout.EndHorizontal();
-                                }
-                                GUILayout.BeginHorizontal();
-                            }
-                        }
-                        GUILayout.EndHorizontal();
+                        currencyViewButtonPressed = false;
+                        techViewButtonPressed = false;
+                        progressViewButtonPressed = false;
+                        progressBasicViewButtonPressed = false;
+                        celestialProgressViewButtonPressed = false;
+                        secretsViewButtonPressed = false;
+                        progressSubViewPressedKeys = new List<string>();
+                        celestialSubViewPressedKeys = new List<List<string>>();
+                        subCelestialSubViewPressedKeys = new List<List<string>>();
+                        secretsSubViewPressedKeys = new List<string>();
                     }
                 }
                 else
@@ -1290,6 +1555,17 @@ namespace SyncrioClientSide
                     progressButtonSelectedGroup = string.Empty;
                     progressButtonSelectedSubspace = -1;
                     scrollPositionProgress = new Vector2();
+
+                    currencyViewButtonPressed = false;
+                    techViewButtonPressed = false;
+                    progressViewButtonPressed = false;
+                    progressBasicViewButtonPressed = false;
+                    celestialProgressViewButtonPressed = false;
+                    secretsViewButtonPressed = false;
+                    progressSubViewPressedKeys = new List<string>();
+                    celestialSubViewPressedKeys = new List<List<string>>();
+                    subCelestialSubViewPressedKeys = new List<List<string>>();
+                    secretsSubViewPressedKeys = new List<string>();
                 }
             }
 

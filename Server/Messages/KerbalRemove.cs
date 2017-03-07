@@ -44,67 +44,38 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
+using SyncrioCommon;
+using MessageStream2;
+using System.IO;
 
-namespace SyncrioServer
+namespace SyncrioServer.Messages
 {
-    class ByteArraySerializer
+    class KerbalRemove
     {
-        private static ByteArraySerializer singleton = new ByteArraySerializer();
-
-        public static ByteArraySerializer fetch
+        public static void HandleKerbalRemoval(ClientObject client, byte[] messageData)
         {
-            get
+            if (!Settings.specialSettingsStore.DarkMultiPlayerCoopMode)
             {
-                return singleton;
-            }
-        }
-
-        public byte[] Serialize(List<string> list)
-        {
-            byte[][] dataArray = list.Select(s => Encoding.UTF8.GetBytes(s)).ToArray();
-            using (MemoryStream stream = new MemoryStream())
-            {
-                byte[] newline = Encoding.UTF8.GetBytes(Environment.NewLine);
-                foreach (byte[] bytes in dataArray)
+                using (MessageReader mr = new MessageReader(messageData))
                 {
-                    stream.Write(bytes, 0, bytes.Length);
-                    stream.Write(newline, 0, newline.Length);
-                }
-                byte[] data = stream.ToArray();
-
-                return data;
-            }
-        }
-
-        public List<string> Deserialize(byte[] data)
-        {
-            if (data == null || data.Length == 0)
-            {
-                SyncrioLog.Debug("ByteArraySerializer's 'Deserialize' function was given null/empty data!");
-                return null;
-            }
-
-            using (MemoryStream stream = new MemoryStream(data))
-            {
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    List<string> lines = new List<string>();
-
-                    while (!reader.EndOfStream)
+                    //Don't care about the subspace on the server.
+                    mr.Read<double>();
+                    string kerbalName = mr.Read<string>();
+                    SyncrioLog.Debug("Removing kerbal " + kerbalName);
+                    if (File.Exists(Path.Combine(Server.ScenarioDirectory, "Kerbals", kerbalName + ".txt")))
                     {
-                        string line = reader.ReadLine();
-                        if (!string.IsNullOrEmpty(line))
+                        lock (Server.ScenarioSizeLock)
                         {
-                            lines.Add(line);
+                            File.Delete(Path.Combine(Server.ScenarioDirectory, "Kerbals", kerbalName + ".txt"));
                         }
                     }
-
-                    return lines;
+                    //Relay the message.
+                    ServerMessage newMessage = new ServerMessage();
+                    newMessage.type = ServerMessageType.KERBAL_REMOVE;
+                    newMessage.data = messageData;
+                    ClientHandler.SendToAll(client, newMessage, false);
                 }
             }
         }

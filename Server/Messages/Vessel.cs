@@ -71,48 +71,51 @@ namespace SyncrioServer.Messages
 
                     List<string> vesselList = SyncrioUtil.ByteArraySerializer.Deserialize(vesselBytes);
 
-                    using (MessageWriter mw = new MessageWriter())
+                    if (vesselList != null)
                     {
-                        List<byte[]> listToWrite = new List<byte[]>();
-
-                        int cursor = 0;
-                        while (cursor < vesselList.Count)
+                        using (MessageWriter mw = new MessageWriter())
                         {
-                            if (vesselList[cursor] == "Vessel" && vesselList[cursor + 1] == "{")
-                            {
-                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(vesselList, cursor + 1);
-                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+                            List<byte[]> listToWrite = new List<byte[]>();
 
-                                if (range.Key + 2 < vesselList.Count && range.Value - 3 > 0)
+                            int cursor = 0;
+                            while (cursor < vesselList.Count)
+                            {
+                                if (vesselList[cursor] == "Vessel" && vesselList[cursor + 1] == "{")
                                 {
-                                    listToWrite.Add(SyncrioUtil.ByteArraySerializer.Serialize(vesselList.GetRange(range.Key + 2, range.Value - 3)));//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                    vesselList.RemoveRange(range.Key, range.Value);
+                                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(vesselList, cursor + 1);
+                                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+
+                                    if (range.Key + 2 < vesselList.Count && range.Value - 3 > 0)
+                                    {
+                                        listToWrite.Add(SyncrioUtil.ByteArraySerializer.Serialize(vesselList.GetRange(range.Key + 2, range.Value - 3)));//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
+                                        vesselList.RemoveRange(range.Key, range.Value);
+                                    }
+                                    else
+                                    {
+                                        vesselList.RemoveRange(range.Key, range.Value);
+                                    }
                                 }
                                 else
                                 {
-                                    vesselList.RemoveRange(range.Key, range.Value);
+                                    cursor++;
                                 }
                             }
-                            else
+
+                            mw.Write<int>(listToWrite.Count);
+
+                            for (int i = 0; i < listToWrite.Count; i++)
                             {
-                                cursor++;
+                                mw.Write<byte[]>(listToWrite[i]);
                             }
+
+                            ServerMessage newMessage = new ServerMessage();
+
+                            newMessage.type = ServerMessageType.SEND_VESSELS;
+
+                            newMessage.data = mw.GetMessageBytes();
+
+                            ClientHandler.SendToClient(client, newMessage, true);
                         }
-
-                        mw.Write<int>(listToWrite.Count);
-
-                        for (int i = 0; i < listToWrite.Count; i++)
-                        {
-                            mw.Write<byte[]>(listToWrite[i]);
-                        }
-
-                        ServerMessage newMessage = new ServerMessage();
-
-                        newMessage.type = ServerMessageType.SEND_VESSELS;
-
-                        newMessage.data = mw.GetMessageBytes();
-
-                        ClientHandler.SendToClient(client, newMessage, true);
                     }
                 }
             }

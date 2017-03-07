@@ -167,15 +167,26 @@ namespace SyncrioClientSide
             {
                 return;
             }
-            
+
+            if (WarpWorker.fetch.warpMode == WarpMode.SUBSPACE)
+            {
+                if (Settings.fetch.DarkMultiPlayerCoopMode)
+                {
+                    VesselWorker.fetch.DetectDMPSync();
+                }
+            }
+
             if (locked)
             {
-                if (WarpWorker.fetch.warpMode == WarpMode.SUBSPACE)
+                if (!Settings.fetch.DarkMultiPlayerCoopMode)
                 {
-                    VesselWorker.fetch.DetectReverting();
+                    if (WarpWorker.fetch.warpMode == WarpMode.SUBSPACE)
+                    {
+                        VesselWorker.fetch.DetectReverting();
+                    }
+                    //Set the Universe time here
+                    SyncTime();
                 }
-                //Set the Scenario time here
-                SyncTime();
             }
         }
 
@@ -238,74 +249,7 @@ namespace SyncrioClientSide
                 SyncrioLog.Debug("Skipping StepClock in loading screen");
                 return;
             }
-            if (HighLogic.LoadedSceneIsFlight)
-            {
-                if (FlightGlobals.fetch.activeVessel == null || !FlightGlobals.ready)
-                {
-                    SyncrioLog.Debug("Skipping StepClock (active vessel is null or not ready)");
-                    return;
-                }
-                try
-                {
-                    OrbitPhysicsManager.HoldVesselUnpack(5);
-                }
-                catch
-                {
-                    SyncrioLog.Debug("Failed to hold vessel unpack");
-                    return;
-                }
-                foreach (Vessel v in FlightGlobals.fetch.vessels)
-                {
-                    if (!v.packed)
-                    {
-                        if (v != FlightGlobals.fetch.activeVessel)
-                        {
-                            try
-                            {
-                                v.GoOnRails();
-                            }
-                            catch
-                            {
-                                SyncrioLog.Debug("Error packing vessel " + v.id.ToString());
-                            }
-                        }
-                        if (v == FlightGlobals.fetch.activeVessel)
-                        {
-                            if (SafeToStepClock(v, targetTick))
-                            {
-                                try
-                                {
-                                    v.GoOnRails();
-                                }
-                                catch
-                                {
-                                    SyncrioLog.Debug("Error packing active vessel " + v.id.ToString());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             Planetarium.SetUniversalTime(targetTick);
-        }
-
-        private bool SafeToStepClock(Vessel checkVessel, double targetTick)
-        {
-            switch (checkVessel.situation)
-            {
-                case Vessel.Situations.LANDED:
-                case Vessel.Situations.PRELAUNCH:
-                case Vessel.Situations.SPLASHED:
-                    return (checkVessel.srf_velocity.magnitude < 2);
-                case Vessel.Situations.ORBITING:
-                case Vessel.Situations.ESCAPING:
-                    return true;
-                case Vessel.Situations.SUB_ORBITAL:
-                    double altitudeAtUT = checkVessel.orbit.getRelativePositionAtUT(targetTick).magnitude;
-                    return (altitudeAtUT > checkVessel.mainBody.Radius + 10000 && checkVessel.altitude > 10000);
-                default :
-                    return false;
-            }
         }
 
         private void SkewClock(double currentError)

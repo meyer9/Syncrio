@@ -70,6 +70,7 @@ namespace SyncrioClientSide
         public bool fireReset;
         public GameMode gameMode;
         public bool serverAllowCheats = true;
+        private bool madeItToSpaceCenter = false;
         //Disconnect message
         public bool displayDisconnectMessage;
         private ScreenMessage disconnectMessage;
@@ -136,6 +137,7 @@ namespace SyncrioClientSide
                 resetEvent.Add(AdminSystem.Reset);
                 resetEvent.Add(GroupSystem.Reset);
                 resetEvent.Add(ChatWorker.Reset);
+                resetEvent.Add(ContractWorker.Reset);
                 resetEvent.Add(CraftLibraryWorker.Reset);
                 resetEvent.Add(DebugWindow.Reset);
                 resetEvent.Add(DynamicTickWorker.Reset);
@@ -146,7 +148,7 @@ namespace SyncrioClientSide
                 resetEvent.Add(PlayerStatusWindow.Reset);
                 resetEvent.Add(PlayerStatusWorker.Reset);
                 resetEvent.Add(ScenarioWorker.Reset);
-                resetEvent.Add(ScenarioWindow.Reset);
+                resetEvent.Add(ScenarioEventHandler.Reset);
                 resetEvent.Add(ScreenshotWorker.Reset);
                 resetEvent.Add(TimeSyncer.Reset);
                 resetEvent.Add(ToolbarSupport.Reset);
@@ -273,7 +275,6 @@ namespace SyncrioClientSide
                 {
                     PlayerStatusWindow.fetch.disconnectEventHandled = true;
                     forceQuit = true;
-                    ScenarioWorker.fetch.ScenarioSync(GroupSystem.playerGroupAssigned, false, true, false); // Send scenario modules before disconnecting
                     NetworkWorker.fetch.SendDisconnect("Quit");
                 }
                 if (!ConnectionWindow.fetch.renameEventHandled)
@@ -409,41 +410,84 @@ namespace SyncrioClientSide
                             Settings.fetch.SaveSettings();
                             FlagSyncer.fetch.flagChangeEvent = true;
                         }
-                    }
 
-                    // save every GeeASL from each body in FlightGlobals
-                    if (HighLogic.LoadedScene == GameScenes.FLIGHT && bodiesGees.Count == 0)
-                    {
-                        foreach (CelestialBody body in FlightGlobals.fetch.bodies)
+                        // save every GeeASL from each body in FlightGlobals
+                        if (HighLogic.LoadedScene == GameScenes.FLIGHT && bodiesGees.Count == 0)
                         {
-                            bodiesGees.Add(body, body.GeeASL);
+                            foreach (CelestialBody body in FlightGlobals.fetch.bodies)
+                            {
+                                bodiesGees.Add(body, body.GeeASL);
+                            }
                         }
-                    }
 
-                    //handle use of cheats
-                    if (!serverAllowCheats)
-                    {
-                        CheatOptions.InfinitePropellant = false;
-                        CheatOptions.NoCrashDamage = false;
-                        CheatOptions.IgnoreAgencyMindsetOnContracts = false;
-                        CheatOptions.IgnoreMaxTemperature = false;
-                        CheatOptions.InfiniteElectricity = false;
-                        CheatOptions.NoCrashDamage = false;
-                        CheatOptions.UnbreakableJoints = false;
-
-                        foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
+                        //handle use of cheats
+                        if (!serverAllowCheats)
                         {
-                            gravityEntry.Key.GeeASL = gravityEntry.Value;
-                        }
-                    }
+                            CheatOptions.InfinitePropellant = false;
+                            CheatOptions.NoCrashDamage = false;
+                            CheatOptions.IgnoreAgencyMindsetOnContracts = false;
+                            CheatOptions.IgnoreMaxTemperature = false;
+                            CheatOptions.InfiniteElectricity = false;
+                            CheatOptions.UnbreakableJoints = false;
 
-                    if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready)
-                    {
-                        HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = Settings.fetch.revertEnabled || (PauseMenu.canSaveAndExit == ClearToSaveStatus.CLEAR);
+                            foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
+                            {
+                                gravityEntry.Key.GeeASL = gravityEntry.Value;
+                            }
+                        }
+
+                        if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready)
+                        {
+                            HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = Settings.fetch.revertEnabled || (PauseMenu.canSaveAndExit == ClearToSaveStatus.CLEAR);
+                        }
+                        else
+                        {
+                            HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
+                        }
                     }
                     else
                     {
-                        HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
+                        if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
+                        {
+                            madeItToSpaceCenter = true;
+                        }
+                        if (madeItToSpaceCenter)
+                        {
+                            // save every GeeASL from each body in FlightGlobals
+                            if (HighLogic.LoadedScene == GameScenes.FLIGHT && bodiesGees.Count == 0)
+                            {
+                                foreach (CelestialBody body in FlightGlobals.fetch.bodies)
+                                {
+                                    bodiesGees.Add(body, body.GeeASL);
+                                }
+                            }
+
+                            //handle use of cheats
+                            if (!serverAllowCheats)
+                            {
+                                CheatOptions.InfinitePropellant = false;
+                                CheatOptions.NoCrashDamage = false;
+                                CheatOptions.IgnoreAgencyMindsetOnContracts = false;
+                                CheatOptions.IgnoreMaxTemperature = false;
+                                CheatOptions.InfiniteElectricity = false;
+                                CheatOptions.NoCrashDamage = false;
+                                CheatOptions.UnbreakableJoints = false;
+
+                                foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
+                                {
+                                    gravityEntry.Key.GeeASL = gravityEntry.Value;
+                                }
+                            }
+
+                            if (HighLogic.LoadedScene == GameScenes.FLIGHT && FlightGlobals.ready)
+                            {
+                                HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = Settings.fetch.revertEnabled || (PauseMenu.canSaveAndExit == ClearToSaveStatus.CLEAR);
+                            }
+                            else
+                            {
+                                HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
+                            }
+                        }
                     }
                 }
 
@@ -451,6 +495,7 @@ namespace SyncrioClientSide
                 {
                     fireReset = false;
                     FireResetEvent();
+                    madeItToSpaceCenter = false;
                 }
 
                 if (startGame)
@@ -534,7 +579,7 @@ namespace SyncrioClientSide
             //Group window: 7714
             //Group Become Leader window: 7715
             //Group Invite Player window: 7716
-            //Scenario window: 7717
+            //7717 not in use.
             //Group Progress window: 7718
             long startClock = Profiler.SyncrioReferenceTime.ElapsedTicks;
             if (showGUI && toolbarShowGUI)
@@ -571,9 +616,6 @@ namespace SyncrioClientSide
             //Load Syncrio stuff
             VesselWorker.fetch.LoadKerbalsIntoGame();
             VesselWorker.fetch.HandleVessels();
-
-            //Load the scenarios from the server
-            ScenarioWorker.fetch.LoadScenarioDataIntoGame();
 
             //Load the missing scenarios as well (Eg, Contracts and stuff for career mode)
             ScenarioWorker.fetch.LoadMissingScenarioDataIntoGame();
@@ -637,7 +679,6 @@ namespace SyncrioClientSide
             if (gameRunning && NetworkWorker.fetch.state == ClientState.RUNNING)
             {
                 Application.CancelQuit();
-                ScenarioWorker.fetch.ScenarioSync(GroupSystem.playerGroupAssigned, false, true, false);
                 HighLogic.LoadScene(GameScenes.MAINMENU);
             }
         }

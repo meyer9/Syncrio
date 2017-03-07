@@ -81,6 +81,12 @@ namespace SyncrioServer
         public string game_mode;
 
         [DataMember]
+        public string warp_mode;
+
+        [DataMember]
+        public int mod_control;
+
+        [DataMember]
         public bool cheats;
 
         [DataMember]
@@ -88,6 +94,9 @@ namespace SyncrioServer
 
         [DataMember]
         public long lastPlayerActivity;
+
+        [DataMember]
+        public string modControlSha;
 
         public ServerInfo(SettingsStore settings)
         {
@@ -98,10 +107,13 @@ namespace SyncrioServer
             players = Server.players;
             max_players = settings.maxPlayers;
             game_mode = settings.gameMode.ToString();
+            warp_mode = settings.warpMode.ToString();
             port = settings.port;
+            mod_control = (int)settings.modControl;
             cheats = settings.cheats;
             ScenarioSize = Server.GetScenarioSize();
             lastPlayerActivity = Server.GetLastPlayerActivity();
+            modControlSha = Server.GetModControlSHA();
         }
 
         public string GetJSON()

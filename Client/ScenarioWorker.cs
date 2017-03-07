@@ -44,6 +44,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using UnityEngine;
 using SyncrioCommon;
@@ -56,16 +57,14 @@ namespace SyncrioClientSide
     {
         public bool workerEnabled = false;
         private static ScenarioWorker singleton;
+        public bool isSyncing = false;
+        public bool stopSync = false;
         private object scenarioLock = new object();
         private object scenarioSyncLock = new object();
         private Dictionary<string,string> checkData = new Dictionary<string, string>();
-        private Queue<ScenarioEntry> scenarioQueue = new Queue<ScenarioEntry>();
-        private List<KeyValuePair<string, byte[]>> activeScenarioQueue = new List<KeyValuePair<string, byte[]>>();
-        public bool autoSendScenarios;
         public bool nonGroupScenarios;
         public bool canResetScenario;
-        public string[] currentScenarioCheckpoint;
-        public List<string> scenarioChangeList = new List<string>();
+        public List<byte[]> baseData = new List<byte[]>();
         //ScenarioType list to check.
         private Dictionary<string, Type> allScenarioTypesInAssemblies;
         //System.Reflection hackiness for loading kerbals into the crew roster:
@@ -79,11 +78,6 @@ namespace SyncrioClientSide
             {
                 return singleton;
             }
-        }
-
-        private void Update()
-        {
-
         }
 
         private void LoadScenarioTypes()
@@ -147,6 +141,7 @@ namespace SyncrioClientSide
             return true;
         }
 
+        /*
         public void LoadScenarioDataIntoGame()
         {
             while (scenarioQueue.Count > 0)
@@ -177,6 +172,7 @@ namespace SyncrioClientSide
                 }
             }
         }
+        */
 
         private void CreateMissingTourists(ConfigNode contractSystemNode)
         {
@@ -295,6 +291,7 @@ namespace SyncrioClientSide
         }
 
         //If the scene field is blank, KSP will throw an error while starting the game, meaning players will be unable to join the server.
+        /*
         private void CheckForBlankSceneSoTheGameDoesntBugOut(ScenarioEntry scenarioEntry)
         {
             if (scenarioEntry.scenarioNode.GetValue("scene") == string.Empty)
@@ -305,6 +302,7 @@ namespace SyncrioClientSide
                 scenarioEntry.scenarioNode.SetValue("scene", "7, 8, 5, 6, 9");
             }
         }
+        */
 
         public void LoadMissingScenarioDataIntoGame()
         {
@@ -336,139 +334,444 @@ namespace SyncrioClientSide
             }
         }
 
-        public void LoadScenarioData()
+        public void LoadBaseScenarioData()
+        {
+            if (baseData.Count > 0)
+            {
+                LoadScenarioData(baseData);
+                baseData = new List<byte[]>();
+            }
+        }
+
+        public void LoadScenarioData(List<byte[]> data)
         {
             lock (scenarioLock)
             {
-                List<KeyValuePair<string, byte[]>> scenarioListToAdd = new List<KeyValuePair<string, byte[]>>();
-                bool changed = false;
-
-                changed = DidScenarioChangeBetweenSyncs();
-
-                if (activeScenarioQueue != null)
+                if (Client.fetch.gameRunning && HighLogic.LoadedScene != GameScenes.LOADING)
                 {
-                    if (changed)
+                    isSyncing = true;
+                    ScenarioEventHandler.fetch.startCooldown = true;
+                    ScenarioEventHandler.fetch.cooldown = true;
+
+                    for (int v = 0; v < data.Count; v += 2)
                     {
-                        foreach (KeyValuePair<string, byte[]> kvp in activeScenarioQueue)
+                        List<string> name = SyncrioUtil.ByteArraySerializer.Deserialize(data[v]);
+                        List<string> dataList = SyncrioUtil.ByteArraySerializer.Deserialize(data[v + 1]);
+
+                        try
                         {
-                            if (scenarioChangeList != null)
+                            if (name[0] == "Contracts")
                             {
-                                if (!scenarioChangeList.Contains(kvp.Key))
+                                List<Contracts.Contract> realContracts = new List<Contracts.Contract>();
+                                List<Contracts.Contract> completeContracts = new List<Contracts.Contract>();
+
+                                int looped = 0;
+                                while (looped < dataList.Count)
                                 {
-                                    scenarioListToAdd.Add(kvp);
+                                    if (dataList[looped] == "ContractNode")
+                                    {
+                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));
+
+                                        if (range.Key + 2 < dataList.Count && range.Value - 3 > 0)
+                                        {
+                                            List<string> contract = dataList.GetRange(range.Key + 2, range.Value - 3);
+
+                                            dataList.RemoveRange(range.Key, range.Value);
+
+                                            ConfigNode contractCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(contract));
+
+                                            Contracts.Contract trueContract = new Contracts.Contract();
+
+                                            Contracts.Contract.Load(trueContract, contractCFG);
+
+                                            if (!trueContract.Complete())
+                                            {
+                                                realContracts.Add(trueContract);
+                                            }
+                                            else
+                                            {
+                                                completeContracts.Add(trueContract);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            looped++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        looped++;
+                                    }
+                                }
+
+                                Contracts.ContractSystem.Instance.ClearContractsCurrent();
+                                Contracts.ContractSystem.Instance.ClearContractsFinished();
+
+                                Contracts.ContractSystem.Instance.Contracts.AddRange(realContracts);
+                                Contracts.ContractSystem.Instance.ContractsFinished.AddRange(completeContracts);
+                            }
+
+                            if (name[0] == "Waypoints")
+                            {
+                                
+                            }
+
+                            if (name[0] == "Currency")
+                            {
+                                double fundsAmount = Convert.ToDouble(dataList[0]);
+                                double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
+                                Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
+
+                                float repAmount = Convert.ToSingle(dataList[1]);
+                                float repAmountDiff = repAmount - Reputation.Instance.reputation;
+                                Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
+
+                                float sciAmount = Convert.ToSingle(dataList[2]);
+                                float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
+                                ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
+                            }
+
+                            if (name[0] == "BuildingLevel")
+                            {
+                                foreach (ScenarioUpgradeableFacilities.ProtoUpgradeable proto in ScenarioUpgradeableFacilities.protoUpgradeables.Values)
+                                {
+                                    foreach (Upgradeables.UpgradeableFacility facility in proto.facilityRefs)
+                                    {
+                                        if (dataList.Any(i => i.StartsWith(facility.id)))
+                                        {
+                                            int index = dataList.FindIndex(i => i.StartsWith(facility.id));
+
+                                            string[] subData = dataList[index].Split('=');
+
+                                            string id = subData[0].Trim();
+                                            string level = subData[1].Trim();
+
+                                            facility.SetLevel(Convert.ToInt32(level));
+                                        }
+                                    }
                                 }
                             }
-                            else
+
+                            if (name[0] == "BuildingDead")
                             {
-                                SyncrioLog.Debug("'scenarioChangeList' is null and it should not be null!");
-                                break;
+                                foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
+                                {
+                                    foreach (DestructibleBuilding building in protoD.dBuildingRefs)
+                                    {
+                                        if (dataList.Any(i => i == building.id))
+                                        {
+                                            int index = dataList.FindIndex(i => i == building.id);
+
+                                            if (!building.IsDestroyed)
+                                            {
+                                                building.Demolish();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (name[0] == "BuildingAlive")
+                            {
+                                foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
+                                {
+                                    foreach (DestructibleBuilding building in protoD.dBuildingRefs)
+                                    {
+                                        if (dataList.Any(i => i == building.id))
+                                        {
+                                            int index = dataList.FindIndex(i => i == building.id);
+
+                                            if (!building.IsIntact)
+                                            {
+                                                building.Repair();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (name[0] == "Parts")
+                            {
+                                foreach (string part in dataList)
+                                {
+                                    string[] split = part.Split(':');
+                                    string partName = split[0].Trim();
+                                    string partTech = split[1].Trim();
+
+                                    AvailablePart truePart = PartLoader.getPartInfoByName(partName);
+
+                                    if (ResearchAndDevelopment.GetTechnologyState(partTech) != RDTech.State.Unavailable)
+                                    {
+                                        if (!ResearchAndDevelopment.PartTechAvailable(truePart))
+                                        {
+                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+
+                                            ptNode.partsPurchased.Add(truePart);
+
+                                            ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
+                                        }
+                                        else
+                                        {
+                                            if (ResearchAndDevelopment.IsExperimentalPart(truePart))
+                                            {
+                                                ResearchAndDevelopment.RemoveExperimentalPart(truePart);
+
+                                                ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+
+                                                ptNode.partsPurchased.Add(truePart);
+
+                                                ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (!ResearchAndDevelopment.PartTechAvailable(truePart))
+                                        {
+                                            ResearchAndDevelopment.AddExperimentalPart(truePart);
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (name[0] == "Upgrades")
+                            {
+                                foreach (string upgrade in dataList)
+                                {
+                                    string[] split = upgrade.Split(':');
+                                    string upgradeName = split[0].Trim();
+                                    string upgradeTech = split[1].Trim();
+
+                                    foreach (PartUpgradeHandler.Upgrade partUpgrade in PartUpgradeManager.Handler.GetUpgradesForTech(upgradeTech))
+                                    {
+                                        if (partUpgrade.name == upgradeName)
+                                        {
+                                            PartUpgradeManager.Handler.SetUnlocked(partUpgrade.name, true);
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (name[0] == "Progress")
+                            {
+                                int looped = 0;
+                                while (looped < dataList.Count)
+                                {
+                                    if (dataList[looped].StartsWith("ProgressNode : "))
+                                    {
+                                        string[] split = dataList[looped].Split(':');
+                                        string start = split[0].Trim();
+                                        string progressId = split[1].Trim();
+
+                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));
+
+                                        if (range.Key + 2 < dataList.Count && range.Value - 3 > 0)
+                                        {
+                                            List<string> progress = dataList.GetRange(range.Key + 2, range.Value - 3);
+
+                                            dataList.RemoveRange(range.Key, range.Value);
+
+                                            ConfigNode progressCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(progress));
+
+                                            ProgressNode target = ProgressTracking.Instance.FindNode(progressId);
+
+                                            if (target != null)
+                                            {
+                                                target.Load(progressCFG);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            looped++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        looped++;
+                                    }
+                                }
+                            }
+
+                            if (name[0] == "Tech")
+                            {
+                                int looped = 0;
+                                while (looped < dataList.Count)
+                                {
+                                    if (dataList[looped].StartsWith("Tech : ") && dataList[looped + 1] == "TechNode" && dataList[looped + 2] == "{")
+                                    {
+                                        string[] split = dataList[looped].Split(':');
+                                        string start = split[0].Trim();
+                                        string tech = split[1].Trim();
+                                        
+                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 2);
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));
+
+                                        if (range.Key + 3 < dataList.Count && range.Value - 4 > 0)
+                                        {
+                                            ConfigNode techCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList.GetRange(range.Key + 3, range.Value - 4)));
+
+                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(tech);
+
+                                            if (ptNode == null)
+                                            {
+                                                List<AvailablePart> parts = new List<AvailablePart>();
+
+                                                int loop2 = matchBracketIdx + 1;
+                                                while (dataList[loop2] != "TechParts" && !dataList[loop2].StartsWith("Tech : ") && loop2 < dataList.Count)
+                                                {
+                                                    loop2++;
+                                                }
+
+                                                if (dataList[loop2] == "TechParts" && dataList[loop2 + 1] == "{")
+                                                {
+                                                    int matchBracketIdx2 = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, loop2 + 1);
+                                                    KeyValuePair<int, int> range2 = new KeyValuePair<int, int>(loop2, (matchBracketIdx2 - loop2));
+
+                                                    int loop3 = loop2 + 2;
+                                                    while (loop3 < matchBracketIdx2 && loop3 < dataList.Count)
+                                                    {
+                                                        if (dataList[loop3].StartsWith("Part : "))
+                                                        {
+                                                            string[] split2 = dataList[loop3].Split(':');
+                                                            string start2 = split2[0].Trim();
+                                                            string partName = split2[1].Trim();
+
+                                                            AvailablePart part = PartLoader.getPartInfoByName(partName);
+
+                                                            if (ResearchAndDevelopment.IsExperimentalPart(part))
+                                                            {
+                                                                ResearchAndDevelopment.RemoveExperimentalPart(part);
+                                                            }
+
+                                                            parts.Add(part);
+                                                        }
+
+                                                        loop3++;
+                                                    }
+                                                    dataList.RemoveRange(range2.Key, range2.Value);
+                                                }
+
+                                                ptNode = new ProtoTechNode();
+
+                                                RDTech RnD = new RDTech();
+
+                                                RnD.Load(techCFG);
+
+                                                ptNode.partsPurchased = parts;
+
+                                                ptNode.scienceCost = RnD.scienceCost;
+
+                                                ptNode.techID = RnD.techID;
+
+                                                ptNode.state = RDTech.State.Available;
+
+                                                ResearchAndDevelopment.Instance.UnlockProtoTechNode(ptNode);
+
+                                                ResearchAndDevelopment.Instance.SetTechState(tech, ptNode);
+
+                                                ResearchAndDevelopment.RefreshTechTreeUI();
+                                            }
+
+                                            dataList.RemoveRange(range.Key, range.Value);
+                                        }
+                                        else
+                                        {
+                                            looped++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        looped++;
+                                    }
+                                }
+                            }
+
+                            if (name[0] == "ScienceRecieved")
+                            {
+                                ConfigNode RnDCFG = new ConfigNode();
+
+                                ResearchAndDevelopment.Instance.Save(RnDCFG);
+
+                                List<string> sciData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(RnDCFG));
+
+                                int index = 0;
+                                while (index < sciData.Count)
+                                {
+                                    if (sciData[index] == "Science" && sciData[index + 1] == "{")
+                                    {
+                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(sciData, index + 1);
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
+
+                                        sciData.RemoveRange(range.Key, range.Value);
+                                    }
+                                    else
+                                    {
+                                        index++;
+                                    }
+                                }
+
+                                int looped = 0;
+                                while (looped < dataList.Count)
+                                {
+                                    if (dataList[looped].StartsWith("Sci : ") && dataList[looped + 1].StartsWith("Value : ") && dataList[looped + 2] == "SciNode" && dataList[looped + 3] == "{")
+                                    {
+                                        string[] split = dataList[looped].Split(':');
+                                        string start = split[0].Trim();
+                                        string sciID = split[1].Trim();
+
+                                        string[] split2 = dataList[looped + 1].Split(':');
+                                        string start2 = split2[0].Trim();
+                                        float dataAmount = Convert.ToSingle(split2[1].Trim());
+
+                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 3);
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));
+
+                                        if (range.Key + 4 < dataList.Count && range.Value - 5 > 0)
+                                        {
+                                            sciData.Add("Science");
+                                            sciData.Add("{");
+
+                                            sciData.AddRange(dataList.GetRange(range.Key + 4, range.Value - 5));
+
+                                            sciData.Add("}");
+
+                                            dataList.RemoveRange(range.Key, range.Value);
+                                        }
+                                        else
+                                        {
+                                            looped++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        looped++;
+                                    }
+                                }
+
+                                RnDCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(sciData));
+
+                                int idx = HighLogic.CurrentGame.scenarios.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
+
+                                if (ScenarioRunner.GetLoadedModules().Contains(HighLogic.CurrentGame.scenarios[idx].moduleRef))
+                                {
+                                    ScenarioRunner.RemoveModule(HighLogic.CurrentGame.scenarios[idx].moduleRef);
+                                }
+
+                                HighLogic.CurrentGame.scenarios[idx].moduleRef = ScenarioRunner.Instance.AddModule(RnDCFG);
+                                HighLogic.CurrentGame.scenarios[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                //ResearchAndDevelopment.Instance.Load(RnDCFG);
                             }
                         }
-                    }
-                    else
-                    {
-                        scenarioListToAdd = activeScenarioQueue;
-                    }
-                }
-                else
-                {
-                    SyncrioLog.Debug("'activeScenarioQueue' is null!");
-                    return;
-                }
-
-                if (scenarioListToAdd == null)
-                {
-                    return;
-                }
-
-                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
-                List<ScenarioModule> loadedModules = ScenarioRunner.GetLoadedModules();
-                bool loaded = false;
-                bool loadedAll = true;
-                List<ScenarioEntry> listOfNewScenarioModulesToAdd = new List<ScenarioEntry>();
-
-                for (int v = 0; v < scenarioListToAdd.Count; v++)
-                {
-                    ScenarioEntry entry = new ScenarioEntry();
-                    entry.scenarioName = scenarioListToAdd[v].Key;
-                    entry.scenarioNode = ConfigNodeSerializer.fetch.Deserialize(scenarioListToAdd[v].Value);
-
-                    if (!IsScenarioModuleAllowed(entry.scenarioName))
-                    {
-                        SyncrioLog.Debug("Skipped '" + entry.scenarioName + "' scenario data  in " + Client.fetch.gameMode + " mode");
-                        continue;
-                    }
-
-                    //Load data from Syncrio
-                    if (entry.scenarioNode == null)
-                    {
-                        SyncrioLog.Debug(entry.scenarioName + " scenario data failed to create a ConfigNode!");
-                        continue;
-                    }
-
-                    //Load data into game
-                    for (int i = 0; i < psmLocked.Count; i++)
-                    {
-                        if (psmLocked[i].moduleName == entry.scenarioName)
+                        catch (Exception e)
                         {
-                            SyncrioLog.Debug("Loading existing " + entry.scenarioName + " scenario module");
-                            try
-                            {
-                                if (entry.scenarioName == "Funding")
-                                {
-                                    double fundsAmount = Convert.ToDouble(entry.scenarioNode.GetValue("funds"));
-                                    double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
-
-                                    Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
-                                }
-                                if (entry.scenarioName == "Reputation")
-                                {
-                                    float repAmount = Convert.ToSingle(entry.scenarioNode.GetValue("rep"));
-                                    float repAmountDiff = repAmount - Reputation.Instance.reputation;
-
-                                    Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
-                                }
-                                if (entry.scenarioName == "ResearchAndDevelopment")
-                                {
-                                    float sciAmount = Convert.ToSingle(entry.scenarioNode.GetValue("sci"));
-                                    float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
-
-                                    ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
-                                }
-                                if (loadedModules.Contains(psmLocked[i].moduleRef))
-                                {
-                                    ScenarioRunner.RemoveModule(psmLocked[i].moduleRef);
-                                }
-                                psmLocked[i].moduleRef = ScenarioRunner.Instance.AddModule(entry.scenarioNode);
-                                psmLocked[i].moduleRef.targetScenes = psmLocked[i].targetScenes;
-                            }
-                            catch (Exception e)
-                            {
-                                SyncrioLog.Debug("Error loading " + entry.scenarioName + " scenario module, Exception: " + e);
-                            }
-                            loaded = true;
+                            SyncrioLog.Debug("Error handling: " + name[0] + " data, error: " + e);
                         }
                     }
-                    if (!loaded)
-                    {
-                        listOfNewScenarioModulesToAdd.Add(entry);
-                        loadedAll = false;
-                    }
-                }
-                HighLogic.CurrentGame.scenarios = psmLocked;
-                if (!loadedAll)
-                {
-                    SyncrioLog.Debug("Loading " + listOfNewScenarioModulesToAdd.Count + " new scenario module(s)");
-                    LoadNewScenarioData(listOfNewScenarioModulesToAdd);
-                }
-                HighLogic.CurrentGame.Updated();
 
-                scenarioListToAdd.Clear();
-                activeScenarioQueue.Clear();
-
-                if (changed)
-                {
-                    ScenarioSync(GroupSystem.playerGroupAssigned, false, true, false);
+                    isSyncing = false;
                 }
             }
         }
@@ -509,25 +812,8 @@ namespace SyncrioClientSide
                 NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
             }
         }
-
-        public void LoadNewScenarioData(List<ScenarioEntry> newScenarioDataList)
-        {
-            for (int i = 0; i < newScenarioDataList.Count; i++)
-            {
-                SyncrioLog.Debug("Loading new " + newScenarioDataList[i].scenarioName + " scenario module");
-                ProtoScenarioModule newModule = new ProtoScenarioModule(newScenarioDataList[i].scenarioNode);
-                try
-                {
-                    HighLogic.CurrentGame.scenarios.Add(newModule);
-                    newModule.Load(ScenarioRunner.Instance);
-                }
-                catch
-                {
-                    SyncrioLog.Debug("Error loading scenario data!");
-                }
-            }
-        }
-
+        
+        /*
         public void QueueScenarioData(string scenarioName, ConfigNode scenarioData)
         {
             ScenarioEntry entry = new ScenarioEntry();
@@ -543,249 +829,7 @@ namespace SyncrioClientSide
                 scenarioQueue.Enqueue(entry);
             }
         }
-
-        public void ScenarioSync(bool isInGroup, bool isTwoWay, bool toServer, bool isAutoReply)
-        {
-            lock (scenarioSyncLock)
-            {
-                if (!Settings.fetch.DarkMultiPlayerCoopMode)
-                {
-                    VesselWorker.fetch.SendVessels();
-                }
-
-                string[] scenarioName;
-                byte[][] scenarioData;
-
-                KeyValuePair<string[], byte[][]> currentScenario = GetCurrentScenarioModules(false);
-                scenarioName = currentScenario.Key;
-                scenarioData = currentScenario.Value;
-
-                if (isAutoReply)
-                {
-                    if (scenarioName.Length > 0 && scenarioData.Length > 0)
-                    {
-                        List<byte[]> entryList = new List<byte[]>();
-                        for (int i = 0; i < scenarioName.Length; i++)
-                        {
-                            entryList.Add(scenarioData[i]);
-                        }
-                        SetScenarioChangeCheckpoint(entryList);
-                    }
-                }
-
-                if (isInGroup)
-                {
-                    string groupName = GroupSystem.playerGroupName;
-                    if (!string.IsNullOrEmpty(groupName))
-                    {
-                        byte[] messageBytes;
-                        ClientMessage newMessage = new ClientMessage();
-                        newMessage.handled = false;
-                        newMessage.type = ClientMessageType.SYNC_SCENARIO_REQUEST;
-                        using (MessageWriter mw = new MessageWriter())
-                        {
-                            mw.Write<bool>(isAutoReply);
-                            mw.Write<bool>(toServer);
-                            mw.Write<bool>(isInGroup);
-                            mw.Write<string>(groupName);
-                            if (toServer)
-                            {
-                                mw.Write<string[]>(scenarioName);
-                                foreach (byte[] scenarioBytes in scenarioData)
-                                {
-                                    mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
-                                }
-                            }
-                            messageBytes = mw.GetMessageBytes();
-                        }
-                        newMessage.data = messageBytes;
-                        NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
-                        if (toServer && isTwoWay)
-                        {
-                            ScenarioSync(true, true, false, false);
-                        }
-                    }
-                }
-                else
-                {
-                    byte[] messageBytes;
-                    ClientMessage newMessage = new ClientMessage();
-                    newMessage.handled = false;
-                    newMessage.type = ClientMessageType.SYNC_SCENARIO_REQUEST;
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(isAutoReply);
-                        mw.Write<bool>(true);
-                        mw.Write<bool>(isInGroup);
-                        mw.Write<string[]>(scenarioName);
-                        foreach (byte[] scenarioBytes in scenarioData)
-                        {
-                            mw.Write<byte[]>(Compression.CompressIfNeeded(scenarioBytes));
-                        }
-                        messageBytes = mw.GetMessageBytes();
-                    }
-                    newMessage.data = messageBytes;
-                    NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
-                }
-            }
-        }
-
-        public KeyValuePair<string[], byte[][]> GetCurrentScenarioModules(bool includeChanged)
-        {
-            KeyValuePair<string[], byte[][]> returnList = new KeyValuePair<string[], byte[][]>();
-            int numberOfScenarioModulesLoaded = 0;
-
-            List<string> scenarioName = new List<string>();
-            List<byte[]> scenarioData = new List<byte[]>();
-
-            if (HighLogic.CurrentGame != null)
-            {
-                foreach (ScenarioModule sm in ScenarioRunner.GetLoadedModules())
-                {
-                    string scenarioType = sm.GetType().Name;
-                    if (!IsScenarioModuleAllowed(scenarioType))
-                    {
-                        continue;
-                    }
-                    if (scenarioType != "ContractSystem" && scenarioType != "Funding" && scenarioType != "PartUpgradeManager" && scenarioType != "ProgressTracking" && scenarioType != "Reputation" && scenarioType != "ResearchAndDevelopment" && scenarioType != "ResourceScenario" && scenarioType != "ScenarioCustomWaypoints" && scenarioType != "ScenarioDestructibles" && scenarioType != "ScenarioUpgradeableFacilities" && scenarioType != "StrategySystem")
-                    {
-                        continue;
-                    }
-                    ConfigNode scenarioNode = new ConfigNode();
-                    sm.Save(scenarioNode);
-                    byte[] scenarioBytes = ConfigNodeSerializer.fetch.Serialize(scenarioNode);
-                    string scenarioHash = Common.CalculateSHA256Hash(scenarioBytes);
-
-                    if (scenarioBytes != null)
-                    {
-                        if (scenarioBytes.Length == 0)
-                        {
-                            SyncrioLog.Debug("Error writing scenario data for " + scenarioType);
-                            continue;
-                        }
-                        if (!includeChanged)
-                        {
-                            if (checkData.ContainsKey(scenarioType) ? (checkData[scenarioType] == scenarioHash) : false)
-                            {
-                                //Data is the same since last time - Skip it.
-                                continue;
-                            }
-                            else
-                            {
-                                if (!checkData.ContainsKey(scenarioType))
-                                {
-                                    checkData.Add(scenarioType, scenarioHash);
-                                }
-                                else
-                                {
-                                    checkData[scenarioType] = scenarioHash;
-                                }
-                            }
-                        }
-                        scenarioName.Add(scenarioType);
-                        scenarioData.Add(scenarioBytes);
-                        numberOfScenarioModulesLoaded += 1;
-                    }
-                    else
-                    {
-                        SyncrioLog.Debug("Error writing scenario data for " + scenarioType + ", and/or the data is null!");
-                        continue;
-                    }
-                }
-            }
-            else
-            {
-                throw new Exception("HighLogic.CurrentGame is Null!");
-            }
-
-            if (scenarioName.Count < 0 || scenarioData.Count < 0)
-            {
-                throw new Exception("We have receved no scenario data from KSP!");
-            }
-
-            SyncrioLog.Debug(numberOfScenarioModulesLoaded + " Scenario Modules loaded from KSP.");
-
-            returnList = new KeyValuePair<string[], byte[][]>(scenarioName.ToArray(), scenarioData.ToArray());
-
-            return returnList;
-        }
-
-        public bool DidScenarioChange(ScenarioEntry scenarioEntry)
-        {
-            string previousScenarioHash = null;
-            string currentScenarioHash = Common.CalculateSHA256Hash(ConfigNodeSerializer.fetch.Serialize(scenarioEntry.scenarioNode));
-            if (checkData.TryGetValue(scenarioEntry.scenarioName, out previousScenarioHash))
-            {
-                return previousScenarioHash != currentScenarioHash;
-            }
-            return true;
-        }
-
-        public bool DidScenarioChangeBetweenSyncs()
-        {
-            scenarioChangeList.Clear();
-            KeyValuePair<string[], byte[][]> currentScenario = GetCurrentScenarioModules(true);
-            string[] scenarioName;
-            byte[][] scenarioData;
-            
-            scenarioName = currentScenario.Key;
-            scenarioData = currentScenario.Value;
-
-            bool didItChange = false;
-
-            if (currentScenarioCheckpoint == null)
-            {
-                didItChange = false;
-                List<byte[]> entryList = new List<byte[]>();
-                for (int i = 0; i < scenarioName.Length; i++)
-                {
-                    entryList.Add(scenarioData[i]);
-                }
-                SetScenarioChangeCheckpoint(entryList);
-            }
-            else
-            {
-                for (int i = 0; i < scenarioName.Length; i++)
-                {
-                    ScenarioEntry entry = new ScenarioEntry();
-                    entry.scenarioName = scenarioName[i];
-
-                    string currentScenarioHash = Common.CalculateSHA256Hash(scenarioData[i]);
-                    bool changed = true;
-                    if (currentScenarioCheckpoint.Length > i)
-                    {
-                        changed = (currentScenarioCheckpoint[i] != currentScenarioHash);
-                    }
-                    if (changed)
-                    {
-                        didItChange = true;
-                        scenarioChangeList.Add(entry.scenarioName);
-                    }
-                }
-            }
-
-            return didItChange;
-        }
-
-        public void SetScenarioChangeCheckpoint(List<byte[]> checkpointList)
-        {
-            currentScenarioCheckpoint = new string[checkpointList.Count];
-            for (int i = 0; i < checkpointList.Count; i++)
-            {
-                currentScenarioCheckpoint[i] = Common.CalculateSHA256Hash(checkpointList[i]);
-            }
-        }
-
-        public void AutoSendScenariosReply()
-        {
-            if (HighLogic.LoadedScene != GameScenes.LOADING && HighLogic.LoadedScene != GameScenes.MAINMENU)
-            {
-                if (GroupSystem.playerGroupAssigned)
-                {
-                    ScenarioSync(true, false, true, true);
-                }
-            }
-        }
+        */
 
         public static void Reset()
         {
@@ -794,18 +838,18 @@ namespace SyncrioClientSide
                 if (singleton != null)
                 {
                     singleton.workerEnabled = false;
-                    Client.updateEvent.Remove(singleton.Update);
                 }
                 singleton = new ScenarioWorker();
-                Client.updateEvent.Add(singleton.Update);
             }
         }
     }
 
+    /*
     public class ScenarioEntry
     {
         public string scenarioName;
         public ConfigNode scenarioNode;
     }
+    */
 }
 

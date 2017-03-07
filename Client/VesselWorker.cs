@@ -55,6 +55,8 @@ namespace SyncrioClientSide
     public class VesselWorker
     {
         public bool workerEnabled;
+        private bool registered = false;
+        public bool isDMPWarping = false;
         //Hooks enabled
         private static VesselWorker singleton;
         //Incoming queue
@@ -79,6 +81,31 @@ namespace SyncrioClientSide
             {
                 return singleton;
             }
+        }
+
+        //Called from main
+        private void FixedUpdate()
+        {
+            if (workerEnabled && !registered)
+            {
+                RegisterGameHooks();
+            }
+            if (!workerEnabled && registered)
+            {
+                UnregisterGameHooks();
+            }
+        }
+
+        private void RegisterGameHooks()
+        {
+            registered = true;
+            GameEvents.onKerbalRemoved.Add(OnKerbalRemoved);
+        }
+
+        private void UnregisterGameHooks()
+        {
+            registered = false;
+            GameEvents.onKerbalRemoved.Remove(OnKerbalRemoved);
         }
 
         public void DetectReverting()
@@ -134,16 +161,52 @@ namespace SyncrioClientSide
             lastUniverseTime = newUniverseTime;
         }
 
+        public void DetectDMPSync()
+        {
+            double newUniverseTime = Planetarium.GetUniversalTime();
+            //10 second fudge to ignore TimeSyncer skips
+            if (newUniverseTime < (lastUniverseTime - 10f) || newUniverseTime > (lastUniverseTime + 10f))
+            {
+                if ((TimeWarp.CurrentRateIndex > 0) && (TimeWarp.CurrentRate > 1.1f) && TimeSyncer.fetch.locked && !isDMPWarping)
+                {
+                    SyncrioLog.Debug("Unlocking from subspace");
+                    TimeSyncer.fetch.UnlockSubspace();
+                    isDMPWarping = true;
+                }
+            }
+            else
+            {
+                if ((TimeWarp.CurrentRateIndex == 0) && (TimeWarp.CurrentRate < 1.1f) && !TimeSyncer.fetch.locked && (TimeSyncer.fetch.currentSubspace == -1) && isDMPWarping)
+                {
+                    WarpWorker.SendNewSubspace();
+                    isDMPWarping = false;
+                }
+            }
+            lastUniverseTime = newUniverseTime;
+        }
+
         public void SendKerbalIfDifferent(ProtoCrewMember pcm)
         {
-            if (pcm.type == ProtoCrewMember.KerbalType.Tourist)
-            {
-                //Don't send tourists
-                SyncrioLog.Debug("Skipping sending of tourist: " + pcm.name);
-                return;
-            }
             ConfigNode kerbalNode = new ConfigNode();
             pcm.Save(kerbalNode);
+            if (GroupSystem.playerGroupAssigned)
+            {
+                if (pcm.type == ProtoCrewMember.KerbalType.Tourist || pcm.type == ProtoCrewMember.KerbalType.Unowned)
+                {
+                    ConfigNode syncNode = new ConfigNode();
+                    syncNode.AddValue("groupContract", GroupSystem.playerGroupName);
+                    kerbalNode.AddNode("Syncrio", syncNode);
+                }
+            }
+            else
+            {
+                if (pcm.type == ProtoCrewMember.KerbalType.Tourist || pcm.type == ProtoCrewMember.KerbalType.Unowned)
+                {
+                    ConfigNode syncNode = new ConfigNode();
+                    syncNode.AddValue("playerContract", Settings.fetch.playerPublicKey);
+                    kerbalNode.AddNode("Syncrio", syncNode);
+                }
+            }
             byte[] kerbalBytes = ConfigNodeSerializer.fetch.Serialize(kerbalNode);
             if (kerbalBytes == null || kerbalBytes.Length == 0)
             {
@@ -225,6 +288,37 @@ namespace SyncrioClientSide
                 SyncrioLog.Debug("crewNode is null!");
                 return;
             }
+            if (crewNode.GetValue("type") == "Tourist")
+            {
+                ConfigNode syncNode = null;
+                if (crewNode.TryGetNode("Syncrio", ref syncNode))
+                {
+                    if (GroupSystem.playerGroupAssigned)
+                    {
+                        string groupOwner = null;
+                        if (syncNode.TryGetValue("groupContract", ref groupOwner))
+                        {
+                            if (groupOwner != GroupSystem.playerGroupName)
+                            {
+                                SyncrioLog.Debug("Skipping load of tourist that belongs to another group");
+                                return;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        string playerOwner = null;
+                        if (syncNode.TryGetValue("playerContract", ref playerOwner))
+                        {
+                            if (playerOwner != Settings.fetch.playerPublicKey)
+                            {
+                                SyncrioLog.Debug("Skipping load of tourist that belongs to another player");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
             ProtoCrewMember protoCrew = new ProtoCrewMember(HighLogic.CurrentGame.Mode, crewNode);
             if (protoCrew == null)
             {
@@ -280,52 +374,6 @@ namespace SyncrioClientSide
                 HighLogic.CurrentGame.CrewRoster[protoCrew.name].seatIdx = protoCrew.seatIdx;
                 HighLogic.CurrentGame.CrewRoster[protoCrew.name].stupidity = protoCrew.stupidity;
                 HighLogic.CurrentGame.CrewRoster[protoCrew.name].UTaR = protoCrew.UTaR;
-            }
-        }
-
-        public void SendKerbalsInVessel(ProtoVessel vessel)
-        {
-            if (vessel == null)
-            {
-                return;
-            }
-            if (vessel.protoPartSnapshots == null)
-            {
-                return;
-            }
-            foreach (ProtoPartSnapshot part in vessel.protoPartSnapshots)
-            {
-                if (part == null)
-                {
-                    continue;
-                }
-                foreach (ProtoCrewMember pcm in part.protoModuleCrew)
-                {
-                    SendKerbalIfDifferent(pcm);
-                }
-            }
-        }
-
-        public void SendKerbalsInVessel(Vessel vessel)
-        {
-            if (vessel == null)
-            {
-                return;
-            }
-            if (vessel.parts == null)
-            {
-                return;
-            }
-            foreach (Part part in vessel.parts)
-            {
-                if (part == null)
-                {
-                    continue;
-                }
-                foreach (ProtoCrewMember pcm in part.protoModuleCrew)
-                {
-                    SendKerbalIfDifferent(pcm);
-                }
             }
         }
         //Called from networkWorker
@@ -389,6 +437,19 @@ namespace SyncrioClientSide
                 }
                 kerbalProtoHistoryTime[kerbalName] = planetTime;
             }
+        }
+        public void SendKerbalRemove(string kerbalName)
+        {
+            if (serverKerbals.ContainsKey(kerbalName))
+            {
+                SyncrioLog.Debug("Found kerbal " + kerbalName + ", sending remove...");
+                serverKerbals.Remove(kerbalName);
+                NetworkWorker.fetch.SendKerbalRemove(kerbalName);
+            }
+        }
+        private void OnKerbalRemoved(ProtoCrewMember pcm)
+        {
+            SendKerbalRemove(pcm.name);
         }
         public void SendVessels()
         {
@@ -464,7 +525,17 @@ namespace SyncrioClientSide
         {
             lock (Client.eventLock)
             {
+                if (singleton != null)
+                {
+                    singleton.workerEnabled = false;
+                    Client.fixedUpdateEvent.Remove(singleton.FixedUpdate);
+                    if (singleton.registered)
+                    {
+                        singleton.UnregisterGameHooks();
+                    }
+                }
                 singleton = new VesselWorker();
+                Client.fixedUpdateEvent.Add(singleton.FixedUpdate);
             }
         }
     }

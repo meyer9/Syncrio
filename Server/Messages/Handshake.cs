@@ -258,7 +258,7 @@ namespace SyncrioServer.Messages
                 Server.playerCount = ClientHandler.GetActiveClientCount();
                 Server.players = ClientHandler.GetActivePlayerNames();
                 SyncrioLog.Debug("Online players is now: " + Server.playerCount + ", connected: " + ClientHandler.GetClients().Length);
-                if (Settings.settingsStore.DarkMultiPlayerCoopMode)
+                if (Settings.specialSettingsStore.DarkMultiPlayerCoopMode)
                 {
                     //Bug Fix
                     Messages.ServerSettings.SendServerSettings(client);
@@ -273,7 +273,7 @@ namespace SyncrioServer.Messages
                     else
                     {
                         string groupname = GroupSystem.fetch.GetPlayerGroup(client.playerName);
-                        Messages.ScenarioData.SendScenarioGroupModules(client, groupname);
+                        ScenarioSystem.fetch.ScenarioSendAllData(groupname, client);
                     }
                     Messages.WarpControl.SendAllReportedSkewRates(client);
                     Messages.LockSystem.SendAllLocks(client);
@@ -302,6 +302,16 @@ namespace SyncrioServer.Messages
                 if (response == 0)
                 {
                     mw.Write<bool>(Settings.settingsStore.compressionEnabled);
+                    mw.Write<int>((int)Settings.settingsStore.modControl);
+                    if (Settings.settingsStore.modControl != ModControlMode.DISABLED)
+                    {
+                        if (!File.Exists(Server.modFile))
+                        {
+                            Server.GenerateNewModFile();
+                        }
+                        string modFileData = File.ReadAllText(Server.modFile);
+                        mw.Write<string>(modFileData);
+                    }
                 }
                 newMessage.data = mw.GetMessageBytes();
             }

@@ -74,7 +74,7 @@ namespace SyncrioServer.Messages
             else
             {
                 string groupname = GroupSystem.fetch.GetPlayerGroup(client.playerName);
-                Messages.ScenarioData.SendScenarioGroupModules(client, groupname);
+                ScenarioSystem.fetch.ScenarioSendAllData(groupname, client);
             }
             Messages.WarpControl.SendAllReportedSkewRates(client);
             Messages.CraftLibrary.SendCraftList(client);

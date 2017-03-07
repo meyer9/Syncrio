@@ -55,13 +55,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ContractWorker.cs" />
     <Compile Include="GroupSystem.cs" />
     <Compile Include="GroupWindow.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="ConfigNodeSerializer.cs" />
-    <Compile Include="ScenarioWindow.cs" />
+    <Compile Include="ScenarioEventHandler.cs" />
     <Compile Include="Utilities\CompatibilityChecker.cs" />
     <Compile Include="TimeSyncer.cs" />
     <Compile Include="NetworkWorker.cs" />
@@ -100,6 +101,10 @@
     <ProjectReference Include="..\Common\SyncrioCommon.csproj">
       <Project>{423C5A4B-EA79-450D-BD86-5B46141D58D1}</Project>
       <Name>SyncrioCommon</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\SyncrioUtil\SyncrioUtil.csproj">
+      <Project>{2de79ab7-6f22-4133-a78a-fed07b7ffaf0}</Project>
+      <Name>SyncrioUtil</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup />

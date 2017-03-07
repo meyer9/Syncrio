@@ -70,7 +70,7 @@ namespace SyncrioClientSide
         private void InitGUI()
         {
             //Setup GUI stuff
-            windowRect = new Rect((Screen.width / 2f) - (WINDOW_WIDTH / 2), (Screen.height / 2f) - (WINDOW_HEIGHT / 2f), WINDOW_WIDTH, WINDOW_HEIGHT);
+            windowRect = new Rect((Screen.width / 2f) - (WINDOW_WIDTH / 2), (Screen.height / 2f) - WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT);
             moveRect = new Rect(0, 0, 10000, 20);
 
             layoutOptions = new GUILayoutOption[2];

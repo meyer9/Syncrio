@@ -104,6 +104,8 @@ namespace SyncrioClientSide
         private Thread sendThread;
         private string serverMotd;
         private bool displayMotd;
+        //Starting game
+        private bool startup = false;
 
         public NetworkWorker()
         {
@@ -246,30 +248,61 @@ namespace SyncrioClientSide
                         Client.fetch.gameRunning = true;
                         PlayerStatusWorker.fetch.workerEnabled = true;
                         ScenarioWorker.fetch.workerEnabled = true;
+                        ContractWorker.fetch.workerEnabled = true;
                         DynamicTickWorker.fetch.workerEnabled = true;
                         WarpWorker.fetch.workerEnabled = true;
                         CraftLibraryWorker.fetch.workerEnabled = true;
                         ScreenshotWorker.fetch.workerEnabled = true;
                         SendMotdRequest();
                         ToolbarSupport.fetch.EnableToolbar();
+                        startup = true;
                     }
                 }
                 else
                 {
                     state = ClientState.RUNNING;
                     Client.fetch.status = "Running";
-                    Client.fetch.gameRunning = true;
                     PlayerStatusWorker.fetch.workerEnabled = true;
                     ScenarioWorker.fetch.workerEnabled = true;
+                    ContractWorker.fetch.workerEnabled = true;
                     DynamicTickWorker.fetch.workerEnabled = true;
                     WarpWorker.fetch.workerEnabled = true;
                     ToolbarSupport.fetch.EnableToolbar();
+                    startup = true;
                 }
             }
-            if (displayMotd && (HighLogic.LoadedScene != GameScenes.LOADING) && (Time.timeSinceLevelLoad > 2f))
+            if (startup && (HighLogic.LoadedScene != GameScenes.LOADING) && (Time.timeSinceLevelLoad > 2f) && (HighLogic.LoadedScene != GameScenes.MAINMENU))
             {
-                displayMotd = false;
-                ScreenMessages.PostScreenMessage(serverMotd, 10f, ScreenMessageStyle.UPPER_CENTER);
+                if (Settings.fetch.DarkMultiPlayerCoopMode)
+                {
+                    Client.fetch.gameRunning = true;
+                }
+                if (ScenarioWorker.fetch.stopSync)
+                {
+                    ScreenMessages.PostScreenMessage("Failed to pass mod part validation." + Environment.NewLine + "SYNCING DISABLED!!!", 10.0f, ScreenMessageStyle.UPPER_CENTER);
+                }
+                else
+                {
+                    ScenarioWorker.fetch.LoadBaseScenarioData();
+                }
+                startup = false;
+                int latestSubspace = TimeSyncer.fetch.GetMostAdvancedSubspace();
+                if (TimeSyncer.fetch.locked)
+                {
+                    if (TimeSyncer.fetch.currentSubspace != latestSubspace)
+                    {
+                        TimeSyncer.fetch.LockSubspace(latestSubspace);
+                    }
+                }
+                else
+                {
+                    TimeSyncer.fetch.LockSubspace(latestSubspace);
+                }
+                if (displayMotd)
+                {
+                    displayMotd = false;
+                    ScreenMessages.PostScreenMessage(serverMotd, 10f, ScreenMessageStyle.UPPER_CENTER);
+                }
                 //Control locks will bug out the space centre sceen, so remove them before starting.
                 DeleteAllTheControlLocksSoTheSpaceCentreBugGoesAway();
             }
@@ -897,9 +930,6 @@ namespace SyncrioClientSide
                         case ServerMessageType.SEND_VESSELS:
                             VesselWorker.fetch.HandleStartingVesselsMessage(message.data);
                             break;
-                        case ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST:
-                            ScenarioWorker.fetch.AutoSendScenariosReply();
-                            break;
                         case ServerMessageType.AUTO_SEND_GROUP_PROGRESS:
                             GroupSystem.fetch.HandleGroupProgress(message.data);
                             break;
@@ -908,6 +938,9 @@ namespace SyncrioClientSide
                             break;
                         case ServerMessageType.KERBAL_COMPLETE:
                             HandleKerbalComplete();
+                            break;
+                        case ServerMessageType.KERBAL_REMOVE:
+                            HandleKerbalRemove(message.data);
                             break;
                         case ServerMessageType.CRAFT_LIBRARY:
                             HandleCraftLibrary(message.data);
@@ -998,9 +1031,6 @@ namespace SyncrioClientSide
                         case ServerMessageType.SCENARIO_DATA:
                             HandleScenarioModuleData(message.data);
                             break;
-                        case ServerMessageType.AUTO_SYNC_SCENARIO_REQUEST:
-                            ScenarioWorker.fetch.AutoSendScenariosReply();
-                            break;
                         case ServerMessageType.AUTO_SEND_GROUP_PROGRESS:
                             GroupSystem.fetch.HandleGroupProgress(message.data);
                             break;
@@ -1090,6 +1120,7 @@ namespace SyncrioClientSide
 
             int reply = 0;
             string reason = "";
+            string modFileData = "";
             int serverProtocolVersion = -1;
             string serverVersion = "Unknown";
             try
@@ -1111,6 +1142,11 @@ namespace SyncrioClientSide
                     if (reply == 0)
                     {
                         Compression.compressionEnabled = mr.Read<bool>() && Settings.fetch.compressionEnabled;
+                        ModWorker.fetch.modControl = (ModControlMode)mr.Read<int>();
+                        if (ModWorker.fetch.modControl != ModControlMode.DISABLED)
+                        {
+                            modFileData = mr.Read<string>();
+                        }
                     }
                 }
             }
@@ -1124,8 +1160,32 @@ namespace SyncrioClientSide
             {
                 case 0:
                     {
-                        SyncrioLog.Debug("Handshake successful");
-                        state = ClientState.AUTHENTICATED;
+                        if (ModWorker.fetch.ParseModFile(modFileData))
+                        {
+                            SyncrioLog.Debug("Handshake successful");
+                            if (ModWorker.fetch.CheckForMissingParts())
+                            {
+                                state = ClientState.AUTHENTICATED;
+                            }
+                            else
+                            {
+                                if (ModWorker.fetch.modControl == ModControlMode.ENABLED_STOP_INVALID_PART_JOIN)
+                                {
+                                    SyncrioLog.Debug("Failed to pass mod part validation");
+                                    SendDisconnect("Failed mod part validation");
+                                }
+                                else
+                                {
+                                    ScenarioWorker.fetch.stopSync = true;
+                                    state = ClientState.AUTHENTICATED;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("Failed to pass mod validation");
+                            SendDisconnect("Failed mod validation");
+                        }
                     }
                     break;
                 default:
@@ -1238,9 +1298,9 @@ namespace SyncrioClientSide
                 Settings.fetch.serverDMPCoopMode = mr.Read<bool>();
                 Client.fetch.gameMode = (GameMode)mr.Read<int>();
                 Client.fetch.serverAllowCheats = mr.Read<bool>();
+                GroupSystem.showAllProgress = mr.Read<bool>();
                 numberOfKerbals = mr.Read<int>();
                 Settings.fetch.numberOfKerbalToSpawn = mr.Read<int>();
-                ScenarioWorker.fetch.autoSendScenarios = mr.Read<bool>();
                 ScenarioWorker.fetch.nonGroupScenarios = mr.Read<bool>();
                 ScenarioWorker.fetch.canResetScenario = mr.Read<bool>();
                 ScreenshotWorker.fetch.screenshotHeight = mr.Read<int>();
@@ -1322,6 +1382,8 @@ namespace SyncrioClientSide
                 {
                     string playerName = mr.Read<string>();
                     ChatWorker.fetch.QueueChannelMessage(ChatWorker.fetch.consoleIdentifier, "", playerName + " has joined the server");
+                    GroupWindow.fetch.SetInvitePlayerButton();
+                    GroupWindow.fetch.CheckInvitePlayerButton();
                 }
             }
         }
@@ -1338,6 +1400,8 @@ namespace SyncrioClientSide
                     ChatWorker.fetch.QueueRemovePlayer(playerName);
                     LockSystem.fetch.ReleasePlayerLocks(playerName);
                     ChatWorker.fetch.QueueChannelMessage(ChatWorker.fetch.consoleIdentifier, "", playerName + " has left the server");
+                    GroupWindow.fetch.SetInvitePlayerButton();
+                    GroupWindow.fetch.CheckInvitePlayerButton();
                 }
             }
             else
@@ -1364,26 +1428,26 @@ namespace SyncrioClientSide
 
         private void HandleScenarioModuleData(byte[] messageData)
         {
-            using (MessageReader mr = new MessageReader(messageData))
+            if (!ScenarioWorker.fetch.stopSync)
             {
-                string[] scenarioName = mr.Read<string[]>();
-                for (int i = 0; i < scenarioName.Length; i++)
+                using (MessageReader mr = new MessageReader(messageData))
                 {
-                    byte[] scenarioData = Compression.DecompressIfNeeded(mr.Read<byte[]>());
-                    ConfigNode scenarioNode = ConfigNodeSerializer.fetch.Deserialize(scenarioData);
-                    if (scenarioNode != null)
+                    List<byte[]> data = new List<byte[]>();
+                    int dataLength = mr.Read<int>();
+                    for (int i = 0; i < dataLength; i++)
                     {
-                        ScenarioWorker.fetch.QueueScenarioData(scenarioName[i], scenarioNode);
+                        byte[] scenarioData = Compression.DecompressIfNeeded(mr.Read<byte[]>());
+
+                        data.Add(scenarioData);
+                    }
+                    if (Client.fetch.gameRunning)
+                    {
+                        ScenarioWorker.fetch.LoadScenarioData(data);
                     }
                     else
                     {
-                        SyncrioLog.Debug("Scenario data has been lost for " + scenarioName[i]);
-                        ScreenMessages.PostScreenMessage("Scenario data has been lost for " + scenarioName[i], 5f, ScreenMessageStyle.UPPER_CENTER);
+                        ScenarioWorker.fetch.baseData = data;
                     }
-                }
-                if (Client.fetch.gameRunning)
-                {
-                    ScenarioWorker.fetch.LoadScenarioData();
                 }
             }
         }
@@ -1423,6 +1487,17 @@ namespace SyncrioClientSide
             state = ClientState.KERBALS_SYNCED;
             SyncrioLog.Debug("Kerbals Synced!");
             Client.fetch.status = "Kerbals synced";
+        }
+        
+        private void HandleKerbalRemove(byte[] messageData)
+        {
+            using (MessageReader mr = new MessageReader(messageData))
+            {
+                double planetTime = mr.Read<double>();
+                string kerbalName = mr.Read<string>();
+                SyncrioLog.Debug("Kerbal removed: " + kerbalName);
+                ScreenMessages.PostScreenMessage("Kerbal " + kerbalName + " removed from game", 5f, ScreenMessageStyle.UPPER_CENTER);
+            }
         }
 
         private void HandleCraftLibrary(byte[] messageData)
@@ -1725,6 +1800,20 @@ namespace SyncrioClientSide
             ClientMessage newMessage = new ClientMessage();
             newMessage.type = ClientMessageType.KERBALS_REQUEST;
             QueueOutgoingMessage(newMessage, true);
+        }
+        // Called from VesselWorker
+        public void SendKerbalRemove(string kerbalName)
+        {
+            SyncrioLog.Debug("Removing kerbal " + kerbalName + " from the server");
+            ClientMessage newMessage = new ClientMessage();
+            newMessage.type = ClientMessageType.KERBAL_REMOVE;
+            using (MessageWriter mw = new MessageWriter())
+            {
+                mw.Write<double>(Planetarium.GetUniversalTime());
+                mw.Write<string>(kerbalName);
+                newMessage.data = mw.GetMessageBytes();
+            }
+            QueueOutgoingMessage(newMessage, false);
         }
         //Called from craftLibraryWorker
         public void SendCraftLibraryMessage(byte[] messageData)

@@ -120,10 +120,23 @@ namespace SyncrioServer
                     newGroupObject.privacy = kvp.Value.privacy;
                     newGroupObject.members = new List<string>(kvp.Value.members);
                     newGroupObject.settings.inviteAvailable = kvp.Value.settings.inviteAvailable;
+                    newGroupObject.settings.progressPublic = kvp.Value.settings.progressPublic;
                     returnDictionary.Add(kvp.Key, newGroupObject);
                 }
             }
             return returnDictionary;
+        }
+
+        public bool IsGroupProgressPublic(string group)
+        {
+            if (GroupExists(group))
+            {
+                 return groups[group].settings.progressPublic;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         private void LoadGroups()
@@ -141,18 +154,11 @@ namespace SyncrioServer
                 {
                     Directory.CreateDirectory(groupScenariosThisGroupDirectory);
                 }
-                for (int i = 0; i < ScenarioSystem.subspaceList.Subspaces.Count; i++)
+
+                string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Scenario");
+                if (!Directory.Exists(thisGroupScenarioDirectory))
                 {
-                    int subspaceNumber = ScenarioSystem.subspaceList.Subspaces[i].SubspaceNumber;
-                    if (!Directory.Exists(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber)))
-                    {
-                        Directory.CreateDirectory(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber));
-                    }
-                    string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber, "Scenario");
-                    if (!Directory.Exists(thisGroupScenarioDirectory))
-                    {
-                        Directory.CreateDirectory(thisGroupScenarioDirectory);
-                    }
+                    Directory.CreateDirectory(thisGroupScenarioDirectory);
                 }
 
                 string membersFile = Path.Combine(thisGroupDirectory, "members.txt");
@@ -187,13 +193,16 @@ namespace SyncrioServer
                                 newGroup.privacy = (GroupPrivacy)Enum.Parse(typeof(GroupPrivacy), currentLine);
                                 break;
                             case 1:
-                                newGroup.passwordSalt = currentLine;
+                                newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine);
                                 break;
                             case 2:
-                                newGroup.passwordHash = currentLine;
+                                newGroup.settings.progressPublic = Convert.ToBoolean(currentLine);
                                 break;
                             case 3:
-                                newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine);
+                                newGroup.passwordSalt = currentLine;
+                                break;
+                            case 4:
+                                newGroup.passwordHash = currentLine;
                                 break;
                         }
                         lineIndex++;
@@ -240,26 +249,11 @@ namespace SyncrioServer
             {
                 Directory.CreateDirectory(groupScenariosThisGroupDirectory);
             }
-
-            for (int i = 0; i < ScenarioSystem.subspaceList.Subspaces.Count; i++)
+            
+            string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Scenario");
+            if (!Directory.Exists(thisGroupScenarioDirectory))
             {
-                int subspaceNumber = ScenarioSystem.subspaceList.Subspaces[i].SubspaceNumber;
-                if (!Directory.Exists(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber)))
-                {
-                    Directory.CreateDirectory(Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber));
-                }
-                string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Subspace" + subspaceNumber, "Scenario");
-                if (!Directory.Exists(thisGroupScenarioDirectory))
-                {
-                    Directory.CreateDirectory(thisGroupScenarioDirectory);
-                    if (subspaceNumber == 0)
-                    {
-                        foreach (string file in Directory.GetFiles(Path.Combine(Server.ScenarioDirectory, "GroupData", "InitialGroup")))
-                        {
-                            File.Copy(file, Path.Combine(thisGroupScenarioDirectory, Path.GetFileName(file)));
-                        }
-                    }
-                }
+                Directory.CreateDirectory(thisGroupScenarioDirectory);
             }
 
             string membersFile = Path.Combine(thisGroupDirectory, "members.txt");
@@ -276,6 +270,8 @@ namespace SyncrioServer
             using (StreamWriter sw = new StreamWriter(settingsFile + ".new"))
             {
                 sw.WriteLine(saveGroup.privacy.ToString());
+                sw.WriteLine(saveGroup.settings.inviteAvailable);
+                sw.WriteLine(saveGroup.settings.progressPublic);
                 if (saveGroup.passwordSalt != null)
                 {
                     sw.WriteLine(saveGroup.passwordSalt);
@@ -283,8 +279,16 @@ namespace SyncrioServer
                     {
                         sw.WriteLine(saveGroup.passwordHash);
                     }
+                    else
+                    {
+                        sw.WriteLine(Environment.NewLine);
+                    }
                 }
-                sw.WriteLine(saveGroup.settings.inviteAvailable);
+                else
+                {
+                    sw.WriteLine(Environment.NewLine);
+                    sw.WriteLine(Environment.NewLine);
+                }
             }
             File.Copy(settingsFile + ".new", settingsFile, true);
             File.Delete(settingsFile + ".new");
@@ -396,6 +400,7 @@ namespace SyncrioServer
                             groupPassword = mr.Read<string>();
                         }
                         bool isGroupFreeToInvite = mr.Read<bool>();
+                        bool isGroupProgressPublic = mr.Read<bool>();
 
                         if (GroupExists(groupName))
                         {
@@ -425,6 +430,7 @@ namespace SyncrioServer
                         go.members.Add(ownerName);
                         go.privacy = groupPrivacy;
                         go.settings.inviteAvailable = isGroupFreeToInvite;
+                        go.settings.progressPublic = isGroupProgressPublic;
                         groups.Add(groupName, go);
                         SyncrioLog.Debug(ownerName + " created group " + groupName);
                         Messages.Chat.SendChatMessageToClient(callingClient, "You created " + groupName);
@@ -476,6 +482,7 @@ namespace SyncrioServer
                     go.members.Add(ownerName);
                     go.privacy = GroupPrivacy.PUBLIC;
                     go.settings.inviteAvailable = true;
+                    go.settings.progressPublic = true;
                     groups.Add(groupName, go);
                     SyncrioLog.Debug(ownerName + " created group " + groupName);
                     Messages.Group.SendGroupToAll(groupName, go);
@@ -890,7 +897,10 @@ namespace SyncrioServer
                         GroupObject go = groups[playerGroupName];
                         go.members.Remove(playerName);
                         SyncrioLog.Debug(playerName + " was kick from " + playerGroupName);
-                        Messages.Chat.SendChatMessageToClient(kickedPlayer, "You were kick from " + playerGroupName);
+                        if (ClientHandler.ClientConnected(kickedPlayer))
+                        {
+                            Messages.Chat.SendChatMessageToClient(kickedPlayer, "You were kick from " + playerGroupName);
+                        }
                         Messages.Group.SendGroupToAll(playerGroupName, go);
                         SaveGroup(playerGroupName);
                         return true;
@@ -903,7 +913,7 @@ namespace SyncrioServer
                         kickPlayerVotes[playerName].playerVotedCounter += 1;
                         kickPlayerVotes[playerName].currentVotes += PlayerVoteYesOrNo;
                         kickPlayerVotes[playerName].votesPrecent = (kickPlayerVotes[playerName].currentVotes / (groups[playerGroupName].members.Count - 1));
-                        double Threshold = (Settings.settingsStore.groupKickPlayerVotesThreshold / 100);
+                        double Threshold = (Settings.specialSettingsStore.groupKickPlayerVotesThreshold / 100);
                         if (kickPlayerVotes[playerName].votesPrecent > Threshold)
                         {
                             kickPlayerVotes[playerName].currentVotes = 0;
@@ -914,7 +924,10 @@ namespace SyncrioServer
                             GroupObject go = groups[playerGroupName];
                             go.members.Remove(playerName);
                             SyncrioLog.Debug(playerName + " was kick from " + playerGroupName);
-                            Messages.Chat.SendChatMessageToClient(kickedPlayer, "You were kick from " + playerGroupName);
+                            if (ClientHandler.ClientConnected(kickedPlayer))
+                            {
+                                Messages.Chat.SendChatMessageToClient(kickedPlayer, "You were kick from " + playerGroupName);
+                            }
                             Messages.Group.SendGroupToAll(playerGroupName, go);
                             SaveGroup(playerGroupName);
                             return true;

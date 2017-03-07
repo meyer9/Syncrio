@@ -83,6 +83,7 @@ namespace SyncrioClientSide
             {
                 using (MessageWriter mw = new MessageWriter())
                 {
+                    SyncrioLog.Debug("Acquiring '" + lockName + "' lock");
                     mw.Write<int>((int)LockMessageType.ACQUIRE);
                     mw.Write<string>(Settings.fetch.playerName);
                     mw.Write<string>(lockName);
