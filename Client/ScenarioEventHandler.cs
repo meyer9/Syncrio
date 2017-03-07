@@ -1215,6 +1215,19 @@ namespace SyncrioClientSide
 
                         mw.Write<string>(tech.host.techID);
 
+                        ConfigNode techCFG = new ConfigNode();
+                        tech.host.Save(techCFG);
+                        byte[] techData = ConfigNodeSerializer.fetch.Serialize(techCFG);
+
+                        mw.Write<byte[]>(techData);
+
+                        mw.Write<int>(tech.host.partsPurchased.Count);
+
+                        for (int i = 0; i < tech.host.partsPurchased.Count; i++)
+                        {
+                            mw.Write<string>(tech.host.partsPurchased[i].name);
+                        }
+
                         data = mw.GetMessageBytes();
                     }
 

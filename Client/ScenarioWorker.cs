@@ -419,17 +419,29 @@ namespace SyncrioClientSide
 
                             if (name[0] == "Currency")
                             {
-                                double fundsAmount = Convert.ToDouble(dataList[0]);
-                                double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
-                                Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
+                                if (Client.fetch.gameMode == GameMode.CAREER)
+                                {
+                                    double fundsAmount = Convert.ToDouble(dataList[0]);
+                                    double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
+                                    Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
 
-                                float repAmount = Convert.ToSingle(dataList[1]);
-                                float repAmountDiff = repAmount - Reputation.Instance.reputation;
-                                Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
+                                    float repAmount = Convert.ToSingle(dataList[1]);
+                                    float repAmountDiff = repAmount - Reputation.Instance.reputation;
+                                    Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
 
-                                float sciAmount = Convert.ToSingle(dataList[2]);
-                                float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
-                                ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
+                                    float sciAmount = Convert.ToSingle(dataList[2]);
+                                    float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
+                                    ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
+                                }
+                                else
+                                {
+                                    if (Client.fetch.gameMode == GameMode.SCIENCE)
+                                    {
+                                        float sciAmount = Convert.ToSingle(dataList[2]);
+                                        float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
+                                        ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
+                                    }
+                                }
                             }
 
                             if (name[0] == "BuildingLevel")
