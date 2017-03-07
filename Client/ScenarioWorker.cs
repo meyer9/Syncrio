@@ -770,6 +770,24 @@ namespace SyncrioClientSide
                             SyncrioLog.Debug("Error handling: " + name[0] + " data, error: " + e);
                         }
                     }
+<<<<<<< HEAD
+=======
+                    if (!loaded)
+                    {
+                        listOfNewScenarioModulesToAdd.Add(entry);
+                        loadedAll = false;
+                    }
+                }
+                HighLogic.CurrentGame.scenarios = psmLocked;
+                if (!loadedAll)
+                {
+                    SyncrioLog.Debug("Loading " + listOfNewScenarioModulesToAdd.Count + " new scenario module(s)");
+                    LoadNewScenarioData(listOfNewScenarioModulesToAdd);
+                }
+
+                scenarioListToAdd.Clear();
+                activeScenarioQueue.Clear();
+>>>>>>> origin/master
 
                     isSyncing = false;
                 }

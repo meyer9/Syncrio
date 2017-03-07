@@ -55,7 +55,10 @@ namespace SyncrioClientSide
     public class VesselWorker
     {
         public bool workerEnabled;
+<<<<<<< HEAD
         private bool registered = false;
+=======
+>>>>>>> origin/master
         public bool isDMPWarping = false;
         //Hooks enabled
         private static VesselWorker singleton;
@@ -162,6 +165,33 @@ namespace SyncrioClientSide
         }
 
         public void DetectDMPSync()
+<<<<<<< HEAD
+=======
+        {
+            double newUniverseTime = Planetarium.GetUniversalTime();
+            //10 second fudge to ignore TimeSyncer skips
+            if (newUniverseTime < (lastUniverseTime - 10f) || newUniverseTime > (lastUniverseTime + 10f))
+            {
+                if ((TimeWarp.CurrentRateIndex > 0) && (TimeWarp.CurrentRate > 1.1f) && TimeSyncer.fetch.locked && !isDMPWarping)
+                {
+                    SyncrioLog.Debug("Unlocking from subspace");
+                    TimeSyncer.fetch.UnlockSubspace();
+                    isDMPWarping = true;
+                }
+            }
+            else
+            {
+                if ((TimeWarp.CurrentRateIndex == 0) && (TimeWarp.CurrentRate < 1.1f) && !TimeSyncer.fetch.locked && (TimeSyncer.fetch.currentSubspace == -1) && isDMPWarping)
+                {
+                    WarpWorker.SendNewSubspace();
+                    isDMPWarping = false;
+                }
+            }
+            lastUniverseTime = newUniverseTime;
+        }
+
+        public void SendKerbalIfDifferent(ProtoCrewMember pcm)
+>>>>>>> origin/master
         {
             double newUniverseTime = Planetarium.GetUniversalTime();
             //10 second fudge to ignore TimeSyncer skips
