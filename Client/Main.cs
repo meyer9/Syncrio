@@ -428,10 +428,6 @@ namespace SyncrioClientSide
                             CheatOptions.IgnoreAgencyMindsetOnContracts = false;
                             CheatOptions.IgnoreMaxTemperature = false;
                             CheatOptions.InfiniteElectricity = false;
-<<<<<<< HEAD
-=======
-                            CheatOptions.NoCrashDamage = false;
->>>>>>> origin/master
                             CheatOptions.UnbreakableJoints = false;
 
                             foreach (KeyValuePair<CelestialBody, double> gravityEntry in bodiesGees)
