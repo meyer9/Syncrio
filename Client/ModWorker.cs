@@ -378,6 +378,7 @@ namespace SyncrioClientSide
                 List<string> autoAllowed = new List<string>();
                 autoAllowed.Add("syncrio/plugins/syncrioclientside.dll");
                 autoAllowed.Add("syncrio/plugins/syncriocommon.dll");
+                autoAllowed.Add("syncrio/plugins/syncrioutil.dll");
                 //Message System
                 autoAllowed.Add("syncrio/plugins/messagewriter2.dll");
                 //Compression
