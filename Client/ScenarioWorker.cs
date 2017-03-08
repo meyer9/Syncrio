@@ -63,7 +63,6 @@ namespace SyncrioClientSide
         private object scenarioSyncLock = new object();
         private Dictionary<string,string> checkData = new Dictionary<string, string>();
         public bool nonGroupScenarios;
-        public bool canResetScenario;
         public List<byte[]> baseData = new List<byte[]>();
         //ScenarioType list to check.
         private Dictionary<string, Type> allScenarioTypesInAssemblies;
@@ -349,6 +348,32 @@ namespace SyncrioClientSide
             {
                 if (Client.fetch.gameRunning && HighLogic.LoadedScene != GameScenes.LOADING)
                 {
+                    if (ResearchAndDevelopment.Instance == null)
+                    {
+                        ResearchAndDevelopment.Instance = new ResearchAndDevelopment();
+
+                        ResearchAndDevelopment.Instance.runner = ScenarioRunner.Instance;
+
+                        int rndIndex = HighLogic.CurrentGame.scenarios.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
+
+                        if (rndIndex != -1)
+                        {
+                            ResearchAndDevelopment.Instance.snapshot = HighLogic.CurrentGame.scenarios[rndIndex];
+                        }
+                        else
+                        {
+                            foreach (KSPScenarioType validScenario in KSPScenarioType.GetAllScenarioTypesInAssemblies())
+                            {
+                                if (validScenario.ModuleType.Name == "ResearchAndDevelopment")
+                                {
+                                    ResearchAndDevelopment.Instance.snapshot = HighLogic.CurrentGame.AddProtoScenarioModule(validScenario.ModuleType, validScenario.ScenarioAttributes.TargetScenes);
+                                }
+                            }
+                        }
+                        
+                        ResearchAndDevelopment.Instance.Start();
+                    }
+
                     isSyncing = true;
                     ScenarioEventHandler.fetch.startCooldown = true;
                     ScenarioEventHandler.fetch.cooldown = true;
@@ -419,7 +444,7 @@ namespace SyncrioClientSide
 
                             if (name[0] == "Currency")
                             {
-                                if (Client.fetch.gameMode == GameMode.CAREER)
+                                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     double fundsAmount = Convert.ToDouble(dataList[0]);
                                     double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
@@ -435,7 +460,7 @@ namespace SyncrioClientSide
                                 }
                                 else
                                 {
-                                    if (Client.fetch.gameMode == GameMode.SCIENCE)
+                                    if (HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
                                     {
                                         float sciAmount = Convert.ToSingle(dataList[2]);
                                         float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
@@ -764,15 +789,19 @@ namespace SyncrioClientSide
 
                                 RnDCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(sciData));
 
-                                int idx = HighLogic.CurrentGame.scenarios.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
+                                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
 
-                                if (ScenarioRunner.GetLoadedModules().Contains(HighLogic.CurrentGame.scenarios[idx].moduleRef))
+                                int idx = psmLocked.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
+
+                                if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
                                 {
-                                    ScenarioRunner.RemoveModule(HighLogic.CurrentGame.scenarios[idx].moduleRef);
+                                    ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
                                 }
 
-                                HighLogic.CurrentGame.scenarios[idx].moduleRef = ScenarioRunner.Instance.AddModule(RnDCFG);
-                                HighLogic.CurrentGame.scenarios[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+                                psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(RnDCFG);
+                                psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                HighLogic.CurrentGame.scenarios = psmLocked;
 
                                 //ResearchAndDevelopment.Instance.Load(RnDCFG);
                             }
@@ -785,43 +814,6 @@ namespace SyncrioClientSide
 
                     isSyncing = false;
                 }
-            }
-        }
-        
-        public void ResetScenatio(bool isInGroup)
-        {
-            if (isInGroup)
-            {
-                string groupName = GroupSystem.playerGroupName;
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] messageBytes;
-                    ClientMessage newMessage = new ClientMessage();
-                    newMessage.handled = false;
-                    newMessage.type = ClientMessageType.RESET_SCENARIO;
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(isInGroup);
-                        mw.Write<string>(groupName);
-                        messageBytes = mw.GetMessageBytes();
-                    }
-                    newMessage.data = messageBytes;
-                    NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
-                }
-            }
-            else
-            {
-                byte[] messageBytes;
-                ClientMessage newMessage = new ClientMessage();
-                newMessage.handled = false;
-                newMessage.type = ClientMessageType.RESET_SCENARIO;
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(isInGroup);
-                    messageBytes = mw.GetMessageBytes();
-                }
-                newMessage.data = messageBytes;
-                NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
             }
         }
         

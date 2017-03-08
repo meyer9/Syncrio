@@ -1117,26 +1117,6 @@ namespace SyncrioServer
             }
         }
 
-        public void sendResetGroupScenario(string groupName, ClientObject clientWhoReset)
-        {
-            foreach (string member in groups[groupName].members)
-            {
-                if (IsGroupMemberOnline(groupName, member))
-                {
-                    ClientObject client = ClientHandler.GetClientByName(member);
-                    Messages.ScenarioData.SendResetScenarioGroupModules(client, groupName);
-                    if (client != clientWhoReset)
-                    {
-                        Messages.Chat.SendChatMessageToClient(client, clientWhoReset.playerName + " has reset the group scenario!");
-                    }
-                    else
-                    {
-                        Messages.Chat.SendChatMessageToClient(client, "You have reset the group scenario!");
-                    }
-                }
-            }
-        }
-
         /// <summary>
         /// Sets the group password, with a raw, unencrypted password. Set to null or empty string to remove the password. Returns true on success.
         /// </summary>

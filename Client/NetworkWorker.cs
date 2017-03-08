@@ -1302,7 +1302,6 @@ namespace SyncrioClientSide
                 numberOfKerbals = mr.Read<int>();
                 Settings.fetch.numberOfKerbalToSpawn = mr.Read<int>();
                 ScenarioWorker.fetch.nonGroupScenarios = mr.Read<bool>();
-                ScenarioWorker.fetch.canResetScenario = mr.Read<bool>();
                 ScreenshotWorker.fetch.screenshotHeight = mr.Read<int>();
                 ChatWorker.fetch.consoleIdentifier = mr.Read<string>();
                 Client.fetch.serverDifficulty = (GameDifficulty)mr.Read<int>();

@@ -164,7 +164,5 @@ namespace SyncrioServer
         public int groupKickPlayerVotesThreshold = 75;
         [Description("Specify if players can have saved scenarios when they're not in a group.\n# -Note! If false, any player who is not in a group will not have their scenario saved.")]
         public bool nonGroupScenarios = true;
-        [Description("Specify if players can reset their scenario to the default settings.\n# WARNING: Using this command will override your/the player's scenario(or your/the player's group's scenario, if you/the player are in a group) using the initial scenario set by you!\n# WARNING: If you are in a group this will override everyone of the group's member's scenario!\n# -Note! If the initial scenario is not set this will do nothing.")]
-        public bool canResetScenario = false;
     }
 }

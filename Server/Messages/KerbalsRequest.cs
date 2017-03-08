@@ -69,7 +69,7 @@ namespace SyncrioServer.Messages
             Messages.PlayerStatus.SendAllPlayerStatus(client);
             if (!GroupSystem.fetch.PlayerIsInGroup(client.playerName))
             {
-                Messages.ScenarioData.SendScenarioModules(client);
+                ScenarioSystem.fetch.ScenarioSendAllData(client);
             }
             else
             {

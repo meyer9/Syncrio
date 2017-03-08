@@ -55,7 +55,6 @@ namespace SyncrioClientSide
         private bool isWindowLocked = false;
         private bool safeDisplay;
         private bool initialized;
-        private bool resetScenario = false;
         //GUI Layout
         private Rect windowRect;
         private Rect moveRect;
@@ -322,39 +321,6 @@ namespace SyncrioClientSide
                 {
                     Settings.fetch.revertEnabled = settingRevert;
                     Settings.fetch.SaveSettings();
-                }
-            }
-            else
-            {
-                bool isInGroup = GroupSystem.playerGroupAssigned;
-
-                if (ScenarioWorker.fetch.canResetScenario)
-                {
-                    GUILayout.EndHorizontal();
-
-                    GUILayout.BeginHorizontal();
-                    resetScenario = GUILayout.Toggle(resetScenario, "Reset Scenario!", buttonStyle);
-                    if (resetScenario)
-                    {
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.BeginHorizontal();
-                        GUILayout.Label("WARNING: You are about to reset your scenario to the default settings", labelOptions);
-                        GUILayout.EndHorizontal();
-
-                        GUILayout.BeginHorizontal();
-                        GUILayout.Space(20);
-                        if (GUILayout.Button("Continue", buttonStyle))
-                        {
-                            ScenarioWorker.fetch.ResetScenatio(isInGroup);
-                        }
-                        GUILayout.FlexibleSpace();
-                        if (GUILayout.Button("Cancel", buttonStyle))
-                        {
-                            resetScenario = false;
-                        }
-                        GUILayout.Space(20);
-                    }
                 }
             }
             GUILayout.BeginHorizontal();

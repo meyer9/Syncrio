@@ -789,7 +789,7 @@ namespace SyncrioServer
                 {
                     if (groups[groupName].members.Contains(client.playerName))
                     {
-                        Messages.ScenarioData.SendScenarioGroupModules(client, data);
+                        Messages.ScenarioData.SendScenarioModules(client, data);
                     }
                 }
             }
@@ -921,88 +921,135 @@ namespace SyncrioServer
 
             if (groups[groupName].members.Contains(player.playerName))
             {
-                Messages.ScenarioData.SendScenarioGroupModules(player, data);
+                Messages.ScenarioData.SendScenarioModules(player, data);
             }
         }
 
-        public void ResetScenario(ClientObject callingClient, byte[] messageData)
+        public void ScenarioSendAllData(ClientObject player)
         {
-            using (MessageReader mr = new MessageReader(messageData))
-            {
-                bool isInGroup = mr.Read<bool>();
-                if (isInGroup)
-                {
-                    string groupName = mr.Read<string>();
+            List<byte[]> data = new List<byte[]>();
 
-                    string thisGroupDirectory = Path.Combine(groupDirectory, groupName);
-                    string groupScenariosThisGroupDirectory = Path.Combine(groupScenariosDirectory, groupName);
-                    string thisGroupScenarioDirectory = Path.Combine(groupScenariosThisGroupDirectory, "Subspace0", "Scenario");
-                    if (Directory.Exists(thisGroupDirectory))
-                    {
-                        if (Directory.Exists(thisGroupScenarioDirectory))
-                        {
-                            if (Directory.GetFiles(thisGroupScenarioDirectory).Length > 0)
-                            {
-                                foreach (string file in Directory.GetFiles(thisGroupScenarioDirectory))
-                                {
-                                    File.Delete(file);
-                                }
-                            }
-                            if (Directory.GetFiles(groupInitialScenarioDirectory).Length > 0)
-                            {
-                                foreach (string file in Directory.GetFiles(groupInitialScenarioDirectory))
-                                {
-                                    File.Copy(file, Path.Combine(thisGroupScenarioDirectory, Path.GetFileName(file)));
-                                }
-                                GroupSystem.fetch.sendResetGroupScenario(groupName, callingClient);
-                            }
-                            else
-                            {
-                                SyncrioLog.Debug("Group Initial Scenario directory is empty, can not reset the scenario!");
-                            }
-                        }
-                        else
-                        {
-                            SyncrioLog.Debug("Group Scenario directory doesn't exist, can not reset the scenario!");
-                        }
-                    }
-                    else
-                    {
-                        SyncrioLog.Debug("Group directory doesn't exist, can not reset the scenario!");
-                    }
-                }
-                else
-                {
-                    string thisPlayerDirectory = Path.Combine(playerDirectory, callingClient.playerName);
-                    if (Directory.Exists(thisPlayerDirectory))
-                    {
-                        if (Directory.GetFiles(thisPlayerDirectory).Length > 0)
-                        {
-                            foreach (string file in Directory.GetFiles(thisPlayerDirectory))
-                            {
-                                File.Delete(file);
-                            }
-                        }
-                        if (Directory.GetFiles(playerInitialScenarioDirectory).Length > 0)
-                        {
-                            foreach (string file in Directory.GetFiles(playerInitialScenarioDirectory))
-                            {
-                                File.Copy(file, Path.Combine(thisPlayerDirectory, Path.GetFileName(file)));
-                            }
-                            Messages.ScenarioData.SendScenarioModules(callingClient);
-                            Messages.Chat.SendChatMessageToClient(callingClient, "You have reset your scenario!");
-                        }
-                        else
-                        {
-                            SyncrioLog.Debug("Player Initial Scenario directory is empty, can not reset the scenario!");
-                        }
-                    }
-                    else
-                    {
-                        SyncrioLog.Debug("Player directory doesn't exist, can not reset the scenario!");
-                    }
-                }
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, player.playerName);
+            string scenarioFolder = Path.Combine(playerFolder, "Scenario");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
             }
+
+            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+            if (File.Exists(filePath))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Contracts");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+            }
+
+            string filePath2 = Path.Combine(scenarioFolder, "Waypoints.txt");
+
+            if (File.Exists(filePath2))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Waypoints");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
+            }
+
+            string filePath3 = Path.Combine(scenarioFolder, "Currency.txt");
+
+            if (File.Exists(filePath3))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Currency");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath3));
+            }
+
+            string filePath4 = Path.Combine(scenarioFolder, "BuildingLevel.txt");
+
+            if (File.Exists(filePath4))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("BuildingLevel");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath4));
+            }
+
+            string filePath5 = Path.Combine(scenarioFolder, "BuildingDead.txt");
+
+            if (File.Exists(filePath5))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("BuildingDead");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath5));
+            }
+
+            string filePath6 = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+
+            if (File.Exists(filePath6))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("BuildingAlive");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath6));
+            }
+
+            string filePath7 = Path.Combine(scenarioFolder, "Progress.txt");
+
+            if (File.Exists(filePath7))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Progress");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath7));
+            }
+
+            string filePath8 = Path.Combine(scenarioFolder, "Tech.txt");
+
+            if (File.Exists(filePath8))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Tech");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath8));
+            }
+
+            string filePath9 = Path.Combine(scenarioFolder, "ScienceRecieved.txt");
+
+            if (File.Exists(filePath9))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("ScienceRecieved");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath9));
+            }
+
+            string filePath10 = Path.Combine(scenarioFolder, "Parts.txt");
+
+            if (File.Exists(filePath10))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Parts");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath10));
+            }
+
+            string filePath11 = Path.Combine(scenarioFolder, "Upgrades.txt");
+
+            if (File.Exists(filePath11))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Upgrades");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
+            }
+
+            Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
+
+            Messages.ScenarioData.SendScenarioModules(player, data);
         }
 
         private void ScenarioSetWeights(List<string> weights, string groupName)

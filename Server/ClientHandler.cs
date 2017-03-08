@@ -701,9 +701,6 @@ namespace SyncrioServer
                     case ClientMessageType.SEND_VESSELS:
                         Messages.Vessel.HandleVessels(client, message.data);
                         break;
-                    case ClientMessageType.RESET_SCENARIO:
-                        ScenarioSystem.fetch.ResetScenario(client, message.data);
-                        break;
                     case ClientMessageType.MOD_DATA:
                         Messages.ModData.HandleModDataMessage(client, message.data);
                         break;

@@ -66,8 +66,7 @@ namespace SyncrioServer.Messages
                 mw.Write<int>(numberOfServerKerbals);
                 mw.Write<int>(Settings.settingsStore.numberOfKerbals);
                 //Send scenario settings
-                mw.Write<bool>(Settings.specialSettingsStore.nonGroupScenarios); 
-                mw.Write<bool>(Settings.specialSettingsStore.canResetScenario);
+                mw.Write<bool>(Settings.specialSettingsStore.nonGroupScenarios);
                 mw.Write<int>(Settings.settingsStore.screenshotHeight);
                 mw.Write<string>(Settings.settingsStore.consoleIdentifier);
                 mw.Write<int>((int)Settings.settingsStore.gameDifficulty);
