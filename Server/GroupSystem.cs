@@ -193,10 +193,10 @@ namespace SyncrioServer
                                 newGroup.privacy = (GroupPrivacy)Enum.Parse(typeof(GroupPrivacy), currentLine);
                                 break;
                             case 1:
-                                newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine);
+                                newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine, ScenarioSystem.english);
                                 break;
                             case 2:
-                                newGroup.settings.progressPublic = Convert.ToBoolean(currentLine);
+                                newGroup.settings.progressPublic = Convert.ToBoolean(currentLine, ScenarioSystem.english);
                                 break;
                             case 3:
                                 newGroup.passwordSalt = currentLine;

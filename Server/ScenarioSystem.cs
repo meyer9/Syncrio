@@ -43,6 +43,7 @@
 
 
 using System;
+using System.Globalization;
 using System.IO;
 using System.Xml;
 using System.Collections.Generic;
@@ -60,7 +61,9 @@ namespace SyncrioServer
         public static SubspacesList subspaceList = new SubspacesList();
         public static List<int> subspacesToMerge = new List<int>();
         public static object subspaceListLock = new object();
-        
+
+        public static CultureInfo english = new CultureInfo("en-US");
+
         //Directories
         public string groupDirectory
         {
@@ -1603,7 +1606,7 @@ namespace SyncrioServer
             {
                 List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
 
-                oldList[0] = Convert.ToString(value);
+                oldList[0] = Convert.ToString(value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
@@ -1611,11 +1614,11 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
 
-                newList[0] = Convert.ToString(Convert.ToDouble(newList[0]) + value);
+                newList[0] = Convert.ToString(Convert.ToDouble(newList[0], english) + value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -1638,7 +1641,7 @@ namespace SyncrioServer
             {
                 List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
 
-                oldList[0] = Convert.ToString(value);
+                oldList[0] = Convert.ToString(value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
@@ -1646,11 +1649,11 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
 
-                newList[0] = Convert.ToString(Convert.ToDouble(newList[0]) + value);
+                newList[0] = Convert.ToString(Convert.ToDouble(newList[0], english) + value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -1679,7 +1682,7 @@ namespace SyncrioServer
             {
                 List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
 
-                oldList[type] = Convert.ToString(value);
+                oldList[type] = Convert.ToString(value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
@@ -1687,11 +1690,11 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
 
-                newList[type] = Convert.ToString(Convert.ToSingle(newList[type]) + value);
+                newList[type] = Convert.ToString(Convert.ToSingle(newList[type], english) + value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -1719,7 +1722,7 @@ namespace SyncrioServer
             {
                 List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
 
-                oldList[type] = Convert.ToString(value);
+                oldList[type] = Convert.ToString(value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
@@ -1727,11 +1730,11 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
-                newList.Add(Convert.ToString(0));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
+                newList.Add(Convert.ToString(0, english));
 
-                newList[type] = Convert.ToString(Convert.ToSingle(newList[type]) + value);
+                newList[type] = Convert.ToString(Convert.ToSingle(newList[type], english) + value, english);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -1758,7 +1761,7 @@ namespace SyncrioServer
 
                 if (cursor != -1)
                 {
-                    if (Convert.ToInt32(oldList[cursor].Substring(startString.Length)) < level)
+                    if (Convert.ToInt32(oldList[cursor].Substring(startString.Length), english) < level)
                     {
                         oldList[cursor] = startString + level.ToString();
                     }
@@ -1784,7 +1787,7 @@ namespace SyncrioServer
 
                 if (cursor != -1)
                 {
-                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length)) < level)
+                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length), english) < level)
                     {
                         newList[cursor] = startString + level.ToString();
                     }
@@ -1822,7 +1825,7 @@ namespace SyncrioServer
 
                 if (cursor != -1)
                 {
-                    if (Convert.ToInt32(oldList[cursor].Substring(startString.Length)) < level)
+                    if (Convert.ToInt32(oldList[cursor].Substring(startString.Length), english) < level)
                     {
                         oldList[cursor] = startString + level.ToString();
                     }
@@ -1848,7 +1851,7 @@ namespace SyncrioServer
 
                 if (cursor != -1)
                 {
-                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length)) < level)
+                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length), english) < level)
                     {
                         newList[cursor] = startString + level.ToString();
                     }
@@ -2488,7 +2491,7 @@ namespace SyncrioServer
                 {
                     oldList.Add("Sci : " + sciID);
 
-                    oldList.Add("Value : " + Convert.ToString(dataValue));
+                    oldList.Add("Value : " + Convert.ToString(dataValue, english));
 
                     oldList.Add("SciNode");
                     oldList.Add("{");
@@ -2501,7 +2504,7 @@ namespace SyncrioServer
                 {
                     int index = oldList.FindIndex(i => i == "Sci : " + sciID);
 
-                    oldList[index + 1] = "Value : " + Convert.ToString(dataValue);
+                    oldList[index + 1] = "Value : " + Convert.ToString(dataValue, english);
 
                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 3);
                     KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
@@ -2519,7 +2522,7 @@ namespace SyncrioServer
 
                 newList.Add("Sci : " + sciID);
 
-                newList.Add("Value : " + Convert.ToString(dataValue));
+                newList.Add("Value : " + Convert.ToString(dataValue, english));
 
                 newList.Add("SciNode");
                 newList.Add("{");
@@ -2549,7 +2552,7 @@ namespace SyncrioServer
                 {
                     oldList.Add("Sci : " + sciID);
 
-                    oldList.Add("Value : " + Convert.ToString(dataValue));
+                    oldList.Add("Value : " + Convert.ToString(dataValue, english));
 
                     oldList.Add("SciNode");
                     oldList.Add("{");
@@ -2562,7 +2565,7 @@ namespace SyncrioServer
                 {
                     int index = oldList.FindIndex(i => i == "Sci : " + sciID);
 
-                    oldList[index + 1] = "Value : " + Convert.ToString(dataValue);
+                    oldList[index + 1] = "Value : " + Convert.ToString(dataValue, english);
 
                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 3);
                     KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
@@ -2580,7 +2583,7 @@ namespace SyncrioServer
 
                 newList.Add("Sci : " + sciID);
 
-                newList.Add("Value : " + Convert.ToString(dataValue));
+                newList.Add("Value : " + Convert.ToString(dataValue, english));
 
                 newList.Add("SciNode");
                 newList.Add("{");
