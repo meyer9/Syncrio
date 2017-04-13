@@ -43,6 +43,7 @@
 
 
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -90,6 +91,8 @@ namespace SyncrioClientSide
         // Server setting
         public GameDifficulty serverDifficulty;
         public GameParameters serverParameters;
+
+        public static CultureInfo english = new CultureInfo("en-US");
 
         public Client()
         {

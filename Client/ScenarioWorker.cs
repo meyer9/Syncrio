@@ -43,7 +43,6 @@
 
 
 using System;
-using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -71,8 +70,6 @@ namespace SyncrioClientSide
         private delegate bool AddCrewMemberToRosterDelegate(ProtoCrewMember pcm);
 
         private AddCrewMemberToRosterDelegate AddCrewMemberToRoster;
-
-        public static CultureInfo english = new CultureInfo("en-US");
 
         public static ScenarioWorker fetch
         {
@@ -449,15 +446,15 @@ namespace SyncrioClientSide
                             {
                                 if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
-                                    double fundsAmount = Convert.ToDouble(dataList[0], english);
+                                    double fundsAmount = Convert.ToDouble(dataList[0], Client.english);
                                     double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
                                     Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
 
-                                    float repAmount = Convert.ToSingle(dataList[1], english);
+                                    float repAmount = Convert.ToSingle(dataList[1], Client.english);
                                     float repAmountDiff = repAmount - Reputation.Instance.reputation;
                                     Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
 
-                                    float sciAmount = Convert.ToSingle(dataList[2], english);
+                                    float sciAmount = Convert.ToSingle(dataList[2], Client.english);
                                     float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
                                     ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
                                 }
@@ -465,7 +462,7 @@ namespace SyncrioClientSide
                                 {
                                     if (HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
                                     {
-                                        float sciAmount = Convert.ToSingle(dataList[2], english);
+                                        float sciAmount = Convert.ToSingle(dataList[2], Client.english);
                                         float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
                                         ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
                                     }
@@ -487,7 +484,7 @@ namespace SyncrioClientSide
                                             string id = subData[0].Trim();
                                             string level = subData[1].Trim();
 
-                                            facility.SetLevel(Convert.ToInt32(level, english));
+                                            facility.SetLevel(Convert.ToInt32(level, Client.english));
                                         }
                                     }
                                 }
@@ -763,7 +760,7 @@ namespace SyncrioClientSide
 
                                         string[] split2 = dataList[looped + 1].Split(':');
                                         string start2 = split2[0].Trim();
-                                        float dataAmount = Convert.ToSingle(split2[1].Trim(), english);
+                                        float dataAmount = Convert.ToSingle(split2[1].Trim(), Client.english);
 
                                         int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 3);
                                         KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));

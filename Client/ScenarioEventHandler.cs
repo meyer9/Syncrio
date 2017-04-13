@@ -494,7 +494,7 @@ namespace SyncrioClientSide
 
                 if (!string.IsNullOrEmpty(groupName))
                 {
-                    if (!LockSystem.fetch.LockIsOurs("contract-spawn-" + groupName))
+                    if (!LockSystem.fetch.LockIsOurs(string.Format(Client.english, "contract-spawn-{0}", groupName)))
                     {
                         contract.Kill();
                     }

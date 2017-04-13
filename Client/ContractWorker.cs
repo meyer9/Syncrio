@@ -53,12 +53,12 @@ namespace SyncrioClientSide
                     if (!string.IsNullOrEmpty(groupName))
                     {
                         //Try to acquire the contract-spawn lock for our group if nobody else has it.
-                        if (!LockSystem.fetch.LockExists("contract-spawn-" + groupName) && !sentRequest)
+                        if (!LockSystem.fetch.LockExists(string.Format(Client.english, "contract-spawn-{0}", groupName)) && !sentRequest)
                         {
                             sentRequest = true;
                             lastRequest = UnityEngine.Time.realtimeSinceStartup;
 
-                            LockSystem.fetch.AcquireLock("contract-spawn-" + groupName, false);
+                            LockSystem.fetch.AcquireLock(string.Format(Client.english, "contract-spawn-{0}", groupName), false);
                         }
 
                         if (sentRequest)

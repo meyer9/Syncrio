@@ -621,7 +621,7 @@ namespace SyncrioClientSide
                     List<string> groupProgressList = new List<string>(mr.Read<string[]>());
 
                     string groupName = groupProgressList[0];
-                    int groupSubspace = Convert.ToInt32(groupProgressList[1], ScenarioWorker.english);
+                    int groupSubspace = Convert.ToInt32(groupProgressList[1], Client.english);
 
                     string funds = groupProgressList[2];
                     string rep = groupProgressList[3];
