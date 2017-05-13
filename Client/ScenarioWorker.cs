@@ -387,8 +387,30 @@ namespace SyncrioClientSide
                         {
                             if (name[0] == "Contracts")
                             {
-                                List<Contracts.Contract> realContracts = new List<Contracts.Contract>();
-                                List<Contracts.Contract> completeContracts = new List<Contracts.Contract>();
+                                ConfigNode ContractCFG = new ConfigNode();
+
+                                Contracts.ContractSystem.Instance.Save(ContractCFG);
+
+                                List<string> contractData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ContractCFG));
+
+                                int index = 0;
+                                while (index < contractData.Count)
+                                {
+                                    if (contractData[index] == "CONTRACTS" && contractData[index + 1] == "{")
+                                    {
+                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(contractData, index + 1);
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index + 1));
+
+                                        contractData.RemoveRange(range.Key, range.Value);
+                                    }
+                                    else
+                                    {
+                                        index++;
+                                    }
+                                }
+
+                                contractData.Add("CONTRACTS");
+                                contractData.Add("{");
 
                                 int looped = 0;
                                 while (looped < dataList.Count)
@@ -396,28 +418,13 @@ namespace SyncrioClientSide
                                     if (dataList[looped] == "ContractNode")
                                     {
                                         int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped + 1));
 
                                         if (range.Key + 2 < dataList.Count && range.Value - 3 > 0)
                                         {
-                                            List<string> contract = dataList.GetRange(range.Key + 2, range.Value - 3);
+                                            contractData.AddRange(dataList.GetRange(range.Key + 2, range.Value - 3));
 
                                             dataList.RemoveRange(range.Key, range.Value);
-
-                                            ConfigNode contractCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(contract));
-
-                                            Contracts.Contract trueContract = new Contracts.Contract();
-
-                                            Contracts.Contract.Load(trueContract, contractCFG);
-
-                                            if (!trueContract.Complete())
-                                            {
-                                                realContracts.Add(trueContract);
-                                            }
-                                            else
-                                            {
-                                                completeContracts.Add(trueContract);
-                                            }
                                         }
                                         else
                                         {
@@ -429,12 +436,29 @@ namespace SyncrioClientSide
                                         looped++;
                                     }
                                 }
+                                
+                                contractData.Add("}");
 
-                                Contracts.ContractSystem.Instance.ClearContractsCurrent();
-                                Contracts.ContractSystem.Instance.ClearContractsFinished();
+                                if (!File.Exists(Path.Combine(KSPUtil.ApplicationRootPath, "dataDump.txt")))
+                                {
+                                    File.WriteAllLines(Path.Combine(KSPUtil.ApplicationRootPath, "dataDump.txt"), contractData.ToArray());
+                                }
 
-                                Contracts.ContractSystem.Instance.Contracts.AddRange(realContracts);
-                                Contracts.ContractSystem.Instance.ContractsFinished.AddRange(completeContracts);
+                                ContractCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(contractData));
+
+                                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                int idx = psmLocked.FindIndex(i => i.moduleName == "ContractSystem");
+
+                                if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                {
+                                    ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
+                                }
+
+                                psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(ContractCFG);
+                                psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                HighLogic.CurrentGame.scenarios = psmLocked;
                             }
 
                             if (name[0] == "Waypoints")
@@ -739,7 +763,7 @@ namespace SyncrioClientSide
                                     if (sciData[index] == "Science" && sciData[index + 1] == "{")
                                     {
                                         int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(sciData, index + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index + 1));
 
                                         sciData.RemoveRange(range.Key, range.Value);
                                     }
@@ -763,7 +787,7 @@ namespace SyncrioClientSide
                                         float dataAmount = Convert.ToSingle(split2[1].Trim());
 
                                         int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 3);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped));
+                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped + 1));
 
                                         if (range.Key + 4 < dataList.Count && range.Value - 5 > 0)
                                         {
@@ -802,8 +826,6 @@ namespace SyncrioClientSide
                                 psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
 
                                 HighLogic.CurrentGame.scenarios = psmLocked;
-
-                                //ResearchAndDevelopment.Instance.Load(RnDCFG);
                             }
                         }
                         catch (Exception e)
