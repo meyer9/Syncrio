@@ -56,7 +56,6 @@ namespace SyncrioServer
     public class Settings
     {
         private static ConfigParser<SettingsStore> serverSettings;
-        private static ConfigParser<SpecialSettingsStore> specialSettings;
         public static SettingsStore settingsStore
         {
             get
@@ -64,30 +63,20 @@ namespace SyncrioServer
                 return serverSettings.Settings;
             }
         }
-        public static SpecialSettingsStore specialSettingsStore
-        {
-            get
-            {
-                return specialSettings.Settings;
-            }
-        }
 
         public static void Reset()
         {
             serverSettings = new ConfigParser<SettingsStore>(new SettingsStore(), Path.Combine(Server.configDirectory, "Settings.txt"));
-            specialSettings = new ConfigParser<SpecialSettingsStore>(new SpecialSettingsStore(), Path.Combine(Server.configDirectory, "SpecialSettings.txt"));
         }
 
         public static void Load()
         {
             serverSettings.LoadSettings();
-            specialSettings.LoadSettings();
         }
 
         public static void Save()
         {
             serverSettings.SaveSettings();
-            specialSettings.SaveSettings();
         }
 
         private static void CheckForCareerMode()
@@ -112,6 +101,8 @@ namespace SyncrioServer
         public GameMode gameMode = GameMode.CAREER;
         [Description("Specify the gameplay difficulty of the server.")]
         public GameDifficulty gameDifficulty = GameDifficulty.NORMAL;
+        [Description("Enable DarkMultiPlayer Cooperative Mode.\n# WARNING: If disabled Syncrio will not work with DarkMultiPlayer!\n# WARNING: If enabled it Must be enabled on the client side as well!\n# This mode will turn off the functions (on the Syncrio side) that both Syncrio and DarkMultiPlayer have.\n# This speeds up the KSP and the Syncrio server by removing the duplicate functions.")]
+        public bool DarkMultiPlayerCoopMode = false;
         [Description("Enable white-listing.")]
         public bool whitelisted = false;
         [Description("Enable mod control.\n# WARNING: Only consider turning off mod control for private servers and you know all players will have the same mods installed.\n# The game will constantly complain about missing parts if there are missing mods.")]
@@ -140,6 +131,10 @@ namespace SyncrioServer
         public int maxPlayers = 20;
         [Description("Maximum amount of player scenario groups that can be exist on the server.")]
         public int maxGroups = 15;
+        [Description("Minimum % of kick votes that has to be sent to kick a player from a group.\n# -Note! Any keep votes sent will lower the % of kick votes sent.\n# -Note! The leader of the group has ultimate power over the vote system and can instantly kick a player, but can't vote to keep the player and is excluded from the vote count.\n# -Note! Enter a number from 0 to 100, 100 is ok to enter, but 0 is not. Do not enter 0!\n# -Note! The number will be divided by 100.")]
+        public int groupKickPlayerVotesThreshold = 75;
+        [Description("Specify if players can have saved scenarios when they're not in a group.\n# -Note! If false, any player who is not in a group will not have their scenario saved.")]
+        public bool nonGroupScenarios = false;
         [Description("Specify a custom screenshot directory.\n#This directory must exist in order to be used. Leave blank to store it in Scenario Folder.")]
         public string screenshotDirectory = string.Empty;
         [Description("Specify the name that will appear when you send a message using the server's console.")]
@@ -156,13 +151,5 @@ namespace SyncrioServer
 
     public class SpecialSettingsStore
     {
-        [Description("Enable DarkMultiPlayer Cooperative Mode.\n# WARNING: If disabled Syncrio will not work with DarkMultiPlayer!\n# WARNING: If enabled it Must be enabled on the client side as well!\n# This mode will turn off the functions (on the Syncrio side) that both Syncrio and DarkMultiPlayer have.\n# This speeds up the KSP and the Syncrio server by removing the duplicate functions.")]
-        public bool DarkMultiPlayerCoopMode = false;
-        [Description("Specify if groups with public progress are to show all progress or just the progress count.")]
-        public bool showAllGroupProgress = false;
-        [Description("Minimum % of kick votes that has to be sent to kick a player from a group.\n# -Note! Any keep votes sent will lower the % of kick votes sent.\n# -Note! The leader of the group has ultimate power over the vote system and can instantly kick a player, but can't vote to keep the player and is excluded from the vote count.\n# -Note! Enter a number from 0 to 100, 100 is ok to enter, but 0 is not. Do not enter 0!\n# -Note! The number will be divided by 100.")]
-        public int groupKickPlayerVotesThreshold = 75;
-        [Description("Specify if players can have saved scenarios when they're not in a group.\n# -Note! If false, any player who is not in a group will not have their scenario saved.")]
-        public bool nonGroupScenarios = true;
     }
 }

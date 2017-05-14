@@ -195,7 +195,6 @@ namespace SyncrioServer.Messages
                 }
                 mw.Write<string[]>(group.members.ToArray());
                 mw.Write<bool>(group.settings.inviteAvailable);
-                mw.Write<bool>(group.settings.progressPublic);
                 returnBytes = mw.GetMessageBytes();
             }
             return returnBytes;
