@@ -226,7 +226,9 @@ namespace SyncrioClientSide
                         SyncrioLog.Debug("Starting Game!");
                         Client.fetch.status = "Starting game";
                         state = ClientState.STARTING;
-                        Client.fetch.startGame = true;
+                        //Client.fetch.startGame = true;
+
+                        Client.fetch.StartGame();
                     }
                     else
                     {

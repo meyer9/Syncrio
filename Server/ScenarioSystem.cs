@@ -1047,8 +1047,6 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
             }
 
-            Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
-
             Messages.ScenarioData.SendScenarioModules(player, data);
         }
 

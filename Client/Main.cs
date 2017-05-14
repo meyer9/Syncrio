@@ -58,7 +58,7 @@ namespace SyncrioClientSide
         private static Client singleton;
         //Global state vars
         public string status;
-        public bool startGame;
+        //public bool startGame;
         public bool forceQuit;
         public bool showGUI = true;
         public bool toolbarShowGUI = true;
@@ -498,11 +498,13 @@ namespace SyncrioClientSide
                     madeItToSpaceCenter = false;
                 }
 
+                /*
                 if (startGame)
                 {
                     startGame = false;
                     StartGame();
                 }
+                */
             }
             catch (Exception e)
             {
@@ -597,7 +599,7 @@ namespace SyncrioClientSide
             Profiler.guiData.ReportTime(startClock);
         }
 
-        private void StartGame()
+        internal void StartGame()
         {
             //Create new game object for our Syncrio session.
             HighLogic.CurrentGame = CreateBlankGame();
