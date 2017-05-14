@@ -510,7 +510,7 @@ namespace SyncrioServer
                     string groupName = mr.Read<string>();
                     string playerName = mr.Read<string>();
                     string groupPassword = mr.Read<string>();
-                    bool passwordCorrect = CheckGroupPasswordRaw(groupName, groupPassword);
+                    bool passwordIncorrect = CheckGroupPasswordRaw(groupName, groupPassword);
                     if (!GroupExists(groupName))
                     {
                         string errorText = "Cannot join group " + groupName + ", Group does not exist";
@@ -532,7 +532,7 @@ namespace SyncrioServer
                         Messages.Chat.SendChatMessageToClient(callingClient, errorText);
                         return false;
                     }
-                    if (passwordCorrect)
+                    if (passwordIncorrect)
                     {
                         string errorText = "Incorrect Password!";
                         SyncrioLog.Debug(errorText);

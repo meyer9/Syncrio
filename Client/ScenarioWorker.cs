@@ -46,6 +46,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Threading;
 using UnityEngine;
 using SyncrioCommon;
 using MessageStream2;
@@ -335,11 +336,31 @@ namespace SyncrioClientSide
 
         public void LoadBaseScenarioData()
         {
+            if (ResearchAndDevelopment.Instance == null || (HighLogic.CurrentGame.Mode == Game.Modes.CAREER && Contracts.ContractSystem.Instance == null) || ProgressTracking.Instance == null)
+            {
+                int timeoutCounter = 0;
+
+                while ((ResearchAndDevelopment.Instance == null || (HighLogic.CurrentGame.Mode == Game.Modes.CAREER && Contracts.ContractSystem.Instance == null) || ProgressTracking.Instance == null) && timeoutCounter != 40)
+                {
+                    timeoutCounter += 1;
+
+                    Thread.Sleep(50);
+                }
+            }
+
             if (baseData.Count > 0)
             {
+                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
+                {
+                    Contracts.ContractSystem.Instance.ClearContractsCurrent();
+                    Contracts.ContractSystem.Instance.ClearContractsFinished();
+                }
+
                 LoadScenarioData(baseData);
                 baseData = new List<byte[]>();
             }
+
+            ScenarioEventHandler.fetch.delaySync = false;
         }
 
         public void LoadScenarioData(List<byte[]> data)
@@ -348,6 +369,7 @@ namespace SyncrioClientSide
             {
                 if (Client.fetch.gameRunning && HighLogic.LoadedScene != GameScenes.LOADING)
                 {
+                    /*
                     if (ResearchAndDevelopment.Instance == null)
                     {
                         ResearchAndDevelopment.Instance = new ResearchAndDevelopment();
@@ -370,9 +392,12 @@ namespace SyncrioClientSide
                                 }
                             }
                         }
+
+                        ResearchAndDevelopment.Instance.targetScenes = new List<GameScenes>() { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER, GameScenes.EDITOR };
                         
                         ResearchAndDevelopment.Instance.Start();
                     }
+                    */
 
                     isSyncing = true;
                     ScenarioEventHandler.fetch.startCooldown = true;

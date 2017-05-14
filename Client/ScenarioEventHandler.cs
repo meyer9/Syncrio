@@ -38,6 +38,7 @@ namespace SyncrioClientSide
         private float syncCooldown = 0.2f;
         public bool cooldown = false;
         public bool startCooldown = false;
+        public bool delaySync = true;
 
         public static ScenarioEventHandler fetch
         {
@@ -417,7 +418,7 @@ namespace SyncrioClientSide
         
         private void OnContractUpdatedWithWeights(Contracts.Contract contract)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -521,7 +522,7 @@ namespace SyncrioClientSide
 
         private void OnContractUpdated(Contracts.Contract contract)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -611,7 +612,7 @@ namespace SyncrioClientSide
 
         private void OnContractOffered(Contracts.Contract contract)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -703,7 +704,7 @@ namespace SyncrioClientSide
 
         private void OnContractParameterChange(Contracts.Contract contract, Contracts.ContractParameter param)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -793,7 +794,7 @@ namespace SyncrioClientSide
 
         private void OnCustomWaypointLoad(GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode> waypoint)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -850,7 +851,7 @@ namespace SyncrioClientSide
 
         private void OnCustomWaypointSave(GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode> waypoint)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -915,7 +916,7 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -968,7 +969,7 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1021,7 +1022,7 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1066,7 +1067,7 @@ namespace SyncrioClientSide
 
         private void OnKSCFacilityUpgraded(Upgradeables.UpgradeableFacility facility, int level)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1115,7 +1116,7 @@ namespace SyncrioClientSide
 
         private void OnKSCStructureCollapsed(DestructibleBuilding building)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1160,7 +1161,7 @@ namespace SyncrioClientSide
 
         private void OnKSCStructureRepaired(DestructibleBuilding building)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1205,7 +1206,7 @@ namespace SyncrioClientSide
 
         private void OnPartPurchased(AvailablePart part)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1252,7 +1253,7 @@ namespace SyncrioClientSide
 
         private void OnPartUpgradePurchased(PartUpgradeHandler.Upgrade upgrade)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1299,7 +1300,7 @@ namespace SyncrioClientSide
 
         private void OnProgressComplete(ProgressNode pn)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1356,7 +1357,7 @@ namespace SyncrioClientSide
 
         private void OnTechnologyResearched(GameEvents.HostTargetAction<RDTech, RDTech.OperationResult> tech)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1430,7 +1431,7 @@ namespace SyncrioClientSide
 
         private void OnScienceRecieved(float dataValue, ScienceSubject subject, ProtoVessel vessel, bool reverseEngineered)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1525,6 +1526,7 @@ namespace SyncrioClientSide
                 }
                 singleton = new ScenarioEventHandler();
                 Client.updateEvent.Add(singleton.Update);
+                singleton.delaySync = true;
             }
         }
 
