@@ -579,8 +579,6 @@ namespace SyncrioClientSide
             //Group window: 7714
             //Group Become Leader window: 7715
             //Group Invite Player window: 7716
-            //7717 not in use.
-            //Group Progress window: 7718
             long startClock = Profiler.SyncrioReferenceTime.ElapsedTicks;
             if (showGUI && toolbarShowGUI)
             {

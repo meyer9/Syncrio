@@ -258,7 +258,7 @@ namespace SyncrioServer.Messages
                 Server.playerCount = ClientHandler.GetActiveClientCount();
                 Server.players = ClientHandler.GetActivePlayerNames();
                 SyncrioLog.Debug("Online players is now: " + Server.playerCount + ", connected: " + ClientHandler.GetClients().Length);
-                if (Settings.specialSettingsStore.DarkMultiPlayerCoopMode)
+                if (Settings.settingsStore.DarkMultiPlayerCoopMode)
                 {
                     //Bug Fix
                     Messages.ServerSettings.SendServerSettings(client);

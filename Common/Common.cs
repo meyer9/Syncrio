@@ -61,7 +61,7 @@ namespace SyncrioCommon
         //Split messages into 8kb chunks to higher priority messages have more injection points into the TCP stream.
         public const int SPLIT_MESSAGE_LENGTH = 8192;
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
-        public const int PROTOCOL_VERSION = 46;
+        public const int PROTOCOL_VERSION = 47;
         //Program version. This is written in the build scripts.
         public const string PROGRAM_VERSION = "v0.9.0.0";
         //Mod control version - The last version to add parts
@@ -610,7 +610,6 @@ namespace SyncrioCommon
         PLAYER_JOIN,
         PLAYER_DISCONNECT,
         SCENARIO_DATA,
-        AUTO_SEND_GROUP_PROGRESS,
         SEND_VESSELS,
         CREATE_GROUP_REPLY,
         CREATE_GROUP_ERROR,
@@ -841,7 +840,6 @@ namespace SyncrioCommon
     public class GroupSettings
     {
         public bool inviteAvailable;
-        public bool progressPublic;
         //Put any additional settings here.
     }
 

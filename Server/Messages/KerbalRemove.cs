@@ -56,7 +56,7 @@ namespace SyncrioServer.Messages
     {
         public static void HandleKerbalRemoval(ClientObject client, byte[] messageData)
         {
-            if (!Settings.specialSettingsStore.DarkMultiPlayerCoopMode)
+            if (!Settings.settingsStore.DarkMultiPlayerCoopMode)
             {
                 using (MessageReader mr = new MessageReader(messageData))
                 {

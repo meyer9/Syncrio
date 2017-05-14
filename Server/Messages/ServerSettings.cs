@@ -58,15 +58,14 @@ namespace SyncrioServer.Messages
             newMessage.type = ServerMessageType.SERVER_SETTINGS;
             using (MessageWriter mw = new MessageWriter())
             {
-                mw.Write<bool>(Settings.specialSettingsStore.DarkMultiPlayerCoopMode);
+                mw.Write<bool>(Settings.settingsStore.DarkMultiPlayerCoopMode);
                 mw.Write<int>((int)Settings.settingsStore.gameMode);
                 mw.Write<bool>(Settings.settingsStore.cheats);
-                mw.Write<bool>(Settings.specialSettingsStore.showAllGroupProgress);
                 //Tack the amount of Server kerbals and the amount of kerbals allowed onto this message
                 mw.Write<int>(numberOfServerKerbals);
                 mw.Write<int>(Settings.settingsStore.numberOfKerbals);
                 //Send scenario settings
-                mw.Write<bool>(Settings.specialSettingsStore.nonGroupScenarios);
+                mw.Write<bool>(Settings.settingsStore.nonGroupScenarios);
                 mw.Write<int>(Settings.settingsStore.screenshotHeight);
                 mw.Write<string>(Settings.settingsStore.consoleIdentifier);
                 mw.Write<int>((int)Settings.settingsStore.gameDifficulty);

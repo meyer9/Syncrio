@@ -160,10 +160,10 @@ namespace SyncrioClientSide.Utilities
 
             if ((incompatible.Length > 0) || (incompatibleUnity.Length > 0))
             {
-				PopupDialog.SpawnPopupDialog (new Vector2 (0, 0), new Vector2 (float.PositiveInfinity, float.PositiveInfinity), "Incompatible Mods Detected", message, "OK", true, HighLogic.UISkin);
+                PopupDialog.SpawnPopupDialog(new Vector2(0, 0), new Vector2(float.PositiveInfinity, float.PositiveInfinity), "Incompatible Mods Detected", message, "OK", true, HighLogic.UISkin);
             }
         }
-
+        
         private static IEnumerable<Type> getAllTypes()
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())

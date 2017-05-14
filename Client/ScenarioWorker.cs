@@ -707,8 +707,6 @@ namespace SyncrioClientSide
                                                 ResearchAndDevelopment.Instance.UnlockProtoTechNode(ptNode);
 
                                                 ResearchAndDevelopment.Instance.SetTechState(tech, ptNode);
-
-                                                ResearchAndDevelopment.RefreshTechTreeUI();
                                             }
 
                                             dataList.RemoveRange(range.Key, range.Value);
