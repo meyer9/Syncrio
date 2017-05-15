@@ -184,10 +184,16 @@ namespace SyncrioClientSide
                 }
                 else
                 {
-                    if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
+                    if (HighLogic.CurrentGame != null)
                     {
-                        Contracts.ContractSystem.Instance.ClearContractsCurrent();
-                        Contracts.ContractSystem.Instance.ClearContractsFinished();
+                        if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
+                        {
+                            if (Contracts.ContractSystem.Instance != null)
+                            {
+                                Contracts.ContractSystem.Instance.ClearContractsCurrent();
+                                Contracts.ContractSystem.Instance.ClearContractsFinished();
+                            }
+                        }
                     }
                 }
             }
