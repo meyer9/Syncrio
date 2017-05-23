@@ -83,7 +83,7 @@ namespace SyncrioServer.Messages
                                 if (vesselList[cursor] == "Vessel" && vesselList[cursor + 1] == "{")
                                 {
                                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(vesselList, cursor + 1);
-                                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+                                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor) + 1);
 
                                     if (range.Key + 2 < vesselList.Count && range.Value - 3 > 0)
                                     {

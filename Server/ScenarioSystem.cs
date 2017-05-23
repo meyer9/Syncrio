@@ -466,7 +466,7 @@ namespace SyncrioServer
                                     }
                                 }
                                 break;
-                            case ScenarioDataType.PROGRESS_COMPLETE:
+                            case ScenarioDataType.PROGRESS_UPDATED:
                                 {
                                     string progressID = subDataReader.Read<string>();
                                     byte[] pnData = subDataReader.Read<byte[]>();
@@ -480,7 +480,7 @@ namespace SyncrioServer
                                         {
                                             ScenarioAddProgress(progressID, pnLines, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.PROGRESS_COMPLETE, callingClient);
+                                            ScenarioSendData(groupName, ScenarioDataType.PROGRESS_UPDATED, callingClient);
                                         }
                                     }
                                     else
@@ -565,6 +565,7 @@ namespace SyncrioServer
                         string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
                         string scenarioFolder = Path.Combine(groupFolder, "Scenario");
                         string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+                        string filePath2 = Path.Combine(scenarioFolder, "Weights.txt");
 
                         if (!Directory.Exists(scenarioFolder))
                         {
@@ -575,6 +576,14 @@ namespace SyncrioServer
                         {
                             List<string> tempList = new List<string>();
                             tempList.Add("Contracts");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+
+                        if (File.Exists(filePath2))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Weights");
                             data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
                             data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
                         }
@@ -714,7 +723,7 @@ namespace SyncrioServer
                         }
                     }
                     break;
-                case ScenarioDataType.PROGRESS_COMPLETE:
+                case ScenarioDataType.PROGRESS_UPDATED:
                     {
                         string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
                         string scenarioFolder = Path.Combine(groupFolder, "Scenario");
@@ -917,6 +926,16 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
             }
 
+            string filePath12 = Path.Combine(scenarioFolder, "Weights.txt");
+
+            if (File.Exists(filePath12))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Weights");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath12));
+            }
+
             Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
 
             if (groups[groupName].members.Contains(player.playerName))
@@ -1047,6 +1066,16 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
             }
 
+            string filePath12 = Path.Combine(scenarioFolder, "Weights.txt");
+
+            if (File.Exists(filePath12))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Weights");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath12));
+            }
+
             Messages.ScenarioData.SendScenarioModules(player, data);
         }
 
@@ -1110,7 +1139,7 @@ namespace SyncrioServer
                         {
                             int tempIndex = oldIndex - looped;
                             int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
 
                             if (range.Key + 2 < oldList.Count && range.Value - 3 > 0)
                             {
@@ -1153,7 +1182,7 @@ namespace SyncrioServer
                         {
                             int tempIndex = oldIndex - looped;
                             int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, tempIndex + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
 
                             if (range.Key + 2 < newList.Count && range.Value - 3 > 0)
                             {
@@ -1208,7 +1237,7 @@ namespace SyncrioServer
                         {
                             int tempIndex = oldIndex - looped;
                             int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
 
                             if (range.Key + 2 < oldList.Count && range.Value - 3 > 0)
                             {
@@ -1251,7 +1280,7 @@ namespace SyncrioServer
                         {
                             int tempIndex = oldIndex - looped;
                             int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, tempIndex + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex + 1));
+                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
 
                             if (range.Key + 2 < newList.Count && range.Value - 3 > 0)
                             {
@@ -1487,7 +1516,7 @@ namespace SyncrioServer
                 {
                     List<string> newWaypointLines = new List<string>();
                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, cursor + 1);
-                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor) + 1);
 
                     oldList.RemoveRange(range.Key, range.Value);
 
@@ -1495,7 +1524,10 @@ namespace SyncrioServer
                 }
                 else
                 {
-                    return;
+                    oldList.Add("Waypoint : " + wpID);
+                    oldList.Add("{");
+                    oldList.AddRange(wpLines);
+                    oldList.Add("}");
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
@@ -1504,22 +1536,10 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                int cursor = newList.FindIndex(i => i == "Waypoint : " + wpID);
-
-                if (cursor != -1 && newList[cursor + 1] == "{")
-                {
-                    List<string> newWaypointLines = new List<string>();
-                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, cursor + 1);
-                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                    newList.RemoveRange(range.Key, range.Value);
-
-                    newList.InsertRange(range.Key, wpLines);
-                }
-                else
-                {
-                    return;
-                }
+                newList.Add("Waypoint : " + wpID);
+                newList.Add("{");
+                newList.AddRange(wpLines);
+                newList.Add("}");
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -1545,7 +1565,7 @@ namespace SyncrioServer
                 {
                     List<string> newWaypointLines = new List<string>();
                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, cursor + 1);
-                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor) + 1);
 
                     oldList.RemoveRange(range.Key, range.Value);
 
@@ -1553,7 +1573,10 @@ namespace SyncrioServer
                 }
                 else
                 {
-                    return;
+                    oldList.Add("Waypoint : " + wpID);
+                    oldList.Add("{");
+                    oldList.AddRange(wpLines);
+                    oldList.Add("}");
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
@@ -1562,22 +1585,10 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                int cursor = newList.FindIndex(i => i == "Waypoint : " + wpID);
-
-                if (cursor != -1 && newList[cursor + 1] == "{")
-                {
-                    List<string> newWaypointLines = new List<string>();
-                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, cursor + 1);
-                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                    newList.RemoveRange(range.Key, range.Value);
-
-                    newList.InsertRange(range.Key, wpLines);
-                }
-                else
-                {
-                    return;
-                }
+                newList.Add("Waypoint : " + wpID);
+                newList.Add("{");
+                newList.AddRange(wpLines);
+                newList.Add("}");
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2300,6 +2311,22 @@ namespace SyncrioServer
 
                     SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
                 }
+                else
+                {
+                    int index = oldList.FindIndex(i => i == "ProgressNode : " + progressID);
+
+                    if (oldList[index + 1] == "{")
+                    {
+                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 1);
+                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+
+                        oldList.RemoveRange(range.Key + 2, range.Value - 3);
+
+                        oldList.InsertRange(range.Key + 2, progressLines);
+
+                        SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                    }
+                }
             }
             else
             {
@@ -2336,6 +2363,22 @@ namespace SyncrioServer
                     oldList.Add("}");
 
                     SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+                else
+                {
+                    int index = oldList.FindIndex(i => i == "ProgressNode : " + progressID);
+
+                    if (oldList[index + 1] == "{")
+                    {
+                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 1);
+                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+
+                        oldList.RemoveRange(range.Key + 2, range.Value - 3);
+
+                        oldList.InsertRange(range.Key + 2, progressLines);
+
+                        SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                    }
                 }
             }
             else
@@ -2502,7 +2545,7 @@ namespace SyncrioServer
                     oldList[index + 1] = "Value : " + Convert.ToString(dataValue);
 
                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 3);
-                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
 
                     oldList.RemoveRange(range.Key + 4, range.Value - 5);
 
@@ -2563,7 +2606,7 @@ namespace SyncrioServer
                     oldList[index + 1] = "Value : " + Convert.ToString(dataValue);
 
                     int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 3);
-                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index));
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
 
                     oldList.RemoveRange(range.Key + 4, range.Value - 5);
 

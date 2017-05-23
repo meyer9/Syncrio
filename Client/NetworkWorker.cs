@@ -1440,7 +1440,10 @@ namespace SyncrioClientSide
                     }
                     else
                     {
-                        ScenarioWorker.fetch.baseData = data;
+                        if (ScenarioWorker.fetch.baseData == null)
+                        {
+                            ScenarioWorker.fetch.baseData = data;
+                        }
                     }
                 }
             }
