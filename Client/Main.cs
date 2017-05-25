@@ -49,6 +49,7 @@ using UnityEngine;
 using SyncrioCommon;
 using System.Reflection;
 using SyncrioClientSide.Utilities;
+using MessageStream2;
 
 namespace SyncrioClientSide
 {
@@ -617,6 +618,9 @@ namespace SyncrioClientSide
             VesselWorker.fetch.LoadKerbalsIntoGame();
             VesselWorker.fetch.HandleVessels();
 
+            //Load the starting scenario data and check if there is a "ResourceScenario" module
+            bool resourceScenarioExists = ScenarioWorker.fetch.LoadStartScenarioData();
+
             //Load the missing scenarios as well (Eg, Contracts and stuff for career mode)
             ScenarioWorker.fetch.LoadMissingScenarioDataIntoGame();
 
@@ -629,6 +633,50 @@ namespace SyncrioClientSide
             HighLogic.CurrentGame.Start();
             ChatWorker.fetch.display = true;
             SyncrioLog.Debug("Started!");
+
+            if (!resourceScenarioExists)
+            {
+                int idx = HighLogic.CurrentGame.scenarios.FindIndex(i => i.moduleName == "ResourceScenario");
+
+                if (idx != -1)
+                {
+                    ConfigNode node = new ConfigNode();
+
+                    HighLogic.CurrentGame.scenarios[idx].Save(node);
+
+                    byte[] data = ConfigNodeSerializer.fetch.Serialize(node);
+
+                    byte[] messageData;
+
+                    using (MessageWriter mw = new MessageWriter())
+                    {
+                        if (GroupSystem.playerGroupAssigned)
+                        {
+                            string groupName = GroupSystem.playerGroupName;
+
+                            if (!string.IsNullOrEmpty(groupName))
+                            {
+                                mw.Write<bool>(true);//In group
+                                mw.Write<string>(groupName);
+                            }
+                            else
+                            {
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            mw.Write<bool>(false);//In group
+                        }
+
+                        mw.Write<byte[]>(data);
+
+                        messageData = mw.GetMessageBytes();
+                    }
+
+                    ScenarioEventHandler.fetch.SendData((int)ScenarioDataType.RESOURCE_SCENARIO, messageData);
+                }
+            }
         }
 
         private void StopGame()
@@ -680,6 +728,11 @@ namespace SyncrioClientSide
             {
                 Application.CancelQuit();
                 HighLogic.LoadScene(GameScenes.MAINMENU);
+
+                if (Settings.fetch.DarkMultiPlayerCoopMode)
+                {
+                    NetworkWorker.fetch.SendDisconnect("Quit to main menu");
+                }
             }
         }
 

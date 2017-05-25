@@ -346,8 +346,6 @@ namespace SyncrioServer
             {
                 Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "Vessels"));
             }
-
-            ScenarioSystem.CreateDefaultScenario();
         }
         //Get mod file SHA
         public static string GetModControlSHA()

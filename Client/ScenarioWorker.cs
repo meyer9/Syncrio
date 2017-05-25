@@ -61,16 +61,9 @@ namespace SyncrioClientSide
         public bool isSyncing = false;
         public bool stopSync = false;
         private object scenarioLock = new object();
-        private object scenarioSyncLock = new object();
-        private Dictionary<string,string> checkData = new Dictionary<string, string>();
         public bool nonGroupScenarios;
         public List<byte[]> baseData;
-        //ScenarioType list to check.
-        private Dictionary<string, Type> allScenarioTypesInAssemblies;
-        //System.Reflection hackiness for loading kerbals into the crew roster:
-        private delegate bool AddCrewMemberToRosterDelegate(ProtoCrewMember pcm);
-
-        private AddCrewMemberToRosterDelegate AddCrewMemberToRoster;
+        public List<byte[]> startData;
 
         public static ScenarioWorker fetch
         {
@@ -79,230 +72,6 @@ namespace SyncrioClientSide
                 return singleton;
             }
         }
-
-        private void LoadScenarioTypes()
-        {
-            allScenarioTypesInAssemblies = new Dictionary<string, Type>();
-            foreach (AssemblyLoader.LoadedAssembly something in AssemblyLoader.loadedAssemblies)
-            {
-                foreach (Type scenarioType in something.assembly.GetTypes())
-                {
-                    if (scenarioType.IsSubclassOf(typeof(ScenarioModule)))
-                    {
-                        if (!allScenarioTypesInAssemblies.ContainsKey(scenarioType.Name))
-                        {
-                            allScenarioTypesInAssemblies.Add(scenarioType.Name, scenarioType);
-                        }
-                    }
-                }
-            }
-        }
-
-        private bool IsScenarioModuleAllowed(string scenarioName)
-        {
-            if (scenarioName == null)
-            {
-                return false;
-            }
-            if (allScenarioTypesInAssemblies == null)
-            {
-                //Load type dictionary on first use
-                LoadScenarioTypes();
-            }
-            if (!allScenarioTypesInAssemblies.ContainsKey(scenarioName))
-            {
-                //Module missing
-                return false;
-            }
-            Type scenarioType = allScenarioTypesInAssemblies[scenarioName];
-            KSPScenario[] scenarioAttributes = (KSPScenario[])scenarioType.GetCustomAttributes(typeof(KSPScenario), true);
-            if (scenarioAttributes.Length > 0)
-            {
-                KSPScenario attribute = scenarioAttributes[0];
-                bool protoAllowed = false;
-                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
-                {
-                    protoAllowed = protoAllowed || attribute.HasCreateOption(ScenarioCreationOptions.AddToExistingCareerGames);
-                    protoAllowed = protoAllowed || attribute.HasCreateOption(ScenarioCreationOptions.AddToNewCareerGames);
-                }
-                if (HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
-                {
-                    protoAllowed = protoAllowed || attribute.HasCreateOption(ScenarioCreationOptions.AddToExistingScienceSandboxGames);
-                    protoAllowed = protoAllowed || attribute.HasCreateOption(ScenarioCreationOptions.AddToNewScienceSandboxGames);
-                }
-                if (HighLogic.CurrentGame.Mode == Game.Modes.SANDBOX)
-                {
-                    protoAllowed = protoAllowed || attribute.HasCreateOption(ScenarioCreationOptions.AddToExistingSandboxGames);
-                    protoAllowed = protoAllowed || attribute.HasCreateOption(ScenarioCreationOptions.AddToNewSandboxGames);
-                }
-                return protoAllowed;
-            }
-            //Scenario is not marked with KSPScenario - let's load it anyway.
-            return true;
-        }
-
-        /*
-        public void LoadScenarioDataIntoGame()
-        {
-            while (scenarioQueue.Count > 0)
-            {
-                ScenarioEntry scenarioEntry = scenarioQueue.Dequeue();
-                if (scenarioEntry.scenarioName == "ContractSystem")
-                {
-                    SpawnStrandedKerbalsForRescueMissions(scenarioEntry.scenarioNode);
-                    CreateMissingTourists(scenarioEntry.scenarioNode);
-                }
-                if (scenarioEntry.scenarioName == "ProgressTracking")
-                {
-                    CreateMissingKerbalsInProgressTrackingSoTheGameDoesntBugOut(scenarioEntry.scenarioNode);
-                }
-                CheckForBlankSceneSoTheGameDoesntBugOut(scenarioEntry);
-                ProtoScenarioModule psm = new ProtoScenarioModule(scenarioEntry.scenarioNode);
-                if (psm != null)
-                {
-                    if (IsScenarioModuleAllowed(psm.moduleName))
-                    {
-                        SyncrioLog.Debug("Loading " + psm.moduleName + " scenario data");
-                        HighLogic.CurrentGame.scenarios.Add(psm);
-                    }
-                    else
-                    {
-                        SyncrioLog.Debug("Skipping " + psm.moduleName + " scenario data in " + Client.fetch.gameMode + " mode");
-                    }
-                }
-            }
-        }
-        */
-
-        private void CreateMissingTourists(ConfigNode contractSystemNode)
-        {
-            ConfigNode contractsNode = contractSystemNode.GetNode("CONTRACTS");
-            foreach (ConfigNode contractNode in contractsNode.GetNodes("CONTRACT"))
-            {
-                if (contractNode.GetValue("type") == "TourismContract" && contractNode.GetValue("state") == "Active")
-                {
-                    foreach (ConfigNode paramNode in contractNode.GetNodes("PARAM"))
-                    {
-                        foreach (string kerbalName in paramNode.GetValues("kerbalName"))
-                        {
-                            SyncrioLog.Debug("Spawning missing tourist (" + kerbalName + ") for active tourism contract");
-                            ProtoCrewMember pcm = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Tourist);
-                            pcm.ChangeName(kerbalName);
-                        }
-                    }
-                }
-            }
-        }
-
-        //Defends against bug #172
-        private void SpawnStrandedKerbalsForRescueMissions(ConfigNode contractSystemNode)
-        {
-            ConfigNode contractsNode = contractSystemNode.GetNode("CONTRACTS");
-            foreach (ConfigNode contractNode in contractsNode.GetNodes("CONTRACT"))
-            {
-                if ((contractNode.GetValue("type") == "RescueKerbal") && (contractNode.GetValue("state") == "Offered"))
-                {
-                    string kerbalName = contractNode.GetValue("kerbalName");
-                    if (!HighLogic.CurrentGame.CrewRoster.Exists(kerbalName))
-                    {
-                        SyncrioLog.Debug("Spawning missing kerbal (" + kerbalName + ") for offered KerbalRescue contract");
-                        ProtoCrewMember pcm = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Unowned);
-                        pcm.ChangeName(kerbalName);
-                    }
-                }
-                if ((contractNode.GetValue("type") == "RescueKerbal") && (contractNode.GetValue("state") == "Active"))
-                {
-
-                    string kerbalName = contractNode.GetValue("kerbalName");
-                    SyncrioLog.Debug("Spawning stranded kerbal (" + kerbalName + ") for active KerbalRescue contract");
-                    int bodyID = Int32.Parse(contractNode.GetValue("body"));
-                    if (!HighLogic.CurrentGame.CrewRoster.Exists(kerbalName))
-                    {
-                        GenerateStrandedKerbal(bodyID, kerbalName);
-                    }
-                }
-            }
-        }
-
-        private void GenerateStrandedKerbal(int bodyID, string kerbalName)
-        {
-            //Add kerbal to crew roster.
-            SyncrioLog.Debug("Spawning missing kerbal, name: " + kerbalName);
-            ProtoCrewMember pcm = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Unowned);
-            pcm.ChangeName(kerbalName);
-            pcm.rosterStatus = ProtoCrewMember.RosterStatus.Assigned;
-            //Create protovessel
-            uint newPartID = ShipConstruction.GetUniqueFlightID(HighLogic.CurrentGame.flightState);
-            CelestialBody contractBody = FlightGlobals.Bodies[bodyID];
-            //Atmo: 10km above atmo, to half the planets radius out.
-            //Non-atmo: 30km above ground, to half the planets radius out.
-            double minAltitude = FinePrint.Utilities.CelestialUtilities.GetMinimumOrbitalDistance(contractBody, 1.1f);
-            double maxAltitude = minAltitude + contractBody.Radius * 0.5;
-            Orbit strandedOrbit = Orbit.CreateRandomOrbitAround(FlightGlobals.Bodies[bodyID], minAltitude, maxAltitude);
-            ConfigNode[] kerbalPartNode = new ConfigNode[1];
-            ProtoCrewMember[] partCrew = new ProtoCrewMember[1];
-            partCrew[0] = pcm;
-            kerbalPartNode[0] = ProtoVessel.CreatePartNode("kerbalEVA", newPartID, partCrew);
-            ConfigNode protoVesselNode = ProtoVessel.CreateVesselNode(kerbalName, VesselType.EVA, strandedOrbit, 0, kerbalPartNode);
-            ConfigNode discoveryNode = ProtoVessel.CreateDiscoveryNode(DiscoveryLevels.Unowned, UntrackedObjectClass.A, double.PositiveInfinity, double.PositiveInfinity);
-            ProtoVessel protoVessel = new ProtoVessel(protoVesselNode, HighLogic.CurrentGame);
-            protoVessel.discoveryInfo = discoveryNode;
-            //It's not supposed to be infinite, but you're crazy if you think I'm going to decipher the values field of the rescue node.
-            HighLogic.CurrentGame.flightState.protoVessels.Add(protoVessel);
-        }
-        //Defends against bug #172
-        private void CreateMissingKerbalsInProgressTrackingSoTheGameDoesntBugOut(ConfigNode progressTrackingNode)
-        {
-            foreach (ConfigNode possibleNode in progressTrackingNode.nodes)
-            {
-                //Recursion (noun): See Recursion.
-                CreateMissingKerbalsInProgressTrackingSoTheGameDoesntBugOut(possibleNode);
-            }
-            //The kerbals are kept in a ConfigNode named 'crew', with 'crews' as a comma space delimited array of names.
-            if (progressTrackingNode.name == "crew")
-            {
-                string kerbalNames = progressTrackingNode.GetValue("crews");
-                if (!String.IsNullOrEmpty(kerbalNames))
-                {
-                    string[] kerbalNamesSplit = kerbalNames.Split(new string[] { ", " }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (string kerbalName in kerbalNamesSplit)
-                    {
-                        if (!HighLogic.CurrentGame.CrewRoster.Exists(kerbalName))
-                        {
-                            if (AddCrewMemberToRoster == null)
-                            {
-                                MethodInfo addMemberToCrewRosterMethod = typeof(KerbalRoster).GetMethod("AddCrewMember", BindingFlags.Public | BindingFlags.Instance);
-                                AddCrewMemberToRoster = (AddCrewMemberToRosterDelegate)Delegate.CreateDelegate(typeof(AddCrewMemberToRosterDelegate), HighLogic.CurrentGame.CrewRoster, addMemberToCrewRosterMethod);
-                            }
-                            if (AddCrewMemberToRoster == null)
-                            {
-                                throw new Exception("Failed to initialize AddCrewMemberToRoster for #172 ProgressTracking fix.");
-                            }
-                            SyncrioLog.Debug("Generating missing kerbal from ProgressTracking: " + kerbalName);
-                            ProtoCrewMember pcm = CrewGenerator.RandomCrewMemberPrototype(ProtoCrewMember.KerbalType.Crew);
-                            pcm.ChangeName(kerbalName);
-                            AddCrewMemberToRoster(pcm);
-                            //Also send it off to the server
-                            VesselWorker.fetch.SendKerbalIfDifferent(pcm);
-                        }
-                    }
-                }
-            }
-        }
-
-        //If the scene field is blank, KSP will throw an error while starting the game, meaning players will be unable to join the server.
-        /*
-        private void CheckForBlankSceneSoTheGameDoesntBugOut(ScenarioEntry scenarioEntry)
-        {
-            if (scenarioEntry.scenarioNode.GetValue("scene") == string.Empty)
-            {
-                string nodeName = scenarioEntry.scenarioName;
-                ScreenMessages.PostScreenMessage(nodeName + " is badly behaved!");
-                SyncrioLog.Debug(nodeName + " is badly behaved!");
-                scenarioEntry.scenarioNode.SetValue("scene", "7, 8, 5, 6, 9");
-            }
-        }
-        */
 
         public void LoadMissingScenarioDataIntoGame()
         {
@@ -332,6 +101,41 @@ namespace SyncrioClientSide
                     HighLogic.CurrentGame.AddProtoScenarioModule(validScenario.ModuleType, validScenario.ScenarioAttributes.TargetScenes);
                 }
             }
+        }
+
+        public bool LoadStartScenarioData()
+        {
+            bool returnVal = false;
+
+            if (startData != null)
+            {
+                if (startData.Count > 0)
+                {
+                    for (int i = 0; i < startData.Count; i += 2)
+                    {
+                        if (i + 1 >= startData.Count)
+                        {
+                            break;
+                        }
+
+                        List<string> name = SyncrioUtil.ByteArraySerializer.Deserialize(startData[i]);
+
+                        if (name[0] == "ResourceScenario")
+                        {
+                            returnVal = true;
+                        }
+
+                        ProtoScenarioModule psm = new ProtoScenarioModule(ConfigNodeSerializer.fetch.Deserialize(startData[i + 1]));
+
+                        if (psm != null)
+                        {
+                            HighLogic.CurrentGame.scenarios.Add(psm);
+                        }
+                    }
+                }
+            }
+
+            return returnVal;
         }
 
         public void LoadBaseScenarioData()
@@ -378,6 +182,11 @@ namespace SyncrioClientSide
 
                     for (int v = 0; v < data.Count; v += 2)
                     {
+                        if (v + 1 >= data.Count)
+                        {
+                            break;
+                        }
+
                         List<string> name = SyncrioUtil.ByteArraySerializer.Deserialize(data[v]);
                         List<string> dataList = SyncrioUtil.ByteArraySerializer.Deserialize(data[v + 1]);
 
@@ -1012,6 +821,24 @@ namespace SyncrioClientSide
 
                                     HighLogic.CurrentGame.scenarios = psmLocked;
                                 }
+                            }
+
+                            if (name[0] == "ResourceScenario")
+                            {
+                                ConfigNode ResourceCfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList));
+
+                                ResourceScenario.Instance.Load(ResourceCfg);
+
+                                ScenarioEventHandler.fetch.lastResourceScenarioModule = ResourceCfg;
+                            }
+
+                            if (name[0] == "StrategySystem")
+                            {
+                                ConfigNode StrategyCfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList));
+
+                                Strategies.StrategySystem.Instance.Load(StrategyCfg);
+
+                                ScenarioEventHandler.fetch.lastStrategySystemModule = StrategyCfg;
                             }
                         }
                         catch (Exception e)

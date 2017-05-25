@@ -34,8 +34,12 @@ namespace SyncrioClientSide
         private static ScenarioEventHandler singleton;
         private bool registered = false;
         private Dictionary<string, ConfigNode> lastPrograssData = new Dictionary<string, ConfigNode>();//<Progress Id, Progress Data>
-        private float lastSync = 0.0f;
-        private float syncCooldown = 0.2f;
+        public ConfigNode lastResourceScenarioModule;
+        public ConfigNode lastStrategySystemModule;
+        private float lastScenarioCheck = 0f;
+        private float scenarioCheckInterval = 4f;
+        private float lastSync = 0f;
+        private float syncCooldown = 1f;
         public bool cooldown = false;
         public bool startCooldown = false;
         public bool delaySync = true;
@@ -64,13 +68,123 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (!registered && !ScenarioWorker.fetch.stopSync)
+            if (!ScenarioWorker.fetch.stopSync)
             {
-                RegisterEvents();
+                if (!registered)
+                {
+                    RegisterEvents();
+                }
+                else
+                {
+                    if ((UnityEngine.Time.realtimeSinceStartup - lastScenarioCheck) > scenarioCheckInterval)
+                    {
+                        lastScenarioCheck = UnityEngine.Time.realtimeSinceStartup;
+
+                        if (lastResourceScenarioModule != null)
+                        {
+                            ConfigNode currentResourceScenarioModule = new ConfigNode();
+
+                            ResourceScenario.Instance.Save(currentResourceScenarioModule);
+
+                            if (currentResourceScenarioModule != lastResourceScenarioModule)
+                            {
+                                lastResourceScenarioModule = currentResourceScenarioModule;
+
+                                byte[] data = ConfigNodeSerializer.fetch.Serialize(currentResourceScenarioModule);
+
+                                byte[] messageData;
+
+                                using (MessageWriter mw = new MessageWriter())
+                                {
+                                    if (GroupSystem.playerGroupAssigned)
+                                    {
+                                        string groupName = GroupSystem.playerGroupName;
+
+                                        if (!string.IsNullOrEmpty(groupName))
+                                        {
+                                            mw.Write<bool>(true);//In group
+                                            mw.Write<string>(groupName);
+                                        }
+                                        else
+                                        {
+                                            return;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        mw.Write<bool>(false);//In group
+                                    }
+
+                                    mw.Write<byte[]>(data);
+
+                                    messageData = mw.GetMessageBytes();
+                                }
+
+                                SendData((int)ScenarioDataType.RESOURCE_SCENARIO, messageData);
+                            }
+                        }
+                        else
+                        {
+                            lastResourceScenarioModule = new ConfigNode();
+
+                            ResourceScenario.Instance.Save(lastResourceScenarioModule);
+                        }
+
+                        if (lastStrategySystemModule != null)
+                        {
+                            ConfigNode currentStrategySystemModule = new ConfigNode();
+
+                            Strategies.StrategySystem.Instance.Save(currentStrategySystemModule);
+
+                            if (currentStrategySystemModule != lastStrategySystemModule)
+                            {
+                                lastStrategySystemModule = currentStrategySystemModule;
+
+                                byte[] data = ConfigNodeSerializer.fetch.Serialize(currentStrategySystemModule);
+
+                                byte[] messageData;
+
+                                using (MessageWriter mw = new MessageWriter())
+                                {
+                                    if (GroupSystem.playerGroupAssigned)
+                                    {
+                                        string groupName = GroupSystem.playerGroupName;
+
+                                        if (!string.IsNullOrEmpty(groupName))
+                                        {
+                                            mw.Write<bool>(true);//In group
+                                            mw.Write<string>(groupName);
+                                        }
+                                        else
+                                        {
+                                            return;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        mw.Write<bool>(false);//In group
+                                    }
+
+                                    mw.Write<byte[]>(data);
+
+                                    messageData = mw.GetMessageBytes();
+                                }
+
+                                SendData((int)ScenarioDataType.STRATEGY_SYSTEM, messageData);
+                            }
+                        }
+                        else
+                        {
+                            lastStrategySystemModule = new ConfigNode();
+
+                            Strategies.StrategySystem.Instance.Save(lastStrategySystemModule);
+                        }
+                    }
+                }
             }
             else
             {
-                if (ScenarioWorker.fetch.stopSync)
+                if (registered)
                 {
                     UnregisterEvents();
                 }
@@ -1261,7 +1375,7 @@ namespace SyncrioClientSide
             }
         }
 
-        private void SendData(int type, byte[] data)
+        internal void SendData(int type, byte[] data)
         {
             byte[] messageBytes;
             ClientMessage newMessage = new ClientMessage();

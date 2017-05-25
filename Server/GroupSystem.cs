@@ -86,7 +86,6 @@ namespace SyncrioServer
             groupDirectory = Path.Combine(Server.ScenarioDirectory, "GroupData", "Groups");
             groupScenariosDirectory = Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupScenarios");
             playerDirectory = Path.Combine(Server.ScenarioDirectory, "Players");
-            ScenarioSystem.LoadGroupSubspaceFile();
             LoadGroups();
         }
 

@@ -929,6 +929,9 @@ namespace SyncrioClientSide
                         case ServerMessageType.SCENARIO_DATA:
                             HandleScenarioModuleData(message.data);
                             break;
+                        case ServerMessageType.SCENARIO_START_DATA:
+                            HandleScenarioStartData(message.data);
+                            break;
                         case ServerMessageType.SEND_VESSELS:
                             VesselWorker.fetch.HandleStartingVesselsMessage(message.data);
                             break;
@@ -1444,6 +1447,29 @@ namespace SyncrioClientSide
                         {
                             ScenarioWorker.fetch.baseData = data;
                         }
+                    }
+                }
+            }
+        }
+
+        private void HandleScenarioStartData(byte[] messageData)
+        {
+            if (!ScenarioWorker.fetch.stopSync)
+            {
+                using (MessageReader mr = new MessageReader(messageData))
+                {
+                    List<byte[]> data = new List<byte[]>();
+                    int dataLength = mr.Read<int>();
+                    for (int i = 0; i < dataLength; i++)
+                    {
+                        byte[] scenarioData = Compression.DecompressIfNeeded(mr.Read<byte[]>());
+
+                        data.Add(scenarioData);
+                    }
+
+                    if (ScenarioWorker.fetch.startData == null)
+                    {
+                        ScenarioWorker.fetch.startData = data;
                     }
                 }
             }

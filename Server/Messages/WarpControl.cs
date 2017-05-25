@@ -334,7 +334,6 @@ namespace SyncrioServer.Messages
             {
                 SyncrioLog.Debug("Creating subspace: " + freeID);
                 HandleSubspaceRef(client.lastSubspace, freeID);
-                ScenarioSystem.AddSubspace(freeID, -1);
                 //Create subspace
                 Subspace newSubspace = new Subspace();
                 newSubspace.serverClock = serverClock;

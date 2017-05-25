@@ -82,7 +82,20 @@ namespace SyncrioServer.Messages
             Messages.LockSystem.SendAllLocks(client);
             Messages.AdminSystem.SendAllAdmins(client);
             Messages.Group.SendAllGroupsToClient(client);
-            Messages.Vessel.SendPlayerVessels(client);//This one is non DMP co-op mode only
+
+            //---These are non DMP co-op mode only---
+            Messages.Vessel.SendPlayerVessels(client);
+            if (!GroupSystem.fetch.PlayerIsInGroup(client.playerName))
+            {
+                ScenarioSystem.fetch.ScenarioSendStartData(client);
+            }
+            else
+            {
+                string groupname = GroupSystem.fetch.GetPlayerGroup(client.playerName);
+                ScenarioSystem.fetch.ScenarioSendStartData(groupname, client);
+            }
+            //---These are non DMP co-op mode only---
+
             //Send kerbals
             lock (Server.ScenarioSizeLock)
             {

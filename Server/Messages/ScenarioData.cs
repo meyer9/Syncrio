@@ -82,5 +82,33 @@ namespace SyncrioServer.Messages
                 ClientHandler.SendToClient(client, newMessage, true);
             }
         }
+
+        public static void SendStartData(ClientObject client, List<byte[]> data)
+        {
+            lock (scenarioDataLock)
+            {
+                ServerMessage newMessage = new ServerMessage();
+                newMessage.type = ServerMessageType.SCENARIO_START_DATA;
+                using (MessageWriter mw = new MessageWriter())
+                {
+                    mw.Write<int>(data.Count);
+
+                    for (int i = 0; i < data.Count; i++)
+                    {
+                        if (client.compressionEnabled)
+                        {
+                            mw.Write<byte[]>(Compression.CompressIfNeeded(data[i]));
+                        }
+                        else
+                        {
+                            mw.Write<byte[]>(Compression.AddCompressionHeader(data[i], false));
+                        }
+                    }
+
+                    newMessage.data = mw.GetMessageBytes();
+                }
+                ClientHandler.SendToClient(client, newMessage, true);
+            }
+        }
     }
 }
