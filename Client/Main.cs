@@ -59,7 +59,7 @@ namespace SyncrioClientSide
         private static Client singleton;
         //Global state vars
         public string status;
-        public bool startGame;
+        //public bool startGame;
         public bool forceQuit;
         public bool showGUI = true;
         public bool toolbarShowGUI = true;
@@ -501,11 +501,13 @@ namespace SyncrioClientSide
                     madeItToSpaceCenter = false;
                 }
 
+                /*
                 if (startGame)
                 {
                     startGame = false;
                     StartGame();
                 }
+                */
             }
             catch (Exception e)
             {
@@ -582,8 +584,6 @@ namespace SyncrioClientSide
             //Group window: 7714
             //Group Become Leader window: 7715
             //Group Invite Player window: 7716
-            //7717 not in use.
-            //Group Progress window: 7718
             long startClock = Profiler.SyncrioReferenceTime.ElapsedTicks;
             if (showGUI && toolbarShowGUI)
             {
@@ -602,7 +602,7 @@ namespace SyncrioClientSide
             Profiler.guiData.ReportTime(startClock);
         }
 
-        private void StartGame()
+        internal void StartGame()
         {
             //Create new game object for our Syncrio session.
             HighLogic.CurrentGame = CreateBlankGame();

@@ -53,9 +53,7 @@ namespace SyncrioClientSide
     public class GroupSystem
     {
         private static GroupSystem singleton;
-        public static bool showAllProgress;
         public Dictionary<string, GroupObject> groups = new Dictionary<string, GroupObject>();
-        public Dictionary<string, Dictionary<int, GroupProgress>> allGroupProgressList = new Dictionary<string, Dictionary<int, GroupProgress>>();
         private object groupLock = new object();
         public static string playerGroupName = string.Empty;
         public static bool playerGroupAssigned = false;
@@ -63,10 +61,8 @@ namespace SyncrioClientSide
         public static bool playerIsGroupLeader = false;
         public static bool groupFreeToInvite = false;
         public static bool setIfGroupIsFreeToInvite = true;
-        public static bool setIfGroupProgressIsPublic = true;
         public static bool kickPlayerButtons = false;
         public static bool invitePlayerButtons = false;
-        public static bool groupProgressButtons = false;
         public static bool newGroupPrivacy_PUBLIC = false;
         public static bool newGroupPrivacy_PASSWORD = false;
         public static bool newGroupPrivacy_INVITE_ONLY = false;
@@ -147,7 +143,6 @@ namespace SyncrioClientSide
                                 mw.Write<string>(gp);
                                 mw.Write<string>(gpass);
                                 mw.Write<bool>(setIfGroupIsFreeToInvite);
-                                mw.Write<bool>(setIfGroupProgressIsPublic);
                                 messageBytes = mw.GetMessageBytes();
                             }
                             newMessage.data = messageBytes;
@@ -170,7 +165,6 @@ namespace SyncrioClientSide
                             mw.Write<string>(gn);
                             mw.Write<string>(gp);
                             mw.Write<bool>(setIfGroupIsFreeToInvite);
-                            mw.Write<bool>(setIfGroupProgressIsPublic);
                             messageBytes = mw.GetMessageBytes();
                         }
                         newMessage.data = messageBytes;
@@ -607,425 +601,6 @@ namespace SyncrioClientSide
             return returnGroup;
         }
 
-        public void HandleGroupProgress(byte[] messageData)
-        {
-            Regex wordRegex = new Regex(@"^[\w_]+", RegexOptions.None);// matches a single word at the start of a line
-
-            using (MessageReader mr = new MessageReader(messageData))
-            {
-                Dictionary<string, Dictionary<int, GroupProgress>> newGroupProgressList = new Dictionary<string, Dictionary<int, GroupProgress>>();
-                int numberOfProgess = mr.Read<int>();
-
-                for (int i = 0; i < numberOfProgess; i++)
-                {
-                    List<string> groupProgressList = new List<string>(mr.Read<string[]>());
-
-                    string groupName = groupProgressList[0];
-                    int groupSubspace = Convert.ToInt32(groupProgressList[1], Client.english);
-
-                    string funds = groupProgressList[2];
-                    string rep = groupProgressList[3];
-                    string sci = groupProgressList[4];
-
-                    List<string> techs = new List<string>();
-                    Dictionary<string, List<string>> progress = new Dictionary<string, List<string>>();
-                    Dictionary<List<string>, List<List<string>>> celestialProgress = new Dictionary<List<string>, List<List<string>>>();
-                    Dictionary<string, List<string>> secrets = new Dictionary<string, List<string>>();
-
-                    int cursor = 5;
-                    while (cursor < groupProgressList.Count)
-                    {
-                        bool increment = true;
-
-                        if (groupProgressList[cursor] == "Techs" && (groupProgressList[cursor + 1] == "{"))
-                        {
-                            increment = false;
-
-                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
-                            {
-                                techs = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-                            }
-                            else
-                            {
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-                            }
-                        }
-
-                        if (cursor > groupProgressList.Count - 1)
-                        {
-                            break;
-                        }
-
-                        if (groupProgressList[cursor] == "ProgressList" && (groupProgressList[cursor + 1] == "{"))
-                        {
-                            increment = false;
-
-                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
-                            {
-                                List<string> progressListLines = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-
-                                int subCursor = 0;
-                                while (subCursor < progressListLines.Count)
-                                {
-                                    if (progressListLines[subCursor] == "Progress" && (progressListLines[subCursor + 1] == "{"))
-                                    {
-                                        int subMatchBracketIdx = FindMatchingBracket(progressListLines, subCursor + 1);
-                                        KeyValuePair<int, int> subRange = new KeyValuePair<int, int>(subCursor, (subMatchBracketIdx - subCursor + 1));
-
-                                        if (subRange.Key + 2 < progressListLines.Count && subRange.Value - 3 > 0)
-                                        {
-                                            List<string> progressLines = progressListLines.GetRange(subRange.Key + 2, subRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                            progressListLines.RemoveRange(subRange.Key, subRange.Value);
-
-                                            int nodeCursor = 0;
-                                            while (nodeCursor < progressLines.Count)
-                                            {
-                                                if (wordRegex.IsMatch(progressLines[nodeCursor]) && (progressLines[nodeCursor + 1] == "{"))
-                                                {
-                                                    string progressName = string.Empty;
-                                                    List<string> progressNode = new List<string>();
-
-                                                    int nodeMatchBracketIdx = FindMatchingBracket(progressLines, nodeCursor + 1);
-                                                    KeyValuePair<int, int> nodeRange = new KeyValuePair<int, int>(nodeCursor, (nodeMatchBracketIdx - nodeCursor + 1));
-
-                                                    if (nodeRange.Key + 2 < progressLines.Count && nodeRange.Value - 3 > 0)
-                                                    {
-                                                        progressName = progressLines[nodeCursor];
-                                                        progressNode = progressLines.GetRange(nodeRange.Key + 2, nodeRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                                        progressLines.RemoveRange(nodeRange.Key, nodeRange.Value);
-
-                                                        if (!progress.ContainsKey(progressName))
-                                                        {
-                                                            progress.Add(progressName, progressNode);
-                                                        }
-                                                        else
-                                                        {
-                                                            progress[progressName] = progressNode;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        progressLines.RemoveRange(nodeRange.Key, nodeRange.Value);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    nodeCursor++;
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            progressListLines.RemoveRange(subRange.Key, subRange.Value);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        subCursor++;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-                            }
-                        }
-
-                        if (cursor > groupProgressList.Count - 1)
-                        {
-                            break;
-                        }
-
-                        if (groupProgressList[cursor] == "CelestialProgressList" && (groupProgressList[cursor + 1] == "{"))
-                        {
-                            increment = false;
-
-                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
-                            {
-                                List<string> celestialProgressLines = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-
-                                Dictionary<List<string>, List<List<string>>> cpNodes = new Dictionary<List<string>, List<List<string>>>();
-
-                                int subCursor = 0;
-                                while (subCursor < celestialProgressLines.Count)
-                                {
-                                    if (celestialProgressLines[subCursor] == "CelestialProgress" && (celestialProgressLines[subCursor + 1] == "{"))
-                                    {
-                                        int subMatchBracketIdx = FindMatchingBracket(celestialProgressLines, subCursor + 1);
-                                        KeyValuePair<int, int> subRange = new KeyValuePair<int, int>(subCursor, (subMatchBracketIdx - subCursor + 1));
-
-                                        if (subRange.Key + 2 < celestialProgressLines.Count && subRange.Value - 3 > 0)
-                                        {
-                                            List<string> cpLines = celestialProgressLines.GetRange(subRange.Key + 2, subRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                            celestialProgressLines.RemoveRange(subRange.Key, subRange.Value);
-
-                                            List<string> cpID = new List<string>();
-                                            List<List<string>> cpNodeList = new List<List<string>>();
-
-                                            int nodeCursor = 0;
-                                            while (nodeCursor < cpLines.Count)
-                                            {
-                                                if (cpLines[nodeCursor] == "Node" && (cpLines[nodeCursor + 1] == "{"))
-                                                {
-                                                    int nodeMatchBracketIdx = FindMatchingBracket(cpLines, nodeCursor + 1);
-                                                    KeyValuePair<int, int> nodeRange = new KeyValuePair<int, int>(nodeCursor, (nodeMatchBracketIdx - nodeCursor + 1));
-
-                                                    if (nodeRange.Key + 2 < cpLines.Count && nodeRange.Value - 3 > 0)
-                                                    {
-                                                        List<string> cpNodeLines = cpLines.GetRange(nodeRange.Key + 2, nodeRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                                        cpLines.RemoveRange(nodeRange.Key, nodeRange.Value);
-
-                                                        int subNodeCursor = 0;
-                                                        while (subNodeCursor < cpNodeLines.Count)
-                                                        {
-                                                            if (cpNodeLines[subNodeCursor] == "Start" && (cpNodeLines[subNodeCursor + 1] == "{"))
-                                                            {
-                                                                int subNodeMatchBracketIdx = FindMatchingBracket(cpNodeLines, subNodeCursor + 1);
-                                                                KeyValuePair<int, int> subNodeRange = new KeyValuePair<int, int>(subNodeCursor, (subNodeMatchBracketIdx - subNodeCursor + 1));
-
-                                                                if (subNodeRange.Key + 2 < cpNodeLines.Count && subNodeRange.Value - 3 > 0)
-                                                                {
-                                                                    cpID = cpNodeLines.GetRange(subNodeRange.Key + 2, subNodeRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                                                    cpNodeLines.RemoveRange(subNodeRange.Key, subNodeRange.Value);
-                                                                }
-                                                                else
-                                                                {
-                                                                    cpNodeLines.RemoveRange(subNodeRange.Key, subNodeRange.Value);
-                                                                }
-                                                            }
-                                                            else
-                                                            {
-                                                                if (wordRegex.IsMatch(cpNodeLines[subNodeCursor]) && (cpNodeLines[subNodeCursor + 1] == "{"))
-                                                                {
-                                                                    int subNodeMatchBracketIdx = FindMatchingBracket(cpNodeLines, subNodeCursor + 1);
-                                                                    KeyValuePair<int, int> subNodeRange = new KeyValuePair<int, int>(subNodeCursor, (subNodeMatchBracketIdx - subNodeCursor + 1));
-
-                                                                    if (subNodeRange.Key + 2 < cpNodeLines.Count && subNodeRange.Value - 3 > 0)
-                                                                    {
-                                                                        List<string> cpNodeToAdd = new List<string>();
-                                                                        cpNodeToAdd.Add(cpNodeLines[subNodeCursor]);
-                                                                        cpNodeToAdd.AddRange(cpNodeLines.GetRange(subNodeRange.Key + 2, subNodeRange.Value - 3));//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                                                        cpNodeList.Add(cpNodeToAdd);
-                                                                        cpNodeLines.RemoveRange(subNodeRange.Key, subNodeRange.Value);
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        cpNodeLines.RemoveRange(subNodeRange.Key, subNodeRange.Value);
-                                                                    }
-                                                                }
-                                                                else
-                                                                {
-                                                                    subNodeCursor++;
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        cpLines.RemoveRange(nodeRange.Key, nodeRange.Value);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    nodeCursor++;
-                                                }
-                                            }
-
-                                            if (cpID.Count > 0)
-                                            {
-                                                if (!cpNodes.ContainsKey(cpID))
-                                                {
-                                                    cpNodes.Add(cpID, cpNodeList);
-                                                }
-                                                else
-                                                {
-                                                    cpNodes[cpID] = cpNodeList;
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            celestialProgressLines.RemoveRange(subRange.Key, subRange.Value);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        subCursor++;
-                                    }
-                                }
-
-                                celestialProgress = cpNodes;
-                            }
-                            else
-                            {
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-                            }
-                        }
-
-                        if (cursor > groupProgressList.Count - 1)
-                        {
-                            break;
-                        }
-
-                        if (groupProgressList[cursor] == "SecretsList" && (groupProgressList[cursor + 1] == "{"))
-                        {
-                            increment = false;
-
-                            int matchBracketIdx = FindMatchingBracket(groupProgressList, cursor + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(cursor, (matchBracketIdx - cursor + 1));
-
-                            if (range.Key + 2 < groupProgressList.Count && range.Value - 3 > 0)
-                            {
-                                List<string> secretsLines = groupProgressList.GetRange(range.Key + 2, range.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-
-                                int subCursor = 0;
-                                while (subCursor < secretsLines.Count)
-                                {
-                                    if (secretsLines[subCursor] == "Secret" && (secretsLines[subCursor + 1] == "{"))
-                                    {
-                                        int subMatchBracketIdx = FindMatchingBracket(secretsLines, subCursor + 1);
-                                        KeyValuePair<int, int> subRange = new KeyValuePair<int, int>(subCursor, (subMatchBracketIdx - subCursor + 1));
-
-                                        if (subRange.Key + 2 < secretsLines.Count && subRange.Value - 3 > 0)
-                                        {
-                                            List<string> secretsNode = secretsLines.GetRange(subRange.Key + 2, subRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                            secretsLines.RemoveRange(subRange.Key, subRange.Value);
-
-                                            int nodeCursor = 0;
-                                            while (nodeCursor < secretsNode.Count)
-                                            {
-                                                if (wordRegex.IsMatch(secretsNode[nodeCursor]) && (secretsNode[nodeCursor + 1] == "{"))
-                                                {
-                                                    string secretsName = string.Empty;
-                                                    List<string> secretsSubNode = new List<string>();
-
-                                                    int nodeMatchBracketIdx = FindMatchingBracket(secretsNode, nodeCursor + 1);
-                                                    KeyValuePair<int, int> nodeRange = new KeyValuePair<int, int>(nodeCursor, (nodeMatchBracketIdx - nodeCursor + 1));
-
-                                                    if (nodeRange.Key + 2 < secretsNode.Count && nodeRange.Value - 3 > 0)
-                                                    {
-                                                        secretsName = secretsNode[nodeCursor];
-                                                        secretsSubNode = secretsNode.GetRange(nodeRange.Key + 2, nodeRange.Value - 3);//Use Key + 2 and Value - 3 because that way you will only get the inside of the node.
-                                                        secretsNode.RemoveRange(nodeRange.Key, nodeRange.Value);
-
-
-                                                        if (!secrets.ContainsKey(secretsName))
-                                                        {
-                                                            secrets.Add(secretsName, secretsSubNode);
-                                                        }
-                                                        else
-                                                        {
-                                                            secrets[secretsName] = secretsSubNode;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        secretsNode.RemoveRange(nodeRange.Key, nodeRange.Value);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    nodeCursor++;
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            secretsLines.RemoveRange(subRange.Key, subRange.Value);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        subCursor++;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                groupProgressList.RemoveRange(range.Key, range.Value);
-                            }
-                        }
-
-                        if (increment)
-                        {
-                            cursor++;
-                        }
-                    }
-
-                    if (newGroupProgressList.ContainsKey(groupName))
-                    {
-                        if (newGroupProgressList[groupName].ContainsKey(groupSubspace))
-                        {
-                            GroupProgress editGroupProgress = newGroupProgressList[groupName][groupSubspace];
-
-                            editGroupProgress.Funds = funds;
-                            editGroupProgress.Rep = rep;
-                            editGroupProgress.Sci = sci;
-
-                            editGroupProgress.Techs = techs;
-                            editGroupProgress.Progress = progress;
-                            editGroupProgress.CelestialProgress = celestialProgress;
-                            editGroupProgress.Secrets = secrets;
-
-                            newGroupProgressList[groupName][groupSubspace] = editGroupProgress;
-                        }
-                        else
-                        {
-                            GroupProgress newGroupProgress = new GroupProgress();
-
-                            newGroupProgress.GroupName = groupName;
-                            newGroupProgress.GroupSubspace = groupSubspace;
-
-                            newGroupProgress.Funds = funds;
-                            newGroupProgress.Rep = rep;
-                            newGroupProgress.Sci = sci;
-
-                            newGroupProgress.Techs = techs;
-                            newGroupProgress.Progress = progress;
-                            newGroupProgress.CelestialProgress = celestialProgress;
-                            newGroupProgress.Secrets = secrets;
-
-                            newGroupProgressList[groupName].Add(groupSubspace, newGroupProgress);
-                        }
-                    }
-                    else
-                    {
-                        GroupProgress newGroupProgress = new GroupProgress();
-
-                        newGroupProgress.GroupName = groupName;
-                        newGroupProgress.GroupSubspace = groupSubspace;
-
-                        newGroupProgress.Funds = funds;
-                        newGroupProgress.Rep = rep;
-                        newGroupProgress.Sci = sci;
-
-                        newGroupProgress.Techs = techs;
-                        newGroupProgress.Progress = progress;
-                        newGroupProgress.CelestialProgress = celestialProgress;
-                        newGroupProgress.Secrets = secrets;
-
-                        newGroupProgressList.Add(groupName, new Dictionary<int, GroupProgress>());
-
-                        newGroupProgressList[groupName].Add(groupSubspace, newGroupProgress);
-                    }
-                }
-                allGroupProgressList = newGroupProgressList;
-            }
-        }
-
         public void HandleGroupMessage(byte[] messageData)
         {
             lock (groupLock)
@@ -1121,7 +696,6 @@ namespace SyncrioClientSide
                                     groupFreeToInvite = mr.Read<bool>();
                                     groups[groupName].settings.inviteAvailable = groupFreeToInvite;
                                 }
-                                groups[groupName].settings.progressPublic = mr.Read<bool>();
                                 GroupWindow.fetch.AssignPlayerGroup();
                                 GroupWindow.fetch.SetJoinGroupButton();
                                 GroupWindow.fetch.SetInvitePlayerButton();
@@ -1155,17 +729,14 @@ namespace SyncrioClientSide
         private static void ResetGroupValues()
         {
             GroupSystem.fetch.groups = new Dictionary<string, GroupObject>();
-            GroupSystem.fetch.allGroupProgressList = new Dictionary<string, Dictionary<int, GroupProgress>>();
             playerGroupName = string.Empty;
             playerGroupAssigned = false;
             playerCreatingGroup = false;
             playerIsGroupLeader = false;
             groupFreeToInvite = false;
             setIfGroupIsFreeToInvite = true;
-            setIfGroupProgressIsPublic = true;
             kickPlayerButtons = false;
             invitePlayerButtons = false;
-            groupProgressButtons = false;
             newGroupPrivacy_PUBLIC = false;
             newGroupPrivacy_PASSWORD = false;
             newGroupPrivacy_INVITE_ONLY = false;

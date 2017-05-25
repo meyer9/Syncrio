@@ -226,7 +226,9 @@ namespace SyncrioClientSide
                         SyncrioLog.Debug("Starting Game!");
                         Client.fetch.status = "Starting game";
                         state = ClientState.STARTING;
-                        Client.fetch.startGame = true;
+                        //Client.fetch.startGame = true;
+
+                        Client.fetch.StartGame();
                     }
                     else
                     {
@@ -930,9 +932,6 @@ namespace SyncrioClientSide
                         case ServerMessageType.SEND_VESSELS:
                             VesselWorker.fetch.HandleStartingVesselsMessage(message.data);
                             break;
-                        case ServerMessageType.AUTO_SEND_GROUP_PROGRESS:
-                            GroupSystem.fetch.HandleGroupProgress(message.data);
-                            break;
                         case ServerMessageType.KERBAL_REPLY:
                             HandleKerbalReply(message.data);
                             break;
@@ -1030,9 +1029,6 @@ namespace SyncrioClientSide
                             break;
                         case ServerMessageType.SCENARIO_DATA:
                             HandleScenarioModuleData(message.data);
-                            break;
-                        case ServerMessageType.AUTO_SEND_GROUP_PROGRESS:
-                            GroupSystem.fetch.HandleGroupProgress(message.data);
                             break;
                         case ServerMessageType.SET_SUBSPACE:
                             WarpWorker.fetch.HandleSetSubspace(message.data);
@@ -1298,7 +1294,6 @@ namespace SyncrioClientSide
                 Settings.fetch.serverDMPCoopMode = mr.Read<bool>();
                 Client.fetch.gameMode = (GameMode)mr.Read<int>();
                 Client.fetch.serverAllowCheats = mr.Read<bool>();
-                GroupSystem.showAllProgress = mr.Read<bool>();
                 numberOfKerbals = mr.Read<int>();
                 Settings.fetch.numberOfKerbalToSpawn = mr.Read<int>();
                 ScenarioWorker.fetch.nonGroupScenarios = mr.Read<bool>();
@@ -1445,7 +1440,10 @@ namespace SyncrioClientSide
                     }
                     else
                     {
-                        ScenarioWorker.fetch.baseData = data;
+                        if (ScenarioWorker.fetch.baseData == null)
+                        {
+                            ScenarioWorker.fetch.baseData = data;
+                        }
                     }
                 }
             }

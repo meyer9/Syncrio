@@ -120,23 +120,10 @@ namespace SyncrioServer
                     newGroupObject.privacy = kvp.Value.privacy;
                     newGroupObject.members = new List<string>(kvp.Value.members);
                     newGroupObject.settings.inviteAvailable = kvp.Value.settings.inviteAvailable;
-                    newGroupObject.settings.progressPublic = kvp.Value.settings.progressPublic;
                     returnDictionary.Add(kvp.Key, newGroupObject);
                 }
             }
             return returnDictionary;
-        }
-
-        public bool IsGroupProgressPublic(string group)
-        {
-            if (GroupExists(group))
-            {
-                 return groups[group].settings.progressPublic;
-            }
-            else
-            {
-                return false;
-            }
         }
 
         private void LoadGroups()
@@ -196,12 +183,9 @@ namespace SyncrioServer
                                 newGroup.settings.inviteAvailable = Convert.ToBoolean(currentLine, ScenarioSystem.english);
                                 break;
                             case 2:
-                                newGroup.settings.progressPublic = Convert.ToBoolean(currentLine, ScenarioSystem.english);
-                                break;
-                            case 3:
                                 newGroup.passwordSalt = currentLine;
                                 break;
-                            case 4:
+                            case 3:
                                 newGroup.passwordHash = currentLine;
                                 break;
                         }
@@ -271,7 +255,6 @@ namespace SyncrioServer
             {
                 sw.WriteLine(saveGroup.privacy.ToString());
                 sw.WriteLine(saveGroup.settings.inviteAvailable);
-                sw.WriteLine(saveGroup.settings.progressPublic);
                 if (saveGroup.passwordSalt != null)
                 {
                     sw.WriteLine(saveGroup.passwordSalt);
@@ -400,7 +383,6 @@ namespace SyncrioServer
                             groupPassword = mr.Read<string>();
                         }
                         bool isGroupFreeToInvite = mr.Read<bool>();
-                        bool isGroupProgressPublic = mr.Read<bool>();
 
                         if (GroupExists(groupName))
                         {
@@ -430,7 +412,6 @@ namespace SyncrioServer
                         go.members.Add(ownerName);
                         go.privacy = groupPrivacy;
                         go.settings.inviteAvailable = isGroupFreeToInvite;
-                        go.settings.progressPublic = isGroupProgressPublic;
                         groups.Add(groupName, go);
                         SyncrioLog.Debug(ownerName + " created group " + groupName);
                         Messages.Chat.SendChatMessageToClient(callingClient, "You created " + groupName);
@@ -482,7 +463,6 @@ namespace SyncrioServer
                     go.members.Add(ownerName);
                     go.privacy = GroupPrivacy.PUBLIC;
                     go.settings.inviteAvailable = true;
-                    go.settings.progressPublic = true;
                     groups.Add(groupName, go);
                     SyncrioLog.Debug(ownerName + " created group " + groupName);
                     Messages.Group.SendGroupToAll(groupName, go);
@@ -510,7 +490,7 @@ namespace SyncrioServer
                     string groupName = mr.Read<string>();
                     string playerName = mr.Read<string>();
                     string groupPassword = mr.Read<string>();
-                    bool passwordCorrect = CheckGroupPasswordRaw(groupName, groupPassword);
+                    bool passwordIncorrect = CheckGroupPasswordRaw(groupName, groupPassword);
                     if (!GroupExists(groupName))
                     {
                         string errorText = "Cannot join group " + groupName + ", Group does not exist";
@@ -532,7 +512,7 @@ namespace SyncrioServer
                         Messages.Chat.SendChatMessageToClient(callingClient, errorText);
                         return false;
                     }
-                    if (passwordCorrect)
+                    if (passwordIncorrect)
                     {
                         string errorText = "Incorrect Password!";
                         SyncrioLog.Debug(errorText);
@@ -913,7 +893,7 @@ namespace SyncrioServer
                         kickPlayerVotes[playerName].playerVotedCounter += 1;
                         kickPlayerVotes[playerName].currentVotes += PlayerVoteYesOrNo;
                         kickPlayerVotes[playerName].votesPrecent = (kickPlayerVotes[playerName].currentVotes / (groups[playerGroupName].members.Count - 1));
-                        double Threshold = (Settings.specialSettingsStore.groupKickPlayerVotesThreshold / 100);
+                        double Threshold = (Settings.settingsStore.groupKickPlayerVotesThreshold / 100);
                         if (kickPlayerVotes[playerName].votesPrecent > Threshold)
                         {
                             kickPlayerVotes[playerName].currentVotes = 0;

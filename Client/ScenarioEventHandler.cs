@@ -33,11 +33,12 @@ namespace SyncrioClientSide
         public bool enabled = false;
         private static ScenarioEventHandler singleton;
         private bool registered = false;
-        private ScenarioEvents scenarioEvents = new ScenarioEvents();
+        private Dictionary<string, ConfigNode> lastPrograssData = new Dictionary<string, ConfigNode>();//<Progress Id, Progress Data>
         private float lastSync = 0.0f;
         private float syncCooldown = 0.2f;
         public bool cooldown = false;
         public bool startCooldown = false;
+        public bool delaySync = true;
 
         public static ScenarioEventHandler fetch
         {
@@ -80,143 +81,35 @@ namespace SyncrioClientSide
         {
             try
             {
-                scenarioEvents.onContractAccepted = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Accepted");
-                if (scenarioEvents.onContractAccepted != null)
-                {
-                    scenarioEvents.onContractAccepted.Add(OnContractUpdatedWithWeights);
-                }
+                GameEvents.Contract.onAccepted.Add(OnContractUpdatedWithWeights);
+                GameEvents.Contract.onCancelled.Add(OnContractUpdated);
+                GameEvents.Contract.onCompleted.Add(OnContractUpdated);
+                GameEvents.Contract.onDeclined.Add(OnContractUpdated);
+                GameEvents.Contract.onFailed.Add(OnContractUpdated);
+                GameEvents.Contract.onFinished.Add(OnContractUpdated);
+                GameEvents.Contract.onOffered.Add(OnContractOffered);
+                GameEvents.Contract.onParameterChange.Add(OnContractParameterChange);
+                GameEvents.Contract.onRead.Add(OnContractUpdated);
+                GameEvents.Contract.onSeen.Add(OnContractUpdated);
 
-                scenarioEvents.onContractCancelled = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Cancelled");
-                if (scenarioEvents.onContractCancelled != null)
-                {
-                    scenarioEvents.onContractCancelled.Add(OnContractUpdated);
-                }
+                GameEvents.onCustomWaypointLoad.Add(OnCustomWaypointLoad);
+                GameEvents.onCustomWaypointSave.Add(OnCustomWaypointSave);
 
-                scenarioEvents.onContractCompleted = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Completed");
-                if (scenarioEvents.onContractCompleted != null)
-                {
-                    scenarioEvents.onContractCompleted.Add(OnContractUpdated);
-                }
+                GameEvents.OnFundsChanged.Add(OnFundsChanged);
+                GameEvents.OnReputationChanged.Add(OnReputationChanged);
+                GameEvents.OnScienceChanged.Add(OnScienceChanged);
 
-                scenarioEvents.onContractDeclined = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Declined");
-                if (scenarioEvents.onContractDeclined != null)
-                {
-                    scenarioEvents.onContractDeclined.Add(OnContractUpdated);
-                }
+                GameEvents.OnKSCFacilityUpgraded.Add(OnKSCFacilityUpgraded);
+                GameEvents.OnKSCStructureCollapsed.Add(OnKSCStructureCollapsed);
+                GameEvents.OnKSCStructureRepaired.Add(OnKSCStructureRepaired);
 
-                scenarioEvents.onContractFailed = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Failed");
-                if (scenarioEvents.onContractFailed != null)
-                {
-                    scenarioEvents.onContractFailed.Add(OnContractUpdated);
-                }
+                GameEvents.OnPartPurchased.Add(OnPartPurchased);
+                GameEvents.OnPartUpgradePurchased.Add(OnPartUpgradePurchased);
 
-                scenarioEvents.onContractFinished = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Finished");
-                if (scenarioEvents.onContractFinished != null)
-                {
-                    scenarioEvents.onContractFinished.Add(OnContractUpdated);
-                }
+                GameEvents.onProgressNodeSave.Add(OnProgressNodeSave);
 
-                scenarioEvents.onContractOffered = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Generated");
-                if (scenarioEvents.onContractOffered != null)
-                {
-                    scenarioEvents.onContractOffered.Add(OnContractOffered);
-                }
-
-                scenarioEvents.onContractParameterChange = GameEvents.FindEvent<EventData<Contracts.Contract, Contracts.ContractParameter>>("Contract.ParameterChange");
-                if (scenarioEvents.onContractParameterChange != null)
-                {
-                    scenarioEvents.onContractParameterChange.Add(OnContractParameterChange);
-                }
-
-                scenarioEvents.onContractRead = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Read");
-                if (scenarioEvents.onContractRead != null)
-                {
-                    scenarioEvents.onContractRead.Add(OnContractUpdated);
-                }
-
-                scenarioEvents.onContractSeen = GameEvents.FindEvent<EventData<Contracts.Contract>>("Contract.Seen");
-                if (scenarioEvents.onContractSeen != null)
-                {
-                    scenarioEvents.onContractSeen.Add(OnContractUpdated);
-                }
-
-                scenarioEvents.onCustomWaypointLoad = GameEvents.FindEvent<EventData<GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode>>>("onCustomWaypointLoad");
-                if (scenarioEvents.onCustomWaypointLoad != null)
-                {
-                    scenarioEvents.onCustomWaypointLoad.Add(OnCustomWaypointLoad);
-                }
-
-                scenarioEvents.onCustomWaypointSave = GameEvents.FindEvent<EventData<GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode>>>("onCustomWaypointSave");
-                if (scenarioEvents.onCustomWaypointSave != null)
-                {
-                    scenarioEvents.onCustomWaypointSave.Add(OnCustomWaypointSave);
-                }
-
-                scenarioEvents.OnFundsChanged = GameEvents.FindEvent<EventData<double, TransactionReasons>>("OnFundsChanged");
-                if (scenarioEvents.OnFundsChanged != null)
-                {
-                    scenarioEvents.OnFundsChanged.Add(OnFundsChanged);
-                }
-
-                scenarioEvents.OnReputationChanged = GameEvents.FindEvent<EventData<float, TransactionReasons>>("OnReputationChanged");
-                if (scenarioEvents.OnReputationChanged != null)
-                {
-                    scenarioEvents.OnReputationChanged.Add(OnReputationChanged);
-                }
-
-                scenarioEvents.OnScienceChanged = GameEvents.FindEvent<EventData<float, TransactionReasons>>("OnScienceChanged");
-                if (scenarioEvents.OnScienceChanged != null)
-                {
-                    scenarioEvents.OnScienceChanged.Add(OnScienceChanged);
-                }
-
-                scenarioEvents.OnKSCFacilityUpgraded = GameEvents.FindEvent<EventData<Upgradeables.UpgradeableFacility, int>>("OnKSCFacilityUpgraded");
-                if (scenarioEvents.OnKSCFacilityUpgraded != null)
-                {
-                    scenarioEvents.OnKSCFacilityUpgraded.Add(OnKSCFacilityUpgraded);
-                }
-
-                scenarioEvents.OnKSCStructureCollapsed = GameEvents.FindEvent<EventData<DestructibleBuilding>>("OnKSCStructureCollapsed");
-                if (scenarioEvents.OnKSCStructureCollapsed != null)
-                {
-                    scenarioEvents.OnKSCStructureCollapsed.Add(OnKSCStructureCollapsed);
-                }
-
-                scenarioEvents.OnKSCStructureRepaired = GameEvents.FindEvent<EventData<DestructibleBuilding>>("OnKSCStructureRepaired");
-                if (scenarioEvents.OnKSCStructureRepaired != null)
-                {
-                    scenarioEvents.OnKSCStructureRepaired.Add(OnKSCStructureRepaired);
-                }
-
-                scenarioEvents.OnPartPurchased = GameEvents.FindEvent<EventData<AvailablePart>>("OnPartPurchased");
-                if (scenarioEvents.OnPartPurchased != null)
-                {
-                    scenarioEvents.OnPartPurchased.Add(OnPartPurchased);
-                }
-
-                scenarioEvents.OnPartUpgradePurchased = GameEvents.FindEvent<EventData<PartUpgradeHandler.Upgrade>>("OnPartUpgradePurchased");
-                if (scenarioEvents.OnPartUpgradePurchased != null)
-                {
-                    scenarioEvents.OnPartUpgradePurchased.Add(OnPartUpgradePurchased);
-                }
-
-                scenarioEvents.OnProgressComplete = GameEvents.FindEvent<EventData<ProgressNode>>("OnProgressComplete");
-                if (scenarioEvents.OnProgressComplete != null)
-                {
-                    scenarioEvents.OnProgressComplete.Add(OnProgressComplete);
-                }
-
-                scenarioEvents.OnTechnologyResearched = GameEvents.FindEvent<EventData<GameEvents.HostTargetAction<RDTech, RDTech.OperationResult>>>("OnTechnologyResearched");
-                if (scenarioEvents.OnTechnologyResearched != null)
-                {
-                    scenarioEvents.OnTechnologyResearched.Add(OnTechnologyResearched);
-                }
-
-                scenarioEvents.OnScienceRecieved = GameEvents.FindEvent<EventData<float, ScienceSubject, ProtoVessel, bool>>("OnScienceRecieved");
-                if (scenarioEvents.OnScienceRecieved != null)
-                {
-                    scenarioEvents.OnScienceRecieved.Add(OnScienceRecieved);
-                }
+                GameEvents.OnTechnologyResearched.Add(OnTechnologyResearched);
+                GameEvents.OnScienceRecieved.Add(OnScienceRecieved);
             }
             catch (Exception e)
             {
@@ -230,120 +123,35 @@ namespace SyncrioClientSide
             registered = false;
             try
             {
-                if (scenarioEvents.onContractAccepted != null)
-                {
-                    scenarioEvents.onContractAccepted.Remove(OnContractUpdatedWithWeights);
-                }
+                GameEvents.Contract.onAccepted.Remove(OnContractUpdatedWithWeights);
+                GameEvents.Contract.onCancelled.Remove(OnContractUpdated);
+                GameEvents.Contract.onCompleted.Remove(OnContractUpdated);
+                GameEvents.Contract.onDeclined.Remove(OnContractUpdated);
+                GameEvents.Contract.onFailed.Remove(OnContractUpdated);
+                GameEvents.Contract.onFinished.Remove(OnContractUpdated);
+                GameEvents.Contract.onOffered.Remove(OnContractOffered);
+                GameEvents.Contract.onParameterChange.Remove(OnContractParameterChange);
+                GameEvents.Contract.onRead.Remove(OnContractUpdated);
+                GameEvents.Contract.onSeen.Remove(OnContractUpdated);
 
-                if (scenarioEvents.onContractCancelled != null)
-                {
-                    scenarioEvents.onContractCancelled.Remove(OnContractUpdated);
-                }
+                GameEvents.onCustomWaypointLoad.Remove(OnCustomWaypointLoad);
+                GameEvents.onCustomWaypointSave.Remove(OnCustomWaypointSave);
 
-                if (scenarioEvents.onContractCompleted != null)
-                {
-                    scenarioEvents.onContractCompleted.Remove(OnContractUpdated);
-                }
+                GameEvents.OnFundsChanged.Remove(OnFundsChanged);
+                GameEvents.OnReputationChanged.Remove(OnReputationChanged);
+                GameEvents.OnScienceChanged.Remove(OnScienceChanged);
 
-                if (scenarioEvents.onContractDeclined != null)
-                {
-                    scenarioEvents.onContractDeclined.Remove(OnContractUpdated);
-                }
+                GameEvents.OnKSCFacilityUpgraded.Remove(OnKSCFacilityUpgraded);
+                GameEvents.OnKSCStructureCollapsed.Remove(OnKSCStructureCollapsed);
+                GameEvents.OnKSCStructureRepaired.Remove(OnKSCStructureRepaired);
 
-                if (scenarioEvents.onContractFailed != null)
-                {
-                    scenarioEvents.onContractFailed.Remove(OnContractUpdated);
-                }
+                GameEvents.OnPartPurchased.Remove(OnPartPurchased);
+                GameEvents.OnPartUpgradePurchased.Remove(OnPartUpgradePurchased);
 
-                if (scenarioEvents.onContractFinished != null)
-                {
-                    scenarioEvents.onContractFinished.Remove(OnContractUpdated);
-                }
+                GameEvents.onProgressNodeSave.Remove(OnProgressNodeSave);
 
-                if (scenarioEvents.onContractOffered != null)
-                {
-                    scenarioEvents.onContractOffered.Remove(OnContractOffered);
-                }
-
-                if (scenarioEvents.onContractParameterChange != null)
-                {
-                    scenarioEvents.onContractParameterChange.Remove(OnContractParameterChange);
-                }
-
-                if (scenarioEvents.onContractRead != null)
-                {
-                    scenarioEvents.onContractRead.Remove(OnContractUpdated);
-                }
-
-                if (scenarioEvents.onContractSeen != null)
-                {
-                    scenarioEvents.onContractSeen.Remove(OnContractUpdated);
-                }
-
-                if (scenarioEvents.onCustomWaypointLoad != null)
-                {
-                    scenarioEvents.onCustomWaypointLoad.Remove(OnCustomWaypointLoad);
-                }
-
-                if (scenarioEvents.onCustomWaypointSave != null)
-                {
-                    scenarioEvents.onCustomWaypointSave.Remove(OnCustomWaypointSave);
-                }
-
-                if (scenarioEvents.OnFundsChanged != null)
-                {
-                    scenarioEvents.OnFundsChanged.Remove(OnFundsChanged);
-                }
-
-                if (scenarioEvents.OnReputationChanged != null)
-                {
-                    scenarioEvents.OnReputationChanged.Remove(OnReputationChanged);
-                }
-
-                if (scenarioEvents.OnScienceChanged != null)
-                {
-                    scenarioEvents.OnScienceChanged.Remove(OnScienceChanged);
-                }
-
-                if (scenarioEvents.OnKSCFacilityUpgraded != null)
-                {
-                    scenarioEvents.OnKSCFacilityUpgraded.Remove(OnKSCFacilityUpgraded);
-                }
-
-                if (scenarioEvents.OnKSCStructureCollapsed != null)
-                {
-                    scenarioEvents.OnKSCStructureCollapsed.Remove(OnKSCStructureCollapsed);
-                }
-
-                if (scenarioEvents.OnKSCStructureRepaired != null)
-                {
-                    scenarioEvents.OnKSCStructureRepaired.Remove(OnKSCStructureRepaired);
-                }
-
-                if (scenarioEvents.OnPartPurchased != null)
-                {
-                    scenarioEvents.OnPartPurchased.Remove(OnPartPurchased);
-                }
-
-                if (scenarioEvents.OnPartUpgradePurchased != null)
-                {
-                    scenarioEvents.OnPartUpgradePurchased.Remove(OnPartUpgradePurchased);
-                }
-
-                if (scenarioEvents.OnProgressComplete != null)
-                {
-                    scenarioEvents.OnProgressComplete.Remove(OnProgressComplete);
-                }
-
-                if (scenarioEvents.OnTechnologyResearched != null)
-                {
-                    scenarioEvents.OnTechnologyResearched.Remove(OnTechnologyResearched);
-                }
-
-                if (scenarioEvents.OnScienceRecieved != null)
-                {
-                    scenarioEvents.OnScienceRecieved.Remove(OnScienceRecieved);
-                }
+                GameEvents.OnTechnologyResearched.Remove(OnTechnologyResearched);
+                GameEvents.OnScienceRecieved.Remove(OnScienceRecieved);
             }
             catch (Exception e)
             {
@@ -353,7 +161,7 @@ namespace SyncrioClientSide
         
         private void OnContractUpdatedWithWeights(Contracts.Contract contract)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -373,7 +181,23 @@ namespace SyncrioClientSide
 
                         ConfigNode cn = new ConfigNode();
                         contract.Save(cn);
-                        byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                        List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                        if (contract.IsFinished())
+                        {
+                            cnList.Insert(0, "CONTRACT_FINISHED");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
+                        }
+                        else
+                        {
+                            cnList.Insert(0, "CONTRACT");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
+                        }
+
+                        byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                         mw.Write<byte[]>(cnData);
                         
@@ -403,7 +227,23 @@ namespace SyncrioClientSide
 
                     ConfigNode cn = new ConfigNode();
                     contract.Save(cn);
-                    byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                    if (contract.IsFinished())
+                    {
+                        cnList.Insert(0, "CONTRACT_FINISHED");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+                    else
+                    {
+                        cnList.Insert(0, "CONTRACT");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+
+                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                     mw.Write<byte[]>(cnData);
 
@@ -425,7 +265,7 @@ namespace SyncrioClientSide
 
         private void OnContractUpdated(Contracts.Contract contract)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -445,7 +285,23 @@ namespace SyncrioClientSide
 
                         ConfigNode cn = new ConfigNode();
                         contract.Save(cn);
-                        byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                        List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                        if (contract.IsFinished())
+                        {
+                            cnList.Insert(0, "CONTRACT_FINISHED");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
+                        }
+                        else
+                        {
+                            cnList.Insert(0, "CONTRACT");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
+                        }
+
+                        byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                         mw.Write<byte[]>(cnData);
 
@@ -468,7 +324,23 @@ namespace SyncrioClientSide
 
                     ConfigNode cn = new ConfigNode();
                     contract.Save(cn);
-                    byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                    if (contract.IsFinished())
+                    {
+                        cnList.Insert(0, "CONTRACT_FINISHED");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+                    else
+                    {
+                        cnList.Insert(0, "CONTRACT");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+
+                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                     mw.Write<byte[]>(cnData);
 
@@ -483,7 +355,7 @@ namespace SyncrioClientSide
 
         private void OnContractOffered(Contracts.Contract contract)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -509,7 +381,23 @@ namespace SyncrioClientSide
 
                             ConfigNode cn = new ConfigNode();
                             contract.Save(cn);
-                            byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                            List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                            if (contract.IsFinished())
+                            {
+                                cnList.Insert(0, "CONTRACT_FINISHED");
+                                cnList.Insert(1, "{");
+                                cnList.Add("}");
+                            }
+                            else
+                            {
+                                cnList.Insert(0, "CONTRACT");
+                                cnList.Insert(1, "{");
+                                cnList.Add("}");
+                            }
+
+                            byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                             mw.Write<byte[]>(cnData);
 
@@ -530,7 +418,23 @@ namespace SyncrioClientSide
 
                     ConfigNode cn = new ConfigNode();
                     contract.Save(cn);
-                    byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                    if (contract.IsFinished())
+                    {
+                        cnList.Insert(0, "CONTRACT_FINISHED");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+                    else
+                    {
+                        cnList.Insert(0, "CONTRACT");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+
+                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                     mw.Write<byte[]>(cnData);
 
@@ -543,7 +447,7 @@ namespace SyncrioClientSide
 
         private void OnContractParameterChange(Contracts.Contract contract, Contracts.ContractParameter param)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -563,7 +467,23 @@ namespace SyncrioClientSide
 
                         ConfigNode cn = new ConfigNode();
                         contract.Save(cn);
-                        byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                        List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                        if (contract.IsFinished())
+                        {
+                            cnList.Insert(0, "CONTRACT_FINISHED");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
+                        }
+                        else
+                        {
+                            cnList.Insert(0, "CONTRACT");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
+                        }
+
+                        byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                         mw.Write<byte[]>(cnData);
 
@@ -586,7 +506,23 @@ namespace SyncrioClientSide
 
                     ConfigNode cn = new ConfigNode();
                     contract.Save(cn);
-                    byte[] cnData = ConfigNodeSerializer.fetch.Serialize(cn);
+
+                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                    if (contract.IsFinished())
+                    {
+                        cnList.Insert(0, "CONTRACT_FINISHED");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+                    else
+                    {
+                        cnList.Insert(0, "CONTRACT");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+
+                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
                     mw.Write<byte[]>(cnData);
 
@@ -601,7 +537,7 @@ namespace SyncrioClientSide
 
         private void OnCustomWaypointLoad(GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode> waypoint)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -658,7 +594,7 @@ namespace SyncrioClientSide
 
         private void OnCustomWaypointSave(GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode> waypoint)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -723,7 +659,7 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -776,7 +712,7 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -829,7 +765,7 @@ namespace SyncrioClientSide
                 }
             }
 
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -874,7 +810,7 @@ namespace SyncrioClientSide
 
         private void OnKSCFacilityUpgraded(Upgradeables.UpgradeableFacility facility, int level)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -923,7 +859,7 @@ namespace SyncrioClientSide
 
         private void OnKSCStructureCollapsed(DestructibleBuilding building)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -968,7 +904,7 @@ namespace SyncrioClientSide
 
         private void OnKSCStructureRepaired(DestructibleBuilding building)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1013,7 +949,7 @@ namespace SyncrioClientSide
 
         private void OnPartPurchased(AvailablePart part)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1060,7 +996,7 @@ namespace SyncrioClientSide
 
         private void OnPartUpgradePurchased(PartUpgradeHandler.Upgrade upgrade)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1105,66 +1041,90 @@ namespace SyncrioClientSide
             }
         }
 
-        private void OnProgressComplete(ProgressNode pn)
+        private void OnProgressNodeSave(GameEvents.FromToAction<ProgressNode, ConfigNode> dataNode)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
 
-            if (GroupSystem.playerGroupAssigned)
+            if (dataNode.from.Id == "BaseConstruction" || dataNode.from.Id == "CrewTransfer" || dataNode.from.Id == "Docking" || dataNode.from.Id == "Escape" || dataNode.from.Id == "FlagPlant" || dataNode.from.Id == "Flight" || dataNode.from.Id == "FlyBy" || dataNode.from.Id == "Landing" || dataNode.from.Id == "Orbit" || dataNode.from.Id == "Rendezvous" || dataNode.from.Id == "ReturnFromFlyby" || dataNode.from.Id == "ReturnFromOrbit" || dataNode.from.Id == "ReturnFromSurface" || dataNode.from.Id == "Science" || dataNode.from.Id == "Spacewalk" || dataNode.from.Id == "Splashdown" || dataNode.from.Id == "StationConstruction" || dataNode.from.Id == "Suborbit" || dataNode.from.Id == "SurfaceEVA")
             {
-                string groupName = GroupSystem.playerGroupName;
+                return;
+            }
 
-                if (!string.IsNullOrEmpty(groupName))
+            bool send = false;
+            
+            if (!lastPrograssData.ContainsKey(dataNode.from.Id))
+            {
+                lastPrograssData.Add(dataNode.from.Id, dataNode.to);
+
+                send = true;
+            }
+            else
+            {
+                if (dataNode.to != null)
+                {
+                    if (dataNode.to != lastPrograssData[dataNode.from.Id])
+                    {
+                        lastPrograssData[dataNode.from.Id] = dataNode.to;
+                        send = true;
+                    }
+                }
+            }
+
+            if (send)
+            {
+                if (GroupSystem.playerGroupAssigned)
+                {
+                    string groupName = GroupSystem.playerGroupName;
+
+                    if (!string.IsNullOrEmpty(groupName))
+                    {
+                        byte[] data;
+
+                        using (MessageWriter mw = new MessageWriter())
+                        {
+                            mw.Write<bool>(true);//In group
+                            mw.Write<string>(groupName);
+
+                            mw.Write<string>(dataNode.from.Id);
+
+                            byte[] pnData = ConfigNodeSerializer.fetch.Serialize(dataNode.to);
+
+                            mw.Write<byte[]>(pnData);
+
+                            data = mw.GetMessageBytes();
+                        }
+
+                        SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
+                    }
+                }
+                else
                 {
                     byte[] data;
 
                     using (MessageWriter mw = new MessageWriter())
                     {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
+                        mw.Write<bool>(false);//In group
 
-                        mw.Write<string>(pn.Id);
-                        
-                        ConfigNode pnCFG = new ConfigNode();
-                        pn.Save(pnCFG);
-                        byte[] pnData = ConfigNodeSerializer.fetch.Serialize(pnCFG);
+                        mw.Write<string>(dataNode.from.Id);
+
+                        byte[] pnData = ConfigNodeSerializer.fetch.Serialize(dataNode.to);
 
                         mw.Write<byte[]>(pnData);
 
                         data = mw.GetMessageBytes();
                     }
 
-                    SendData((int)ScenarioDataType.PROGRESS_COMPLETE, data);
+                    SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
                 }
-            }
-            else
-            {
-                byte[] data;
-
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(pn.Id);
-
-                    ConfigNode pnCFG = new ConfigNode();
-                    pn.Save(pnCFG);
-                    byte[] pnData = ConfigNodeSerializer.fetch.Serialize(pnCFG);
-
-                    mw.Write<byte[]>(pnData);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.PROGRESS_COMPLETE, data);
             }
         }
 
         private void OnTechnologyResearched(GameEvents.HostTargetAction<RDTech, RDTech.OperationResult> tech)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1238,7 +1198,7 @@ namespace SyncrioClientSide
 
         private void OnScienceRecieved(float dataValue, ScienceSubject subject, ProtoVessel vessel, bool reverseEngineered)
         {
-            if (cooldown)
+            if (cooldown || delaySync)
             {
                 return;
             }
@@ -1333,42 +1293,8 @@ namespace SyncrioClientSide
                 }
                 singleton = new ScenarioEventHandler();
                 Client.updateEvent.Add(singleton.Update);
+                singleton.delaySync = true;
             }
-        }
-
-        class ScenarioEvents
-        {
-            //Contracts
-            public EventData<Contracts.Contract> onContractAccepted;//"Contract.Accepted"
-            public EventData<Contracts.Contract> onContractCancelled;//"Contract.Cancelled"
-            public EventData<Contracts.Contract> onContractCompleted;//"Contract.Completed"
-            public EventData<Contracts.Contract> onContractDeclined;//"Contract.Declined"
-            public EventData<Contracts.Contract> onContractFailed;//"Contract.Failed"
-            public EventData<Contracts.Contract> onContractFinished;//"Contract.Finished"
-            public EventData<Contracts.Contract> onContractOffered;//"Contract.Generated"
-            public EventData<Contracts.Contract, Contracts.ContractParameter> onContractParameterChange;//"Contract.ParameterChange"
-            public EventData<Contracts.Contract> onContractRead;//"Contract.Read"
-            public EventData<Contracts.Contract> onContractSeen;//"Contract.Seen"
-            //Custom Waypoints
-            public EventData<GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode>> onCustomWaypointLoad;//"onCustomWaypointLoad"
-            public EventData<GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode>> onCustomWaypointSave;//"onCustomWaypointSave"
-            //Currency
-            public EventData<double, TransactionReasons> OnFundsChanged;//"OnFundsChanged"
-            public EventData<float, TransactionReasons> OnReputationChanged;//"OnReputationChanged"
-            public EventData<float, TransactionReasons> OnScienceChanged;//"OnScienceChanged"
-            //Facilities
-            public EventData<Upgradeables.UpgradeableFacility, int> OnKSCFacilityUpgraded;//"OnKSCFacilityUpgraded"
-            public EventData<DestructibleBuilding> OnKSCStructureCollapsed;//"OnKSCStructureCollapsed"
-            public EventData<DestructibleBuilding> OnKSCStructureRepaired;//"OnKSCStructureRepaired"
-            //Parts
-            public EventData<AvailablePart> OnPartPurchased;//"OnPartPurchased"
-            public EventData<PartUpgradeHandler.Upgrade> OnPartUpgradePurchased;//"OnPartUpgradePurchased"
-            //Progress
-            public EventData<ProgressNode> OnProgressComplete;//"OnProgressComplete"
-            //Technology
-            public EventData<GameEvents.HostTargetAction<RDTech, RDTech.OperationResult>> OnTechnologyResearched;//"OnTechnologyResearched"
-            //Science
-            public EventData<float, ScienceSubject, ProtoVessel, bool> OnScienceRecieved;//"OnScienceRecieved"
         }
     }
 }
