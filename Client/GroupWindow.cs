@@ -169,16 +169,16 @@ namespace SyncrioClientSide
                 {
                     if (oldGroupName != GroupSystem.playerGroupName)
                     {
-                        if (LockSystem.fetch.LockExists("contract-spawn-" + oldGroupName))
+                        if (LockSystem.fetch.LockExists(string.Format(Client.english, "contract-spawn-{0}", oldGroupName)))
                         {
-                            if (LockSystem.fetch.LockIsOurs("contract-spawn-" + oldGroupName))
+                            if (LockSystem.fetch.LockIsOurs(string.Format(Client.english, "contract-spawn-{0}", oldGroupName)))
                             {
-                                LockSystem.fetch.ReleaseLock("contract-spawn-" + oldGroupName);
+                                LockSystem.fetch.ReleaseLock(string.Format(Client.english, "contract-spawn-{0}", oldGroupName));
                             }
                         }
-                        if (!LockSystem.fetch.LockExists("contract-spawn-" + GroupSystem.playerGroupName))
+                        if (!LockSystem.fetch.LockExists(string.Format(Client.english, "contract-spawn-{0}", GroupSystem.playerGroupName)))
                         {
-                            LockSystem.fetch.AcquireLock("contract-spawn-" + GroupSystem.playerGroupName, false);
+                            LockSystem.fetch.AcquireLock(string.Format(Client.english, "contract-spawn-{0}", GroupSystem.playerGroupName), false);
                         }
                     }
                 }
@@ -202,11 +202,11 @@ namespace SyncrioClientSide
                 GroupSystem.playerGroupName = string.Empty;
                 if (wasPlayerInGroup)
                 {
-                    if (LockSystem.fetch.LockExists("contract-spawn-" + oldGroupName))
+                    if (LockSystem.fetch.LockExists(string.Format(Client.english, "contract-spawn-{0}", oldGroupName)))
                     {
-                        if (LockSystem.fetch.LockIsOurs("contract-spawn-" + oldGroupName))
+                        if (LockSystem.fetch.LockIsOurs(string.Format(Client.english, "contract-spawn-{0}", oldGroupName)))
                         {
-                            LockSystem.fetch.ReleaseLock("contract-spawn-" + oldGroupName);
+                            LockSystem.fetch.ReleaseLock(string.Format(Client.english, "contract-spawn-{0}", oldGroupName));
                         }
                     }
                 }

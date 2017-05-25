@@ -319,11 +319,11 @@ namespace SyncrioServer.Messages
                 Directory.CreateDirectory(Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces"));
             }
 
-            string path = Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces", Convert.ToString(subspaceNumber) + ".txt");
+            string path = Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces", Convert.ToString(subspaceNumber, ScenarioSystem.english) + ".txt");
 
             List<string> listToSave = new List<string>();
 
-            listToSave.Add(Convert.ToString(parentNumber));
+            listToSave.Add(Convert.ToString(parentNumber, ScenarioSystem.english));
 
             SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(listToSave), path);
         }
