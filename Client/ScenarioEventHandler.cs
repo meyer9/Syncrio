@@ -33,9 +33,9 @@ namespace SyncrioClientSide
         public bool enabled = false;
         private static ScenarioEventHandler singleton;
         private bool registered = false;
-        private Dictionary<string, ConfigNode> lastPrograssData = new Dictionary<string, ConfigNode>();//<Progress Id, Progress Data>
-        public ConfigNode lastResourceScenarioModule;
-        public ConfigNode lastStrategySystemModule;
+        private Dictionary<string, List<string>> lastPrograssData = new Dictionary<string, List<string>>();//<Progress Id, Progress Data>
+        public List<string> lastResourceScenarioModule;
+        public List<string> lastStrategySystemModule;
         private float lastScenarioCheck = 0f;
         private float scenarioCheckInterval = 4f;
         private float lastSync = 0f;
@@ -85,10 +85,42 @@ namespace SyncrioClientSide
                             ConfigNode currentResourceScenarioModule = new ConfigNode();
 
                             ResourceScenario.Instance.Save(currentResourceScenarioModule);
+                            
+                            List<string> newData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(currentResourceScenarioModule));
 
-                            if (currentResourceScenarioModule != lastResourceScenarioModule)
+                            bool dataIsAMatch = false;
+
+                            if (newData == lastResourceScenarioModule)
                             {
-                                lastResourceScenarioModule = currentResourceScenarioModule;
+                                dataIsAMatch = true;
+                            }
+                            else
+                            {
+                                if (newData.Count == lastResourceScenarioModule.Count)
+                                {
+                                    int loop = 0;
+
+                                    bool subDataIsAMatch = true;
+
+                                    while (loop < newData.Count)
+                                    {
+                                        if (newData[loop].Trim() != lastResourceScenarioModule[loop].Trim())
+                                        {
+                                            subDataIsAMatch = false;
+
+                                            break;
+                                        }
+
+                                        loop++;
+                                    }
+
+                                    dataIsAMatch = subDataIsAMatch;
+                                }
+                            }
+
+                            if (!dataIsAMatch)
+                            {
+                                lastResourceScenarioModule = newData;
 
                                 byte[] data = ConfigNodeSerializer.fetch.Serialize(currentResourceScenarioModule);
 
@@ -125,9 +157,11 @@ namespace SyncrioClientSide
                         }
                         else
                         {
-                            lastResourceScenarioModule = new ConfigNode();
+                            ConfigNode module = new ConfigNode();
 
-                            ResourceScenario.Instance.Save(lastResourceScenarioModule);
+                            ResourceScenario.Instance.Save(module);
+
+                            lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
                         }
 
                         if (lastStrategySystemModule != null)
@@ -135,10 +169,42 @@ namespace SyncrioClientSide
                             ConfigNode currentStrategySystemModule = new ConfigNode();
 
                             Strategies.StrategySystem.Instance.Save(currentStrategySystemModule);
+                            
+                            List<string> newData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(currentStrategySystemModule));
 
-                            if (currentStrategySystemModule != lastStrategySystemModule)
+                            bool dataIsAMatch = false;
+
+                            if (newData == lastStrategySystemModule)
                             {
-                                lastStrategySystemModule = currentStrategySystemModule;
+                                dataIsAMatch = true;
+                            }
+                            else
+                            {
+                                if (newData.Count == lastStrategySystemModule.Count)
+                                {
+                                    int loop = 0;
+
+                                    bool subDataIsAMatch = true;
+
+                                    while (loop < newData.Count)
+                                    {
+                                        if (newData[loop].Trim() != lastStrategySystemModule[loop].Trim())
+                                        {
+                                            subDataIsAMatch = false;
+
+                                            break;
+                                        }
+
+                                        loop++;
+                                    }
+
+                                    dataIsAMatch = subDataIsAMatch;
+                                }
+                            }
+
+                            if (!dataIsAMatch)
+                            {
+                                lastStrategySystemModule = newData;
 
                                 byte[] data = ConfigNodeSerializer.fetch.Serialize(currentStrategySystemModule);
 
@@ -175,9 +241,11 @@ namespace SyncrioClientSide
                         }
                         else
                         {
-                            lastStrategySystemModule = new ConfigNode();
+                            ConfigNode module = new ConfigNode();
 
-                            Strategies.StrategySystem.Instance.Save(lastStrategySystemModule);
+                            Strategies.StrategySystem.Instance.Save(module);
+
+                            lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
                         }
                     }
                 }
@@ -1171,7 +1239,7 @@ namespace SyncrioClientSide
             
             if (!lastPrograssData.ContainsKey(dataNode.from.Id))
             {
-                lastPrograssData.Add(dataNode.from.Id, dataNode.to);
+                lastPrograssData.Add(dataNode.from.Id, SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(dataNode.to)));
 
                 send = true;
             }
@@ -1179,9 +1247,41 @@ namespace SyncrioClientSide
             {
                 if (dataNode.to != null)
                 {
-                    if (dataNode.to != lastPrograssData[dataNode.from.Id])
+                    List<string> newData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(dataNode.to));
+
+                    bool dataIsAMatch = false;
+
+                    if (newData == lastPrograssData[dataNode.from.Id])
                     {
-                        lastPrograssData[dataNode.from.Id] = dataNode.to;
+                        dataIsAMatch = true;
+                    }
+                    else
+                    {
+                        if (newData.Count == lastPrograssData[dataNode.from.Id].Count)
+                        {
+                            int loop = 0;
+
+                            bool subDataIsAMatch = true;
+
+                            while (loop < newData.Count)
+                            {
+                                if (newData[loop].Trim() != lastPrograssData[dataNode.from.Id][loop].Trim())
+                                {
+                                    subDataIsAMatch = false;
+
+                                    break;
+                                }
+
+                                loop++;
+                            }
+
+                            dataIsAMatch = subDataIsAMatch;
+                        }
+                    }
+
+                    if (!dataIsAMatch)
+                    {
+                        lastPrograssData[dataNode.from.Id] = newData;
                         send = true;
                     }
                 }

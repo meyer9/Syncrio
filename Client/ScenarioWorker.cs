@@ -829,7 +829,7 @@ namespace SyncrioClientSide
 
                                 ResourceScenario.Instance.Load(ResourceCfg);
 
-                                ScenarioEventHandler.fetch.lastResourceScenarioModule = ResourceCfg;
+                                ScenarioEventHandler.fetch.lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ResourceCfg));
                             }
 
                             if (name[0] == "StrategySystem")
@@ -838,7 +838,7 @@ namespace SyncrioClientSide
 
                                 Strategies.StrategySystem.Instance.Load(StrategyCfg);
 
-                                ScenarioEventHandler.fetch.lastStrategySystemModule = StrategyCfg;
+                                ScenarioEventHandler.fetch.lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(StrategyCfg));
                             }
                         }
                         catch (Exception e)
