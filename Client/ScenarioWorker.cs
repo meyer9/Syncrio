@@ -174,680 +174,756 @@ namespace SyncrioClientSide
         {
             lock (scenarioLock)
             {
-                if (Client.fetch.gameRunning && HighLogic.LoadedScene != GameScenes.LOADING)
+                if (Client.fetch.gameRunning)
                 {
-                    isSyncing = true;
-                    ScenarioEventHandler.fetch.startCooldown = true;
-                    ScenarioEventHandler.fetch.cooldown = true;
-
-                    for (int v = 0; v < data.Count; v += 2)
+                    if (HighLogic.LoadedScene != GameScenes.LOADING)
                     {
-                        if (v + 1 >= data.Count)
-                        {
-                            break;
-                        }
+                        isSyncing = true;
+                        ScenarioEventHandler.fetch.startCooldown = true;
+                        ScenarioEventHandler.fetch.cooldown = true;
 
-                        List<string> name = SyncrioUtil.ByteArraySerializer.Deserialize(data[v]);
-                        List<string> dataList = SyncrioUtil.ByteArraySerializer.Deserialize(data[v + 1]);
-
-                        try
+                        for (int v = 0; v < data.Count; v += 2)
                         {
-                            if (name[0] == "Contracts")
+                            if (v + 1 >= data.Count)
                             {
-                                ConfigNode ContractCFG = new ConfigNode();
+                                break;
+                            }
 
-                                Contracts.ContractSystem.Instance.Save(ContractCFG);
+                            List<string> name = SyncrioUtil.ByteArraySerializer.Deserialize(data[v]);
+                            List<string> dataList = SyncrioUtil.ByteArraySerializer.Deserialize(data[v + 1]);
 
-                                List<string> contractData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ContractCFG));
-
-                                int index = 0;
-                                while (index < contractData.Count)
+                            try
+                            {
+                                if (name[0] == "Contracts")
                                 {
-                                    if (contractData[index] == "CONTRACTS" && contractData[index + 1] == "{")
+                                    if (!ScenarioEventHandler.fetch.MissionControlOpen)
                                     {
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(contractData, index + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+                                        ConfigNode ContractCFG = new ConfigNode();
 
-                                        contractData.RemoveRange(range.Key, range.Value);
-                                    }
-                                    else
-                                    {
-                                        index++;
-                                    }
-                                }
+                                        Contracts.ContractSystem.Instance.Save(ContractCFG);
 
-                                contractData.Add("CONTRACTS");
-                                contractData.Add("{");
+                                        List<string> contractData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ContractCFG));
 
-                                int looped = 0;
-                                while (looped < dataList.Count)
-                                {
-                                    if (dataList[looped] == "ContractNode")
-                                    {
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
-
-                                        if (range.Key + 2 < dataList.Count && range.Value - 3 > 0)
+                                        int index = 0;
+                                        while (index < contractData.Count)
                                         {
-                                            contractData.AddRange(dataList.GetRange(range.Key + 2, range.Value - 3));
+                                            if (contractData[index] == "CONTRACTS" && contractData[index + 1] == "{")
+                                            {
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(contractData, index + 1);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
 
-                                            dataList.RemoveRange(range.Key, range.Value);
+                                                contractData.RemoveRange(range.Key, range.Value);
+                                            }
+                                            else
+                                            {
+                                                index++;
+                                            }
+                                        }
+
+                                        contractData.Add("CONTRACTS");
+                                        contractData.Add("{");
+
+                                        int looped = 0;
+                                        while (looped < dataList.Count)
+                                        {
+                                            if (dataList[looped] == "ContractNode")
+                                            {
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
+
+                                                if (range.Key + 2 < dataList.Count && range.Value - 3 > 0)
+                                                {
+                                                    contractData.AddRange(dataList.GetRange(range.Key + 2, range.Value - 3));
+
+                                                    dataList.RemoveRange(range.Key, range.Value);
+                                                }
+                                                else
+                                                {
+                                                    looped++;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                looped++;
+                                            }
+                                        }
+
+                                        contractData.Add("}");
+
+                                        ContractCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(contractData));
+
+                                        List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                        int idx = psmLocked.FindIndex(i => i.moduleName == "ContractSystem");
+
+                                        if (idx != -1)
+                                        {
+                                            if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                            {
+                                                ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
+                                            }
+
+                                            psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(ContractCFG);
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
                                         else
                                         {
-                                            looped++;
+                                            ScenarioModule sm = ScenarioRunner.Instance.AddModule(ContractCFG);
+
+                                            HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[4] { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER, GameScenes.EDITOR });
+
+                                            psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                            idx = psmLocked.FindIndex(i => i.moduleName == "ContractSystem");
+
+                                            psmLocked[idx].moduleRef = sm;
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
                                     }
                                     else
                                     {
-                                        looped++;
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Contract", dataBacklog));
                                     }
                                 }
-                                
-                                contractData.Add("}");
 
-                                ContractCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(contractData));
-
-                                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                int idx = psmLocked.FindIndex(i => i.moduleName == "ContractSystem");
-
-                                if (idx != -1)
+                                if (name[0] == "Weights")
                                 {
-                                    if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                    foreach (string weight in dataList)
                                     {
-                                        ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
-                                    }
-
-                                    psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(ContractCFG);
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                                else
-                                {
-                                    ScenarioModule sm = ScenarioRunner.Instance.AddModule(ContractCFG);
-
-                                    HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[4] { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER, GameScenes.EDITOR });
-
-                                    psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                    idx = psmLocked.FindIndex(i => i.moduleName == "ContractSystem");
-
-                                    psmLocked[idx].moduleRef = sm;
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                            }
-
-                            if (name[0] == "Weights")
-                            {
-                                foreach (string weight in dataList)
-                                {
-                                    if (!string.IsNullOrEmpty(weight))
-                                    {
-                                        if (weight.Contains(":"))
+                                        if (!string.IsNullOrEmpty(weight))
                                         {
-                                            string[] split = weight.Split(':');
-                                            string weightName = split[0].Trim();
-                                            int weightAmount = Convert.ToInt32(split[1].Trim());
+                                            if (weight.Contains(":"))
+                                            {
+                                                string[] split = weight.Split(':');
+                                                string weightName = split[0].Trim();
+                                                int weightAmount = Convert.ToInt32(split[1].Trim());
 
-                                            Contracts.ContractSystem.WeightAssignment(weightName, weightAmount);
+                                                if (Contracts.ContractSystem.ContractWeights.ContainsKey(weightName))
+                                                {
+                                                    Contracts.ContractSystem.ContractWeights[weightName] = weightAmount;
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            if (name[0] == "Waypoints")
-                            {
-                                ConfigNode WaypointCFG = new ConfigNode();
-
-                                ScenarioCustomWaypoints.Instance.Save(WaypointCFG);
-
-                                List<string> waypointData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(WaypointCFG));
-
-                                int index = 0;
-                                while (index < waypointData.Count)
+                                if (name[0] == "Waypoints")
                                 {
-                                    if (waypointData[index] == "WAYPOINT" && waypointData[index + 1] == "{")
+                                    if (HighLogic.LoadedScene != GameScenes.TRACKSTATION)
                                     {
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(waypointData, index + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+                                        ConfigNode WaypointCFG = new ConfigNode();
 
-                                        waypointData.RemoveRange(range.Key, range.Value);
-                                    }
-                                    else
-                                    {
-                                        index++;
-                                    }
-                                }
+                                        ScenarioCustomWaypoints.Instance.Save(WaypointCFG);
 
-                                int looped = 0;
-                                while (looped < dataList.Count)
-                                {
-                                    if (dataList[looped].StartsWith("Waypoint : ") && dataList[looped + 1] == "{")
-                                    {
-                                        /* //Not needed
-                                        string[] split = dataList[looped].Split(':');
-                                        string start = split[0].Trim();
-                                        string waypointID = split[1].Trim();
-                                        */
+                                        List<string> waypointData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(WaypointCFG));
 
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
-
-                                        if (range.Key + 1 < dataList.Count && range.Value - 1 > 0)
+                                        int index = 0;
+                                        while (index < waypointData.Count)
                                         {
-                                            waypointData.Add("WAYPOINT");
+                                            if (waypointData[index] == "WAYPOINT" && waypointData[index + 1] == "{")
+                                            {
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(waypointData, index + 1);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
 
-                                            waypointData.AddRange(dataList.GetRange(range.Key + 1, range.Value - 1));
+                                                waypointData.RemoveRange(range.Key, range.Value);
+                                            }
+                                            else
+                                            {
+                                                index++;
+                                            }
+                                        }
 
-                                            dataList.RemoveRange(range.Key, range.Value);
+                                        int looped = 0;
+                                        while (looped < dataList.Count)
+                                        {
+                                            if (dataList[looped].StartsWith("Waypoint : ") && dataList[looped + 1] == "{")
+                                            {
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
+
+                                                if (range.Key + 1 < dataList.Count && range.Value - 1 > 0)
+                                                {
+                                                    waypointData.Add("WAYPOINT");
+
+                                                    waypointData.AddRange(dataList.GetRange(range.Key + 1, range.Value - 1));
+
+                                                    dataList.RemoveRange(range.Key, range.Value);
+                                                }
+                                                else
+                                                {
+                                                    looped++;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                looped++;
+                                            }
+                                        }
+
+                                        WaypointCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(waypointData));
+
+                                        List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                        int idx = psmLocked.FindIndex(i => i.moduleName == "ScenarioCustomWaypoints");
+
+                                        if (idx != -1)
+                                        {
+                                            if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                            {
+                                                ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
+                                            }
+
+                                            psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(WaypointCFG);
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
                                         else
                                         {
-                                            looped++;
+                                            ScenarioModule sm = ScenarioRunner.Instance.AddModule(WaypointCFG);
+
+                                            HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[2] { GameScenes.FLIGHT, GameScenes.TRACKSTATION });
+
+                                            psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                            idx = psmLocked.FindIndex(i => i.moduleName == "ScenarioCustomWaypoints");
+
+                                            psmLocked[idx].moduleRef = sm;
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
                                     }
                                     else
                                     {
-                                        looped++;
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Waypoint", dataBacklog));
                                     }
                                 }
 
-                                WaypointCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(waypointData));
-
-                                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                int idx = psmLocked.FindIndex(i => i.moduleName == "ScenarioCustomWaypoints");
-
-                                if (idx != -1)
+                                if (name[0] == "Currency")
                                 {
-                                    if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                    if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                     {
-                                        ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
-                                    }
+                                        double fundsAmount = Convert.ToDouble(dataList[0]);
+                                        double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
+                                        Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
 
-                                    psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(WaypointCFG);
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+                                        float repAmount = Convert.ToSingle(dataList[1]);
+                                        float repAmountDiff = repAmount - Reputation.Instance.reputation;
+                                        Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
 
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                                else
-                                {
-                                    ScenarioModule sm = ScenarioRunner.Instance.AddModule(WaypointCFG);
-
-                                    HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[2] { GameScenes.FLIGHT, GameScenes.TRACKSTATION });
-
-                                    psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                    idx = psmLocked.FindIndex(i => i.moduleName == "ScenarioCustomWaypoints");
-
-                                    psmLocked[idx].moduleRef = sm;
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                            }
-
-                            if (name[0] == "Currency")
-                            {
-                                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
-                                {
-                                    double fundsAmount = Convert.ToDouble(dataList[0]);
-                                    double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
-                                    Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
-
-                                    float repAmount = Convert.ToSingle(dataList[1]);
-                                    float repAmountDiff = repAmount - Reputation.Instance.reputation;
-                                    Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
-
-                                    float sciAmount = Convert.ToSingle(dataList[2]);
-                                    float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
-                                    ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
-                                }
-                                else
-                                {
-                                    if (HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
-                                    {
                                         float sciAmount = Convert.ToSingle(dataList[2]);
                                         float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
                                         ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
                                     }
-                                }
-                            }
-
-                            if (name[0] == "BuildingLevel")
-                            {
-                                foreach (ScenarioUpgradeableFacilities.ProtoUpgradeable proto in ScenarioUpgradeableFacilities.protoUpgradeables.Values)
-                                {
-                                    foreach (Upgradeables.UpgradeableFacility facility in proto.facilityRefs)
+                                    else
                                     {
-                                        if (dataList.Any(i => i.StartsWith(facility.id)))
+                                        if (HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
                                         {
-                                            int index = dataList.FindIndex(i => i.StartsWith(facility.id));
-
-                                            string[] subData = dataList[index].Split('=');
-
-                                            string id = subData[0].Trim();
-                                            string level = subData[1].Trim();
-
-                                            facility.SetLevel(Convert.ToInt32(level));
+                                            float sciAmount = Convert.ToSingle(dataList[2]);
+                                            float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
+                                            ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
                                         }
                                     }
                                 }
-                            }
 
-                            if (name[0] == "BuildingDead")
-                            {
-                                foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
+                                if (name[0] == "BuildingLevel")
                                 {
-                                    foreach (DestructibleBuilding building in protoD.dBuildingRefs)
+                                    foreach (ScenarioUpgradeableFacilities.ProtoUpgradeable proto in ScenarioUpgradeableFacilities.protoUpgradeables.Values)
                                     {
-                                        if (dataList.Any(i => i == building.id))
+                                        foreach (Upgradeables.UpgradeableFacility facility in proto.facilityRefs)
                                         {
-                                            int index = dataList.FindIndex(i => i == building.id);
-
-                                            if (!building.IsDestroyed)
+                                            if (dataList.Any(i => i.StartsWith(facility.id)))
                                             {
-                                                building.Demolish();
+                                                int index = dataList.FindIndex(i => i.StartsWith(facility.id));
+
+                                                string[] subData = dataList[index].Split('=');
+
+                                                string id = subData[0].Trim();
+                                                string level = subData[1].Trim();
+
+                                                facility.SetLevel(Convert.ToInt32(level));
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            if (name[0] == "BuildingAlive")
-                            {
-                                foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
+                                if (name[0] == "BuildingDead")
                                 {
-                                    foreach (DestructibleBuilding building in protoD.dBuildingRefs)
+                                    foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
                                     {
-                                        if (dataList.Any(i => i == building.id))
+                                        foreach (DestructibleBuilding building in protoD.dBuildingRefs)
                                         {
-                                            int index = dataList.FindIndex(i => i == building.id);
-
-                                            if (!building.IsIntact)
+                                            if (dataList.Any(i => i == building.id))
                                             {
-                                                building.Repair();
+                                                int index = dataList.FindIndex(i => i == building.id);
+
+                                                if (!building.IsDestroyed)
+                                                {
+                                                    building.Demolish();
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            if (name[0] == "Parts")
-                            {
-                                foreach (string part in dataList)
+                                if (name[0] == "BuildingAlive")
                                 {
-                                    string[] split = part.Split(':');
-                                    string partName = split[0].Trim();
-                                    string partTech = split[1].Trim();
-
-                                    AvailablePart truePart = PartLoader.getPartInfoByName(partName);
-
-                                    if (ResearchAndDevelopment.GetTechnologyState(partTech) != RDTech.State.Unavailable)
+                                    foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
                                     {
-                                        if (!ResearchAndDevelopment.PartTechAvailable(truePart))
+                                        foreach (DestructibleBuilding building in protoD.dBuildingRefs)
                                         {
-                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+                                            if (dataList.Any(i => i == building.id))
+                                            {
+                                                int index = dataList.FindIndex(i => i == building.id);
 
-                                            ptNode.partsPurchased.Add(truePart);
+                                                if (!building.IsIntact)
+                                                {
+                                                    building.Repair();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
 
-                                            ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
+                                if (name[0] == "Parts")
+                                {
+                                    if (!ScenarioEventHandler.fetch.RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR)
+                                    {
+                                        foreach (string part in dataList)
+                                        {
+                                            string[] split = part.Split(':');
+                                            string partName = split[0].Trim();
+                                            string partTech = split[1].Trim();
+
+                                            AvailablePart truePart = PartLoader.getPartInfoByName(partName);
+
+                                            if (ResearchAndDevelopment.GetTechnologyState(partTech) != RDTech.State.Unavailable)
+                                            {
+                                                if (!ResearchAndDevelopment.PartTechAvailable(truePart))
+                                                {
+                                                    ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+
+                                                    ptNode.partsPurchased.Add(truePart);
+
+                                                    ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
+                                                }
+                                                else
+                                                {
+                                                    if (ResearchAndDevelopment.IsExperimentalPart(truePart))
+                                                    {
+                                                        ResearchAndDevelopment.RemoveExperimentalPart(truePart);
+
+                                                        ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+
+                                                        ptNode.partsPurchased.Add(truePart);
+
+                                                        ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                if (!ResearchAndDevelopment.PartTechAvailable(truePart))
+                                                {
+                                                    ResearchAndDevelopment.AddExperimentalPart(truePart);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Tech", dataBacklog));//This is a "Tech" because it's needs are same as tech needs
+                                    }
+                                }
+
+                                if (name[0] == "Upgrades")
+                                {
+                                    foreach (string upgrade in dataList)
+                                    {
+                                        string[] split = upgrade.Split(':');
+                                        string upgradeName = split[0].Trim();
+                                        string upgradeTech = split[1].Trim();
+
+                                        foreach (PartUpgradeHandler.Upgrade partUpgrade in PartUpgradeManager.Handler.GetUpgradesForTech(upgradeTech))
+                                        {
+                                            if (partUpgrade.name == upgradeName)
+                                            {
+                                                PartUpgradeManager.Handler.SetUnlocked(partUpgrade.name, true);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (name[0] == "Progress")
+                                {
+                                    ConfigNode ProgressCFG = new ConfigNode();
+
+                                    ProgressTracking.Instance.Save(ProgressCFG);
+
+                                    List<string> progressData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ProgressCFG));
+
+                                    int index = 0;
+                                    while (index < progressData.Count)
+                                    {
+                                        if (progressData[index] == "Progress" && progressData[index + 1] == "{")
+                                        {
+                                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(progressData, index + 1);
+                                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+
+                                            progressData.RemoveRange(range.Key, range.Value);
                                         }
                                         else
                                         {
-                                            if (ResearchAndDevelopment.IsExperimentalPart(truePart))
+                                            index++;
+                                        }
+                                    }
+
+                                    progressData.Add("Progress");
+                                    progressData.Add("{");
+
+                                    int looped = 0;
+                                    while (looped < dataList.Count)
+                                    {
+                                        if (dataList[looped].StartsWith("ProgressNode : ") && dataList[looped + 1] == "{")
+                                        {
+                                            string[] split = dataList[looped].Split(':');
+                                            string start = split[0].Trim();
+                                            string progressId = split[1].Trim();
+
+                                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
+                                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
+
+                                            if (range.Key + 1 < dataList.Count && range.Value - 1 > 0)
                                             {
-                                                ResearchAndDevelopment.RemoveExperimentalPart(truePart);
+                                                progressData.Add(progressId);
 
-                                                ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+                                                progressData.AddRange(dataList.GetRange(range.Key + 1, range.Value - 1));
 
-                                                ptNode.partsPurchased.Add(truePart);
-
-                                                ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
+                                                dataList.RemoveRange(range.Key, range.Value);
                                             }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (!ResearchAndDevelopment.PartTechAvailable(truePart))
-                                        {
-                                            ResearchAndDevelopment.AddExperimentalPart(truePart);
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (name[0] == "Upgrades")
-                            {
-                                foreach (string upgrade in dataList)
-                                {
-                                    string[] split = upgrade.Split(':');
-                                    string upgradeName = split[0].Trim();
-                                    string upgradeTech = split[1].Trim();
-
-                                    foreach (PartUpgradeHandler.Upgrade partUpgrade in PartUpgradeManager.Handler.GetUpgradesForTech(upgradeTech))
-                                    {
-                                        if (partUpgrade.name == upgradeName)
-                                        {
-                                            PartUpgradeManager.Handler.SetUnlocked(partUpgrade.name, true);
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (name[0] == "Progress")
-                            {
-                                ConfigNode ProgressCFG = new ConfigNode();
-
-                                ProgressTracking.Instance.Save(ProgressCFG);
-
-                                List<string> progressData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ProgressCFG));
-
-                                int index = 0;
-                                while (index < progressData.Count)
-                                {
-                                    if (progressData[index] == "Progress" && progressData[index + 1] == "{")
-                                    {
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(progressData, index + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
-
-                                        progressData.RemoveRange(range.Key, range.Value);
-                                    }
-                                    else
-                                    {
-                                        index++;
-                                    }
-                                }
-
-                                progressData.Add("Progress");
-                                progressData.Add("{");
-
-                                int looped = 0;
-                                while (looped < dataList.Count)
-                                {
-                                    if (dataList[looped].StartsWith("ProgressNode : ") && dataList[looped + 1] == "{")
-                                    {
-                                        string[] split = dataList[looped].Split(':');
-                                        string start = split[0].Trim();
-                                        string progressId = split[1].Trim();
-
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
-
-                                        if (range.Key + 1 < dataList.Count && range.Value - 1 > 0)
-                                        {
-                                            progressData.Add(progressId);
-
-                                            progressData.AddRange(dataList.GetRange(range.Key + 1, range.Value - 1));
-
-                                            dataList.RemoveRange(range.Key, range.Value);
+                                            else
+                                            {
+                                                looped++;
+                                            }
                                         }
                                         else
                                         {
                                             looped++;
                                         }
                                     }
+
+                                    progressData.Add("}");
+
+                                    ProgressCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(progressData));
+
+                                    List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                    int idx = psmLocked.FindIndex(i => i.moduleName == "ProgressTracking");
+
+                                    if (idx != -1)
+                                    {
+                                        if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                        {
+                                            ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
+                                        }
+
+                                        psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(ProgressCFG);
+                                        psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                        HighLogic.CurrentGame.scenarios = psmLocked;
+                                    }
                                     else
                                     {
-                                        looped++;
+                                        ScenarioModule sm = ScenarioRunner.Instance.AddModule(ProgressCFG);
+
+                                        HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[3] { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER });
+
+                                        psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                        idx = psmLocked.FindIndex(i => i.moduleName == "ProgressTracking");
+
+                                        psmLocked[idx].moduleRef = sm;
+                                        psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                        HighLogic.CurrentGame.scenarios = psmLocked;
                                     }
                                 }
 
-                                progressData.Add("}");
-
-                                ProgressCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(progressData));
-
-                                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                int idx = psmLocked.FindIndex(i => i.moduleName == "ProgressTracking");
-
-                                if (idx != -1)
+                                if (name[0] == "Tech")
                                 {
-                                    if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                    if (!ScenarioEventHandler.fetch.RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR)
                                     {
-                                        ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
-                                    }
-
-                                    psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(ProgressCFG);
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                                else
-                                {
-                                    ScenarioModule sm = ScenarioRunner.Instance.AddModule(ProgressCFG);
-
-                                    HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[3] { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER });
-
-                                    psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                    idx = psmLocked.FindIndex(i => i.moduleName == "ProgressTracking");
-
-                                    psmLocked[idx].moduleRef = sm;
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                            }
-
-                            if (name[0] == "Tech")
-                            {
-                                int looped = 0;
-                                while (looped < dataList.Count)
-                                {
-                                    if (dataList[looped].StartsWith("Tech : ") && dataList[looped + 1] == "TechNode" && dataList[looped + 2] == "{")
-                                    {
-                                        string[] split = dataList[looped].Split(':');
-                                        string start = split[0].Trim();
-                                        string tech = split[1].Trim();
-                                        
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 2);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
-
-                                        if (range.Key + 3 < dataList.Count && range.Value - 4 > 0)
+                                        int looped = 0;
+                                        while (looped < dataList.Count)
                                         {
-                                            ConfigNode techCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList.GetRange(range.Key + 3, range.Value - 4)));
-
-                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(tech);
-
-                                            if (ptNode == null)
+                                            if (dataList[looped].StartsWith("Tech : ") && dataList[looped + 1] == "TechNode" && dataList[looped + 2] == "{")
                                             {
-                                                List<AvailablePart> parts = new List<AvailablePart>();
+                                                string[] split = dataList[looped].Split(':');
+                                                string start = split[0].Trim();
+                                                string tech = split[1].Trim();
 
-                                                int loop2 = matchBracketIdx + 1;
-                                                while (dataList[loop2] != "TechParts" && !dataList[loop2].StartsWith("Tech : ") && loop2 < dataList.Count)
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 2);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
+
+                                                if (range.Key + 3 < dataList.Count && range.Value - 4 > 0)
                                                 {
-                                                    loop2++;
-                                                }
+                                                    ConfigNode techCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList.GetRange(range.Key + 3, range.Value - 4)));
 
-                                                if (dataList[loop2] == "TechParts" && dataList[loop2 + 1] == "{")
-                                                {
-                                                    int matchBracketIdx2 = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, loop2 + 1);
-                                                    KeyValuePair<int, int> range2 = new KeyValuePair<int, int>(loop2, (matchBracketIdx2 - loop2) + 1);
+                                                    ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(tech);
 
-                                                    int loop3 = loop2 + 2;
-                                                    while (loop3 < matchBracketIdx2 && loop3 < dataList.Count)
+                                                    if (ptNode == null)
                                                     {
-                                                        if (dataList[loop3].StartsWith("Part : "))
+                                                        List<AvailablePart> parts = new List<AvailablePart>();
+
+                                                        int loop2 = matchBracketIdx + 1;
+                                                        while (dataList[loop2] != "TechParts" && !dataList[loop2].StartsWith("Tech : ") && loop2 < dataList.Count)
                                                         {
-                                                            string[] split2 = dataList[loop3].Split(':');
-                                                            string start2 = split2[0].Trim();
-                                                            string partName = split2[1].Trim();
-
-                                                            AvailablePart part = PartLoader.getPartInfoByName(partName);
-
-                                                            if (ResearchAndDevelopment.IsExperimentalPart(part))
-                                                            {
-                                                                ResearchAndDevelopment.RemoveExperimentalPart(part);
-                                                            }
-
-                                                            parts.Add(part);
+                                                            loop2++;
                                                         }
 
-                                                        loop3++;
+                                                        if (dataList[loop2] == "TechParts" && dataList[loop2 + 1] == "{")
+                                                        {
+                                                            int matchBracketIdx2 = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, loop2 + 1);
+                                                            KeyValuePair<int, int> range2 = new KeyValuePair<int, int>(loop2, (matchBracketIdx2 - loop2) + 1);
+
+                                                            int loop3 = loop2 + 2;
+                                                            while (loop3 < matchBracketIdx2 && loop3 < dataList.Count)
+                                                            {
+                                                                if (dataList[loop3].StartsWith("Part : "))
+                                                                {
+                                                                    string[] split2 = dataList[loop3].Split(':');
+                                                                    string start2 = split2[0].Trim();
+                                                                    string partName = split2[1].Trim();
+
+                                                                    AvailablePart part = PartLoader.getPartInfoByName(partName);
+
+                                                                    if (ResearchAndDevelopment.IsExperimentalPart(part))
+                                                                    {
+                                                                        ResearchAndDevelopment.RemoveExperimentalPart(part);
+                                                                    }
+
+                                                                    parts.Add(part);
+                                                                }
+
+                                                                loop3++;
+                                                            }
+                                                            dataList.RemoveRange(range2.Key, range2.Value);
+                                                        }
+
+                                                        ptNode = new ProtoTechNode();
+
+                                                        RDTech RnD = new RDTech();
+
+                                                        RnD.Load(techCFG);
+
+                                                        ptNode.partsPurchased = parts;
+
+                                                        ptNode.scienceCost = RnD.scienceCost;
+
+                                                        ptNode.techID = RnD.techID;
+
+                                                        ptNode.state = RDTech.State.Available;
+
+                                                        ResearchAndDevelopment.Instance.UnlockProtoTechNode(ptNode);
+
+                                                        ResearchAndDevelopment.Instance.SetTechState(tech, ptNode);
                                                     }
-                                                    dataList.RemoveRange(range2.Key, range2.Value);
+
+                                                    dataList.RemoveRange(range.Key, range.Value);
                                                 }
+                                                else
+                                                {
+                                                    looped++;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                looped++;
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        List<byte[]> dataBacklog = new List<byte[]>();
 
-                                                ptNode = new ProtoTechNode();
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
 
-                                                RDTech RnD = new RDTech();
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Tech", dataBacklog));
+                                    }
+                                }
 
-                                                RnD.Load(techCFG);
+                                if (name[0] == "ScienceRecieved")
+                                {
+                                    if (!ScenarioEventHandler.fetch.RnDOpen)
+                                    {
+                                        ConfigNode RnDCFG = new ConfigNode();
 
-                                                ptNode.partsPurchased = parts;
+                                        ResearchAndDevelopment.Instance.Save(RnDCFG);
 
-                                                ptNode.scienceCost = RnD.scienceCost;
+                                        List<string> sciData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(RnDCFG));
 
-                                                ptNode.techID = RnD.techID;
+                                        int index = 0;
+                                        while (index < sciData.Count)
+                                        {
+                                            if (sciData[index] == "Science" && sciData[index + 1] == "{")
+                                            {
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(sciData, index + 1);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
 
-                                                ptNode.state = RDTech.State.Available;
+                                                sciData.RemoveRange(range.Key, range.Value);
+                                            }
+                                            else
+                                            {
+                                                index++;
+                                            }
+                                        }
 
-                                                ResearchAndDevelopment.Instance.UnlockProtoTechNode(ptNode);
+                                        int looped = 0;
+                                        while (looped < dataList.Count)
+                                        {
+                                            if (dataList[looped].StartsWith("Sci : ") && dataList[looped + 1].StartsWith("Value : ") && dataList[looped + 2] == "SciNode" && dataList[looped + 3] == "{")
+                                            {
+                                                string[] split = dataList[looped].Split(':');
+                                                string start = split[0].Trim();
+                                                string sciID = split[1].Trim();
 
-                                                ResearchAndDevelopment.Instance.SetTechState(tech, ptNode);
+                                                string[] split2 = dataList[looped + 1].Split(':');
+                                                string start2 = split2[0].Trim();
+                                                float dataAmount = Convert.ToSingle(split2[1].Trim());
+
+                                                int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 3);
+                                                KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
+
+                                                if (range.Key + 4 < dataList.Count && range.Value - 5 > 0)
+                                                {
+                                                    sciData.Add("Science");
+                                                    sciData.Add("{");
+
+                                                    sciData.AddRange(dataList.GetRange(range.Key + 4, range.Value - 5));
+
+                                                    sciData.Add("}");
+
+                                                    dataList.RemoveRange(range.Key, range.Value);
+                                                }
+                                                else
+                                                {
+                                                    looped++;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                looped++;
+                                            }
+                                        }
+
+                                        RnDCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(sciData));
+
+                                        List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                        int idx = psmLocked.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
+
+                                        if (idx != -1)
+                                        {
+                                            if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                            {
+                                                ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
                                             }
 
-                                            dataList.RemoveRange(range.Key, range.Value);
+                                            psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(RnDCFG);
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
                                         else
                                         {
-                                            looped++;
+                                            ScenarioModule sm = ScenarioRunner.Instance.AddModule(RnDCFG);
+
+                                            HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[4] { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER, GameScenes.EDITOR });
+
+                                            psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                            idx = psmLocked.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
+
+                                            psmLocked[idx].moduleRef = sm;
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
                                     }
                                     else
                                     {
-                                        looped++;
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Science", dataBacklog));
                                     }
                                 }
-                            }
 
-                            if (name[0] == "ScienceRecieved")
-                            {
-                                ConfigNode RnDCFG = new ConfigNode();
-
-                                ResearchAndDevelopment.Instance.Save(RnDCFG);
-
-                                List<string> sciData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(RnDCFG));
-
-                                int index = 0;
-                                while (index < sciData.Count)
+                                if (name[0] == "ResourceScenario")
                                 {
-                                    if (sciData[index] == "Science" && sciData[index + 1] == "{")
-                                    {
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(sciData, index + 1);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+                                    ConfigNode ResourceCfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList));
 
-                                        sciData.RemoveRange(range.Key, range.Value);
+                                    ResourceScenario.Instance.Load(ResourceCfg);
+
+                                    ScenarioEventHandler.fetch.lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ResourceCfg));
+                                }
+
+                                if (name[0] == "StrategySystem")
+                                {
+                                    if (!ScenarioEventHandler.fetch.AdministrationOpen)
+                                    {
+                                        ConfigNode StrategyCfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList));
+
+                                        Strategies.StrategySystem.Instance.Load(StrategyCfg);
+
+                                        ScenarioEventHandler.fetch.lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(StrategyCfg));
                                     }
                                     else
                                     {
-                                        index++;
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Strategy", dataBacklog));
                                     }
-                                }
-
-                                int looped = 0;
-                                while (looped < dataList.Count)
-                                {
-                                    if (dataList[looped].StartsWith("Sci : ") && dataList[looped + 1].StartsWith("Value : ") && dataList[looped + 2] == "SciNode" && dataList[looped + 3] == "{")
-                                    {
-                                        string[] split = dataList[looped].Split(':');
-                                        string start = split[0].Trim();
-                                        string sciID = split[1].Trim();
-
-                                        string[] split2 = dataList[looped + 1].Split(':');
-                                        string start2 = split2[0].Trim();
-                                        float dataAmount = Convert.ToSingle(split2[1].Trim());
-
-                                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 3);
-                                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
-
-                                        if (range.Key + 4 < dataList.Count && range.Value - 5 > 0)
-                                        {
-                                            sciData.Add("Science");
-                                            sciData.Add("{");
-
-                                            sciData.AddRange(dataList.GetRange(range.Key + 4, range.Value - 5));
-
-                                            sciData.Add("}");
-
-                                            dataList.RemoveRange(range.Key, range.Value);
-                                        }
-                                        else
-                                        {
-                                            looped++;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        looped++;
-                                    }
-                                }
-
-                                RnDCFG = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(sciData));
-
-                                List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                int idx = psmLocked.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
-
-                                if (idx != -1)
-                                {
-                                    if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
-                                    {
-                                        ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
-                                    }
-
-                                    psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(RnDCFG);
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
-                                }
-                                else
-                                {
-                                    ScenarioModule sm = ScenarioRunner.Instance.AddModule(RnDCFG);
-
-                                    HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[4] { GameScenes.FLIGHT, GameScenes.TRACKSTATION, GameScenes.SPACECENTER, GameScenes.EDITOR });
-
-                                    psmLocked = HighLogic.CurrentGame.scenarios;
-
-                                    idx = psmLocked.FindIndex(i => i.moduleName == "ResearchAndDevelopment");
-
-                                    psmLocked[idx].moduleRef = sm;
-                                    psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
-
-                                    HighLogic.CurrentGame.scenarios = psmLocked;
                                 }
                             }
-
-                            if (name[0] == "ResourceScenario")
+                            catch (Exception e)
                             {
-                                ConfigNode ResourceCfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList));
-
-                                ResourceScenario.Instance.Load(ResourceCfg);
-
-                                ScenarioEventHandler.fetch.lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ResourceCfg));
-                            }
-
-                            if (name[0] == "StrategySystem")
-                            {
-                                ConfigNode StrategyCfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(dataList));
-
-                                Strategies.StrategySystem.Instance.Load(StrategyCfg);
-
-                                ScenarioEventHandler.fetch.lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(StrategyCfg));
+                                SyncrioLog.Debug("Error handling: " + name[0] + " data, error: " + e);
                             }
                         }
-                        catch (Exception e)
-                        {
-                            SyncrioLog.Debug("Error handling: " + name[0] + " data, error: " + e);
-                        }
+
+                        isSyncing = false;
                     }
-
-                    isSyncing = false;
+                    else
+                    {
+                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Loading", data));
+                    }
                 }
             }
         }

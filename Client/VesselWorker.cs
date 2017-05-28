@@ -124,6 +124,13 @@ namespace SyncrioClientSide
                 }
                 else
                 {
+                    /*
+                    if (ScenarioEventHandler.fetch.revertBacklog.Count > 0)
+                    {
+                        ScenarioEventHandler.fetch.SendRevert();
+                    }
+                    */
+
                     kerbalProtoQueue.Clear();
                     //Kerbal queue
                     KerbalEntry lastKerbalEntry = null;

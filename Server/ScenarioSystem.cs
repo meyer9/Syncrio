@@ -192,6 +192,13 @@ namespace SyncrioServer
             Messages.ScenarioData.SendStartData(client, data);
         }
 
+        /*
+        public void RevertScenario(ClientObject callingClient, byte[] messageData)
+        {
+
+        }
+        */
+
         public void SyncScenario(ClientObject callingClient, byte[] messageData)
         {
             using (MessageReader mr = new MessageReader(messageData))

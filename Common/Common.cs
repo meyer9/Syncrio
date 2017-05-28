@@ -570,6 +570,7 @@ namespace SyncrioCommon
         PLAYER_STATUS,
         PLAYER_COLOR,
         SCENARIO_DATA,
+        //REVERTED_SCENARIO_DATA,
         SEND_VESSELS,
         JOIN_GROUP_REQUEST,
         LEAVE_GROUP,
