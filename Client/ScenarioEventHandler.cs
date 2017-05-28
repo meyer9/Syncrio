@@ -33,9 +33,18 @@ namespace SyncrioClientSide
         public bool enabled = false;
         private static ScenarioEventHandler singleton;
         private bool registered = false;
-        private Dictionary<string, ConfigNode> lastPrograssData = new Dictionary<string, ConfigNode>();//<Progress Id, Progress Data>
-        private float lastSync = 0.0f;
-        private float syncCooldown = 0.2f;
+        private Dictionary<string, List<string>> lastPrograssData = new Dictionary<string, List<string>>();//<Progress Id, Progress Data>
+        public List<string> lastResourceScenarioModule;
+        public List<string> lastStrategySystemModule;
+        private float lastScenarioCheck = 0f;
+        private float scenarioCheckInterval = 4f;
+        private float lastSync = 0f;
+        private float syncCooldown = 1f;
+        public List<KeyValuePair<string, List<byte[]>>> scenarioBacklog = new List<KeyValuePair<string, List<byte[]>>>();
+        //public List<KeyValuePair<byte[], ScenarioDataType>> revertBacklog = new List<KeyValuePair<byte[], ScenarioDataType>>();
+        public bool RnDOpen = false;
+        public bool MissionControlOpen = false;
+        public bool AdministrationOpen = false;
         public bool cooldown = false;
         public bool startCooldown = false;
         public bool delaySync = true;
@@ -50,32 +59,316 @@ namespace SyncrioClientSide
 
         private void Update()
         {
-            if (ScenarioWorker.fetch.isSyncing || startCooldown)
+            if (Client.fetch.gameRunning)
             {
-                lastSync = UnityEngine.Time.realtimeSinceStartup;
-                cooldown = true;
-                startCooldown = false;
-            }
-            else
-            {
-                if (UnityEngine.Time.realtimeSinceStartup > lastSync + syncCooldown)
+                if (ScenarioWorker.fetch.isSyncing || startCooldown)
                 {
-                    cooldown = false;
+                    lastSync = UnityEngine.Time.realtimeSinceStartup;
+                    cooldown = true;
+                    startCooldown = false;
                 }
-            }
-
-            if (!registered && !ScenarioWorker.fetch.stopSync)
-            {
-                RegisterEvents();
-            }
-            else
-            {
-                if (ScenarioWorker.fetch.stopSync)
+                else
                 {
-                    UnregisterEvents();
+                    if (UnityEngine.Time.realtimeSinceStartup > lastSync + syncCooldown)
+                    {
+                        cooldown = false;
+                    }
+                }
+
+                if (!ScenarioWorker.fetch.stopSync)
+                {
+                    /*
+                    if (!HighLogic.LoadedSceneIsFlight && revertBacklog.Count > 0)
+                    {
+                        revertBacklog = new List<KeyValuePair<byte[], ScenarioDataType>>();
+                    }
+                    */
+
+                    if (scenarioBacklog.Count > 0)
+                    {
+                        List<int> dataToRemove = new List<int>();
+
+                        for (int i = 0; i < scenarioBacklog.Count; i++)
+                        {
+                            if (scenarioBacklog[i].Key == "Loading" && HighLogic.LoadedScene != GameScenes.LOADING)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
+
+                            if (scenarioBacklog[i].Key == "Tech" && !RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
+
+                            if (scenarioBacklog[i].Key == "Science" && !RnDOpen)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
+
+                            if (scenarioBacklog[i].Key == "Contract" && !MissionControlOpen)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
+
+                            if (scenarioBacklog[i].Key == "Strategy" && !AdministrationOpen)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
+
+                            if (scenarioBacklog[i].Key == "Waypoint" && HighLogic.LoadedScene != GameScenes.TRACKSTATION)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
+
+                            dataToRemove.Add(i);
+                        }
+
+                        if (dataToRemove.Count > 0)
+                        {
+                            for (int i = dataToRemove.Count; i < 0; i--)
+                            {
+                                scenarioBacklog.RemoveAt(dataToRemove[i - 1]);
+                            }
+                        }
+                    }
+
+                    if (!registered)
+                    {
+                        RegisterEvents();
+                    }
+                    else
+                    {
+                        if ((UnityEngine.Time.realtimeSinceStartup - lastScenarioCheck) > scenarioCheckInterval)
+                        {
+                            lastScenarioCheck = UnityEngine.Time.realtimeSinceStartup;
+
+                            if (lastResourceScenarioModule != null)
+                            {
+                                ConfigNode currentResourceScenarioModule = new ConfigNode();
+
+                                ResourceScenario.Instance.Save(currentResourceScenarioModule);
+
+                                List<string> newData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(currentResourceScenarioModule));
+
+                                bool dataIsAMatch = false;
+
+                                if (newData == lastResourceScenarioModule)
+                                {
+                                    dataIsAMatch = true;
+                                }
+                                else
+                                {
+                                    if (newData.Count == lastResourceScenarioModule.Count)
+                                    {
+                                        int loop = 0;
+
+                                        bool subDataIsAMatch = true;
+
+                                        while (loop < newData.Count)
+                                        {
+                                            if (newData[loop].Trim() != lastResourceScenarioModule[loop].Trim())
+                                            {
+                                                subDataIsAMatch = false;
+
+                                                break;
+                                            }
+
+                                            loop++;
+                                        }
+
+                                        dataIsAMatch = subDataIsAMatch;
+                                    }
+                                }
+
+                                if (!dataIsAMatch)
+                                {
+                                    lastResourceScenarioModule = newData;
+
+                                    byte[] data = ConfigNodeSerializer.fetch.Serialize(currentResourceScenarioModule);
+
+                                    byte[] messageData;
+
+                                    using (MessageWriter mw = new MessageWriter())
+                                    {
+                                        if (GroupSystem.playerGroupAssigned)
+                                        {
+                                            string groupName = GroupSystem.playerGroupName;
+
+                                            if (!string.IsNullOrEmpty(groupName))
+                                            {
+                                                mw.Write<bool>(true);//In group
+                                                mw.Write<string>(groupName);
+                                            }
+                                            else
+                                            {
+                                                return;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            mw.Write<bool>(false);//In group
+                                        }
+
+                                        mw.Write<byte[]>(data);
+
+                                        messageData = mw.GetMessageBytes();
+                                    }
+
+                                    SendData((int)ScenarioDataType.RESOURCE_SCENARIO, messageData);
+                                }
+                            }
+                            else
+                            {
+                                ConfigNode module = new ConfigNode();
+
+                                ResourceScenario.Instance.Save(module);
+
+                                lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
+                            }
+
+                            if (lastStrategySystemModule != null)
+                            {
+                                ConfigNode currentStrategySystemModule = new ConfigNode();
+
+                                Strategies.StrategySystem.Instance.Save(currentStrategySystemModule);
+
+                                List<string> newData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(currentStrategySystemModule));
+
+                                bool dataIsAMatch = false;
+
+                                if (newData == lastStrategySystemModule)
+                                {
+                                    dataIsAMatch = true;
+                                }
+                                else
+                                {
+                                    if (newData.Count == lastStrategySystemModule.Count)
+                                    {
+                                        int loop = 0;
+
+                                        bool subDataIsAMatch = true;
+
+                                        while (loop < newData.Count)
+                                        {
+                                            if (newData[loop].Trim() != lastStrategySystemModule[loop].Trim())
+                                            {
+                                                subDataIsAMatch = false;
+
+                                                break;
+                                            }
+
+                                            loop++;
+                                        }
+
+                                        dataIsAMatch = subDataIsAMatch;
+                                    }
+                                }
+
+                                if (!dataIsAMatch)
+                                {
+                                    lastStrategySystemModule = newData;
+
+                                    byte[] data = ConfigNodeSerializer.fetch.Serialize(currentStrategySystemModule);
+
+                                    byte[] messageData;
+
+                                    using (MessageWriter mw = new MessageWriter())
+                                    {
+                                        if (GroupSystem.playerGroupAssigned)
+                                        {
+                                            string groupName = GroupSystem.playerGroupName;
+
+                                            if (!string.IsNullOrEmpty(groupName))
+                                            {
+                                                mw.Write<bool>(true);//In group
+                                                mw.Write<string>(groupName);
+                                            }
+                                            else
+                                            {
+                                                return;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            mw.Write<bool>(false);//In group
+                                        }
+
+                                        mw.Write<byte[]>(data);
+
+                                        messageData = mw.GetMessageBytes();
+                                    }
+
+                                    SendData((int)ScenarioDataType.STRATEGY_SYSTEM, messageData);
+                                }
+                            }
+                            else
+                            {
+                                ConfigNode module = new ConfigNode();
+
+                                Strategies.StrategySystem.Instance.Save(module);
+
+                                lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (registered)
+                    {
+                        UnregisterEvents();
+                    }
                 }
             }
         }
+
+        /*
+        public void SendRevert()
+        {
+            byte[] messageBytes;
+            ClientMessage newMessage = new ClientMessage();
+            newMessage.handled = false;
+            newMessage.type = ClientMessageType.REVERTED_SCENARIO_DATA;
+            using (MessageWriter mw = new MessageWriter())
+            {
+                mw.Write<int>(revertBacklog.Count);
+
+                for (int i = 0; i < revertBacklog.Count; i++)
+                {
+                    mw.Write<int>((int)revertBacklog[i].Value);
+                    mw.Write<byte[]>(revertBacklog[i].Key);
+                }
+
+                messageBytes = mw.GetMessageBytes();
+            }
+            newMessage.data = messageBytes;
+            NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
+        }
+        */
 
         private void RegisterEvents()
         {
@@ -110,6 +403,15 @@ namespace SyncrioClientSide
 
                 GameEvents.OnTechnologyResearched.Add(OnTechnologyResearched);
                 GameEvents.OnScienceRecieved.Add(OnScienceRecieved);
+
+                GameEvents.onGUIRnDComplexSpawn.Add(OnGUIRnDComplexSpawn);
+                GameEvents.onGUIRnDComplexDespawn.Add(OnGUIRnDComplexDespawn);
+
+                GameEvents.onGUIMissionControlSpawn.Add(OnGUIMissionControlSpawn);
+                GameEvents.onGUIMissionControlDespawn.Add(OnGUIMissionControlDespawn);
+
+                GameEvents.onGUIAdministrationFacilitySpawn.Add(OnGUIAdministrationFacilitySpawn);
+                GameEvents.onGUIAdministrationFacilityDespawn.Add(OnGUIAdministrationFacilityDespawn);
             }
             catch (Exception e)
             {
@@ -152,13 +454,52 @@ namespace SyncrioClientSide
 
                 GameEvents.OnTechnologyResearched.Remove(OnTechnologyResearched);
                 GameEvents.OnScienceRecieved.Remove(OnScienceRecieved);
+
+                GameEvents.onGUIRnDComplexSpawn.Remove(OnGUIRnDComplexSpawn);
+                GameEvents.onGUIRnDComplexDespawn.Remove(OnGUIRnDComplexDespawn);
+
+                GameEvents.onGUIMissionControlSpawn.Remove(OnGUIMissionControlSpawn);
+                GameEvents.onGUIMissionControlDespawn.Remove(OnGUIMissionControlDespawn);
+
+                GameEvents.onGUIAdministrationFacilitySpawn.Remove(OnGUIAdministrationFacilitySpawn);
+                GameEvents.onGUIAdministrationFacilityDespawn.Remove(OnGUIAdministrationFacilityDespawn);
             }
             catch (Exception e)
             {
                 SyncrioLog.Debug("Error unregistering  scenario events! Error: " + e);
             }
         }
-        
+
+        private void OnGUIRnDComplexSpawn()
+        {
+            RnDOpen = true;
+        }
+
+        private void OnGUIRnDComplexDespawn()
+        {
+            RnDOpen = false;
+        }
+
+        private void OnGUIMissionControlSpawn()
+        {
+            MissionControlOpen = true;
+        }
+
+        private void OnGUIMissionControlDespawn()
+        {
+            MissionControlOpen = false;
+        }
+
+        private void OnGUIAdministrationFacilitySpawn()
+        {
+            AdministrationOpen = true;
+        }
+
+        private void OnGUIAdministrationFacilityDespawn()
+        {
+            AdministrationOpen = false;
+        }
+
         private void OnContractUpdatedWithWeights(Contracts.Contract contract)
         {
             if (cooldown || delaySync)
@@ -213,8 +554,14 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                    }
+                    */
 
+                    SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
                 }
             }
             else
@@ -258,6 +605,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
             }
@@ -310,6 +664,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                 }
@@ -348,6 +709,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
             }
@@ -404,6 +772,13 @@ namespace SyncrioClientSide
                             data = mw.GetMessageBytes();
                         }
 
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_OFFERED));
+                        }
+                        */
+
                         SendData((int)ScenarioDataType.CONTRACT_OFFERED, data);
                     }
                 }
@@ -440,6 +815,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_OFFERED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.CONTRACT_OFFERED, data);
             }
@@ -492,6 +874,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                 }
@@ -531,6 +920,13 @@ namespace SyncrioClientSide
                     data = mw.GetMessageBytes();
                 }
 
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                }
+                */
+
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
             }
         }
@@ -566,6 +962,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_LOAD));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
                 }
             }
@@ -587,6 +990,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_LOAD));
+                }
+                */
 
                 SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
             }
@@ -623,6 +1033,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_SAVE));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
                 }
             }
@@ -644,6 +1061,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_SAVE));
+                }
+                */
 
                 SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
             }
@@ -682,6 +1106,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.FUNDS_CHANGED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
                 }
             }
@@ -697,6 +1128,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.FUNDS_CHANGED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
             }
@@ -735,6 +1173,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REPUTATION_CHANGED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
                 }
             }
@@ -750,6 +1195,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REPUTATION_CHANGED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
             }
@@ -788,6 +1240,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_CHANGED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
                 }
             }
@@ -803,6 +1262,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_CHANGED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
             }
@@ -835,6 +1301,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_FACILITY_UPGRADED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
                 }
             }
@@ -852,6 +1325,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_FACILITY_UPGRADED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
             }
@@ -882,6 +1362,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_COLLAPSED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
                 }
             }
@@ -897,6 +1384,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_COLLAPSED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
             }
@@ -927,6 +1421,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_REPAIRED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
                 }
             }
@@ -942,6 +1443,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_REPAIRED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
             }
@@ -973,6 +1481,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.PART_PURCHASED, data);
                 }
             }
@@ -989,6 +1504,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.PART_PURCHASED, data);
             }
@@ -1020,6 +1542,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_UPGRADE_PURCHASED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
                 }
             }
@@ -1036,6 +1565,13 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
+
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_UPGRADE_PURCHASED));
+                }
+                */
 
                 SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
             }
@@ -1057,7 +1593,7 @@ namespace SyncrioClientSide
             
             if (!lastPrograssData.ContainsKey(dataNode.from.Id))
             {
-                lastPrograssData.Add(dataNode.from.Id, dataNode.to);
+                lastPrograssData.Add(dataNode.from.Id, SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(dataNode.to)));
 
                 send = true;
             }
@@ -1065,9 +1601,41 @@ namespace SyncrioClientSide
             {
                 if (dataNode.to != null)
                 {
-                    if (dataNode.to != lastPrograssData[dataNode.from.Id])
+                    List<string> newData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(dataNode.to));
+
+                    bool dataIsAMatch = false;
+
+                    if (newData == lastPrograssData[dataNode.from.Id])
                     {
-                        lastPrograssData[dataNode.from.Id] = dataNode.to;
+                        dataIsAMatch = true;
+                    }
+                    else
+                    {
+                        if (newData.Count == lastPrograssData[dataNode.from.Id].Count)
+                        {
+                            int loop = 0;
+
+                            bool subDataIsAMatch = true;
+
+                            while (loop < newData.Count)
+                            {
+                                if (newData[loop].Trim() != lastPrograssData[dataNode.from.Id][loop].Trim())
+                                {
+                                    subDataIsAMatch = false;
+
+                                    break;
+                                }
+
+                                loop++;
+                            }
+
+                            dataIsAMatch = subDataIsAMatch;
+                        }
+                    }
+
+                    if (!dataIsAMatch)
+                    {
+                        lastPrograssData[dataNode.from.Id] = newData;
                         send = true;
                     }
                 }
@@ -1097,6 +1665,13 @@ namespace SyncrioClientSide
                             data = mw.GetMessageBytes();
                         }
 
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PROGRESS_UPDATED));
+                        }
+                        */
+
                         SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
                     }
                 }
@@ -1116,6 +1691,13 @@ namespace SyncrioClientSide
 
                         data = mw.GetMessageBytes();
                     }
+
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PROGRESS_UPDATED));
+                    }
+                    */
 
                     SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
                 }
@@ -1162,6 +1744,13 @@ namespace SyncrioClientSide
                             data = mw.GetMessageBytes();
                         }
 
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.TECHNOLOGY_RESEARCHED));
+                        }
+                        */
+
                         SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
                     }
                 }
@@ -1190,6 +1779,13 @@ namespace SyncrioClientSide
 
                         data = mw.GetMessageBytes();
                     }
+
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.TECHNOLOGY_RESEARCHED));
+                    }
+                    */
 
                     SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
                 }
@@ -1231,6 +1827,13 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_RECIEVED));
+                    }
+                    */
+
                     SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
                 }
             }
@@ -1257,11 +1860,18 @@ namespace SyncrioClientSide
                     data = mw.GetMessageBytes();
                 }
 
+                /*
+                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                {
+                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_RECIEVED));
+                }
+                */
+
                 SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
             }
         }
 
-        private void SendData(int type, byte[] data)
+        internal void SendData(int type, byte[] data)
         {
             byte[] messageBytes;
             ClientMessage newMessage = new ClientMessage();

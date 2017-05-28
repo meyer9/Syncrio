@@ -57,9 +57,6 @@ namespace SyncrioServer
     {
         private static ScenarioSystem singleton;
         public int numberOfPlayersSyncing = 0;
-
-        public static SubspacesList subspaceList = new SubspacesList();
-        public static List<int> subspacesToMerge = new List<int>();
         public static object subspaceListLock = new object();
 
         public static CultureInfo english = new CultureInfo("en-US");
@@ -116,46 +113,94 @@ namespace SyncrioServer
             }
         }
 
-        public static void CreateDefaultScenario()
+        public void ScenarioSendStartData(ClientObject client)
         {
-            if (!File.Exists(Path.Combine(ScenarioSystem.fetch.groupInitialScenarioDirectory, "ScenarioNewGameIntro.txt")))
+            List<byte[]> data = new List<byte[]>();
+
+            List<string> newScenarioName = new List<string>();
+
+            newScenarioName.Add("ScenarioNewGameIntro");
+
+            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(newScenarioName));
+
+            List<string> newScenario = new List<string>();
+
+            newScenario.Add("name = ScenarioNewGameIntro");
+            newScenario.Add("scene = 5, 6, 8");
+            newScenario.Add("kscComplete = True");
+            newScenario.Add("editorComplete = True");
+            newScenario.Add("tsComplete = True");
+
+            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(newScenario));
+            
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string scenarioFolder = Path.Combine(playerFolder, "Scenario");
+
+            if (!Directory.Exists(scenarioFolder))
             {
-                List<string> newScenario = new List<string>();
-
-                newScenario.Add("name = ScenarioNewGameIntro");
-                newScenario.Add("scene = 5, 6, 8");
-                newScenario.Add("kscComplete = True");
-                newScenario.Add("editorComplete = True");
-                newScenario.Add("tsComplete = True");
-
-                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newScenario), Path.Combine(ScenarioSystem.fetch.groupInitialScenarioDirectory, "ScenarioNewGameIntro.txt"));
-
-                foreach (Subspace subSpace in subspaceList.Subspaces)
-                {
-                    foreach (Group group in subSpace.Groups)
-                    {
-                        string path = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, group.GroupName, "Scenario", "ScenarioNewGameIntro.txt");
-
-                        if (!File.Exists(path))
-                        {
-                            File.Copy(Path.Combine(ScenarioSystem.fetch.groupInitialScenarioDirectory, "ScenarioNewGameIntro.txt"), path);
-                        }
-                    }
-                }
+                Directory.CreateDirectory(scenarioFolder);
             }
-            if (!File.Exists(Path.Combine(ScenarioSystem.fetch.playerInitialScenarioDirectory, "ScenarioNewGameIntro.txt")))
+
+            string filePath = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+
+            if (File.Exists(filePath))
             {
-                List<string> newScenario = new List<string>();
-
-                newScenario.Add("name = ScenarioNewGameIntro");
-                newScenario.Add("scene = 5, 6, 8");
-                newScenario.Add("kscComplete = True");
-                newScenario.Add("editorComplete = True");
-                newScenario.Add("tsComplete = True");
-
-                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newScenario), Path.Combine(ScenarioSystem.fetch.playerInitialScenarioDirectory, "ScenarioNewGameIntro.txt"));
+                List<string> tempList = new List<string>();
+                tempList.Add("ResourceScenario");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
             }
+
+            Messages.ScenarioData.SendStartData(client, data);
         }
+
+        public void ScenarioSendStartData(string groupName, ClientObject client)
+        {
+            List<byte[]> data = new List<byte[]>();
+
+            List<string> newScenarioName = new List<string>();
+
+            newScenarioName.Add("ScenarioNewGameIntro");
+
+            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(newScenarioName));
+
+            List<string> newScenario = new List<string>();
+
+            newScenario.Add("name = ScenarioNewGameIntro");
+            newScenario.Add("scene = 5, 6, 8");
+            newScenario.Add("kscComplete = True");
+            newScenario.Add("editorComplete = True");
+            newScenario.Add("tsComplete = True");
+
+            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(newScenario));
+
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            string filePath = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+
+            if (File.Exists(filePath))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("ResourceScenario");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+            }
+
+            Messages.ScenarioData.SendStartData(client, data);
+        }
+
+        /*
+        public void RevertScenario(ClientObject callingClient, byte[] messageData)
+        {
+
+        }
+        */
 
         public void SyncScenario(ClientObject callingClient, byte[] messageData)
         {
@@ -542,6 +587,54 @@ namespace SyncrioServer
                                     }
                                 }
                                 break;
+                            case ScenarioDataType.RESOURCE_SCENARIO:
+                                {
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                                            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                                            string filePath = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+
+                                            SyncrioUtil.FileHandler.WriteToFile(subDataReader.Read<byte[]>(), filePath);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.RESOURCE_SCENARIO, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, callingClient.playerName);
+                                        string filePath = Path.Combine(playerFolder, "ResourceScenario.txt");
+
+                                        SyncrioUtil.FileHandler.WriteToFile(subDataReader.Read<byte[]>(), filePath);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.STRATEGY_SYSTEM:
+                                {
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                                            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                                            string filePath = Path.Combine(scenarioFolder, "StrategySystem.txt");
+
+                                            SyncrioUtil.FileHandler.WriteToFile(subDataReader.Read<byte[]>(), filePath);
+
+                                            ScenarioSendData(groupName, ScenarioDataType.STRATEGY_SYSTEM, callingClient);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, callingClient.playerName);
+                                        string filePath = Path.Combine(playerFolder, "StrategySystem.txt");
+
+                                        SyncrioUtil.FileHandler.WriteToFile(subDataReader.Read<byte[]>(), filePath);
+                                    }
+                                }
+                                break;
                             default:
                                 {
                                     //Nothing for now.
@@ -786,6 +879,46 @@ namespace SyncrioServer
                         }
                     }
                     break;
+                case ScenarioDataType.RESOURCE_SCENARIO:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("ResourceScenario");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
+                case ScenarioDataType.STRATEGY_SYSTEM:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "StrategySystem.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("StrategySystem");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
                 default:
                     {
 
@@ -939,6 +1072,26 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath12));
             }
 
+            string filePath13 = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+
+            if (File.Exists(filePath13))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("ResourceScenario");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath13));
+            }
+
+            string filePath14 = Path.Combine(scenarioFolder, "StrategySystem.txt");
+
+            if (File.Exists(filePath14))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("StrategySystem");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath14));
+            }
+
             Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
 
             if (groups[groupName].members.Contains(player.playerName))
@@ -1077,6 +1230,26 @@ namespace SyncrioServer
                 tempList.Add("Weights");
                 data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath12));
+            }
+
+            string filePath13 = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+
+            if (File.Exists(filePath13))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("ResourceScenario");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath13));
+            }
+
+            string filePath14 = Path.Combine(scenarioFolder, "StrategySystem.txt");
+
+            if (File.Exists(filePath14))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("StrategySystem");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath14));
             }
 
             Messages.ScenarioData.SendScenarioModules(player, data);
@@ -2633,141 +2806,6 @@ namespace SyncrioServer
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
-        }
-
-        public static void LoadGroupSubspaceFile()
-        {
-            string gsFile = Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupSubspaces.txt");
-
-            lock (subspaceListLock)
-            {
-                try
-                {
-                    using (StreamReader sr = new StreamReader(gsFile))
-                    {
-                        //Ignore the comment line.
-                        string firstLine = "";
-                        while (firstLine.StartsWith("#") || String.IsNullOrEmpty(firstLine))
-                        {
-                            if (sr.EndOfStream)
-                            {
-                                throw new Exception();
-                            }
-                            firstLine = sr.ReadLine().Trim();
-                        }
-                        int firstLineIndex = Int32.Parse(firstLine);
-                        AddSubspace(firstLineIndex, -1);
-                        Messages.WarpControl.playersInSubspaces.Add(firstLineIndex, 0);
-                        while (!sr.EndOfStream)
-                        {
-                            int lineIndex = Int32.Parse(sr.ReadLine().Trim());
-                            AddSubspace(lineIndex, -1);
-                            Messages.WarpControl.playersInSubspaces.Add(lineIndex, 0);
-                        }
-                    }
-                }
-                catch
-                {
-                    AddSubspace(0, -1);
-                    Messages.WarpControl.playersInSubspaces.Add(0, 0);
-                    SaveGroupSubspaceFile();
-                }
-            }
-        }
-
-        public static void SaveGroupSubspaceFile()
-        {
-            string gsFile = Path.Combine(Server.ScenarioDirectory, "GroupData", "GroupSubspaces.txt");
-
-            lock (subspaceListLock)
-            {
-                using (StreamWriter sw = new StreamWriter(gsFile))
-                {
-                    sw.WriteLine("#Incorrectly editing this file will cause the server to crash.");
-                    sw.WriteLine("#This file can only be edited if the server is stopped.");
-                    for (int i = 0; i < subspaceList.Subspaces.Count; i++)
-                    {
-                        sw.WriteLine(subspaceList.Subspaces[i].SubspaceNumber);
-                    }
-                }
-            }
-        }
-
-        public static SubspacesList CopySubspacesList(SubspacesList imputlist)
-        {
-            SubspacesList outputList = new SubspacesList();
-
-            foreach (Subspace ss in imputlist.Subspaces)
-            {
-                Subspace newSS = new Subspace();
-
-                newSS.SubspaceNumber = ss.SubspaceNumber;
-
-                foreach (Group group in ss.Groups)
-                {
-                    Group newGroup = new Group();
-
-                    newGroup.GroupName = group.GroupName;
-
-                    newGroup.GroupQueuedScenarioData = group.GroupQueuedScenarioData;
-
-                    newSS.Groups.Add(newGroup);
-                }
-
-                outputList.Subspaces.Add(newSS);
-            }
-
-            return outputList;
-        }
-
-        /// <summary>
-        /// Set 'index' to -1 to add the subspace at the end of the list.
-        /// </summary>
-        public static int AddSubspace(int number, int index)
-        {
-            lock (subspaceListLock)
-            {
-                int returnIndex = 0;
-                Subspace newSubspace = new Subspace();
-
-                newSubspace.SubspaceNumber = number;
-
-                if (index != -1)
-                {
-                    if (index < subspaceList.Subspaces.Count)
-                    {
-                        subspaceList.Subspaces.Insert(index, newSubspace);
-                        returnIndex = index;
-                    }
-                    else
-                    {
-                        subspaceList.Subspaces.Add(newSubspace);
-                        returnIndex = subspaceList.Subspaces.Count - 1;
-                    }
-                }
-                else
-                {
-                    subspaceList.Subspaces.Add(newSubspace);
-                    returnIndex = subspaceList.Subspaces.Count - 1;
-                }
-                
-                return returnIndex;
-            }
-        }
-
-        public class SubspacesList
-        {
-            public List<Subspace> Subspaces = new List<Subspace>();
-        }
-        public class Subspace
-        {
-            public int SubspaceNumber = 0;
-            public List<Group> Groups = new List<Group>();
-        }
-        public class Group
-        {
-            public string GroupName = "";
-            public Dictionary<string, List<byte[]>> GroupQueuedScenarioData = new Dictionary<string, List<byte[]>>();
         }
     }
 }

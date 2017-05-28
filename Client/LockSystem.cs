@@ -68,15 +68,6 @@ namespace SyncrioClientSide
             }
         }
 
-        public void ThrottledAcquireLock(string lockname)
-        {
-            if (lastAcquireTime.ContainsKey(lockname) ? ((UnityEngine.Time.realtimeSinceStartup - lastAcquireTime[lockname]) > 5f) : true)
-            {
-                lastAcquireTime[lockname] = UnityEngine.Time.realtimeSinceStartup;
-                AcquireLock(lockname, false);
-            }
-        }
-
         public void AcquireLock(string lockName, bool force)
         {
             lock (lockObject)
