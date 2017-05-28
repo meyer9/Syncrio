@@ -394,12 +394,12 @@ namespace SyncrioClientSide
             }
             try
             {
-                xmlDoc.SelectSingleNode("/settings/global/@player-color").Value = playerColor.r.ToString() + ", " + playerColor.g.ToString() + ", " + playerColor.b.ToString();
+                xmlDoc.SelectSingleNode("/settings/global/@player-color").Value = string.Format(Client.english, "{0}{1}{2}{3}{4}", playerColor.r.ToString(), ", ", playerColor.g.ToString(), ", ", playerColor.b.ToString());
             }
             catch
             {
                 XmlAttribute colorAttribute = xmlDoc.CreateAttribute("player-color");
-                colorAttribute.Value = playerColor.r.ToString() + ", " + playerColor.g.ToString() + ", " + playerColor.b.ToString();
+                colorAttribute.Value = string.Format(Client.english, "{0}{1}{2}{3}{4}", playerColor.r.ToString(), ", ", playerColor.g.ToString(), ", ", playerColor.b.ToString());
                 xmlDoc.SelectSingleNode("/settings/global").Attributes.Append(colorAttribute);
             }
             try

@@ -1,6 +1,6 @@
 /*   Syncrio License
  *   
- *   Copyright © 2016 Caleb Huyck
+ *   Copyright Â© 2016 Caleb Huyck
  *   
  *   This file is part of Syncrio.
  *   
@@ -418,15 +418,15 @@ namespace SyncrioClientSide
                                 {
                                     if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                     {
-                                        double fundsAmount = Convert.ToDouble(dataList[0]);
+                                        double fundsAmount = Convert.ToDouble(dataList[0], Client.english);
                                         double fundsAmountDiff = fundsAmount - Funding.Instance.Funds;
                                         Funding.Instance.AddFunds(fundsAmountDiff, TransactionReasons.None);
 
-                                        float repAmount = Convert.ToSingle(dataList[1]);
+                                        float repAmount = Convert.ToSingle(dataList[1], Client.english);
                                         float repAmountDiff = repAmount - Reputation.Instance.reputation;
                                         Reputation.Instance.AddReputation(repAmountDiff, TransactionReasons.None);
 
-                                        float sciAmount = Convert.ToSingle(dataList[2]);
+                                        float sciAmount = Convert.ToSingle(dataList[2], Client.english);
                                         float sciAmountDiff = sciAmount - ResearchAndDevelopment.Instance.Science;
                                         ResearchAndDevelopment.Instance.AddScience(sciAmountDiff, TransactionReasons.None);
                                     }
@@ -455,8 +455,8 @@ namespace SyncrioClientSide
 
                                                 string id = subData[0].Trim();
                                                 string level = subData[1].Trim();
-
-                                                facility.SetLevel(Convert.ToInt32(level));
+                                                
+                                                facility.SetLevel(Convert.ToInt32(level, Client.english));
                                             }
                                         }
                                     }
@@ -810,7 +810,7 @@ namespace SyncrioClientSide
 
                                                 string[] split2 = dataList[looped + 1].Split(':');
                                                 string start2 = split2[0].Trim();
-                                                float dataAmount = Convert.ToSingle(split2[1].Trim());
+                                                float dataAmount = Convert.ToSingle(split2[1].Trim(), Client.english);
 
                                                 int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 3);
                                                 KeyValuePair<int, int> range = new KeyValuePair<int, int>(looped, (matchBracketIdx - looped) + 1);
