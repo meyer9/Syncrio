@@ -1311,7 +1311,7 @@ namespace SyncrioServer
                             looped++;
                         }
 
-                        if (oldList[oldIndex - looped] == "ContractNode")
+                        if (oldList[oldIndex - looped] == "ContractNode" && oldList[(oldIndex - looped) + 1] == "{" && oldList[(oldIndex - looped) + 2] == "CONTRACT")
                         {
                             int tempIndex = oldIndex - looped;
                             int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
@@ -1342,39 +1342,10 @@ namespace SyncrioServer
 
                 if (cnLines.Any(i => i.StartsWith("guid")))
                 {
-                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
-
-                    if (newList.Any(i => i == cnLines[cnIndex]))
-                    {
-                        int oldIndex = newList.FindIndex(i => i == cnLines[cnIndex]);
-
-                        int looped = 0;
-                        while (newList[oldIndex - looped] != "ContractNode" && looped <= 20)
-                        {
-                            looped++;
-                        }
-
-                        if (newList[oldIndex - looped] == "ContractNode")
-                        {
-                            int tempIndex = oldIndex - looped;
-                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, tempIndex + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
-
-                            if (range.Key + 2 < newList.Count && range.Value - 3 > 0)
-                            {
-                                newList.RemoveRange(range.Key + 2, range.Value - 3);
-
-                                newList.InsertRange(range.Key + 2, cnLines);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        newList.Add("ContractNode");
-                        newList.Add("{");
-                        newList.AddRange(cnLines);
-                        newList.Add("}");
-                    }
+                    newList.Add("ContractNode");
+                    newList.Add("{");
+                    newList.AddRange(cnLines);
+                    newList.Add("}");
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
@@ -1409,7 +1380,7 @@ namespace SyncrioServer
                             looped++;
                         }
 
-                        if (oldList[oldIndex - looped] == "ContractNode")
+                        if (oldList[oldIndex - looped] == "ContractNode" && oldList[(oldIndex - looped) + 1] == "{" && oldList[(oldIndex - looped) + 2] == "CONTRACT")
                         {
                             int tempIndex = oldIndex - looped;
                             int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
@@ -1440,39 +1411,10 @@ namespace SyncrioServer
 
                 if (cnLines.Any(i => i.StartsWith("guid")))
                 {
-                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
-
-                    if (newList.Any(i => i == cnLines[cnIndex]))
-                    {
-                        int oldIndex = newList.FindIndex(i => i == cnLines[cnIndex]);
-
-                        int looped = 0;
-                        while (newList[oldIndex - looped] != "ContractNode" && looped <= 20)
-                        {
-                            looped++;
-                        }
-
-                        if (newList[oldIndex - looped] == "ContractNode")
-                        {
-                            int tempIndex = oldIndex - looped;
-                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(newList, tempIndex + 1);
-                            KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
-
-                            if (range.Key + 2 < newList.Count && range.Value - 3 > 0)
-                            {
-                                newList.RemoveRange(range.Key + 2, range.Value - 3);
-
-                                newList.InsertRange(range.Key + 2, cnLines);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        newList.Add("ContractNode");
-                        newList.Add("{");
-                        newList.AddRange(cnLines);
-                        newList.Add("}");
-                    }
+                    newList.Add("ContractNode");
+                    newList.Add("{");
+                    newList.AddRange(cnLines);
+                    newList.Add("}");
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
@@ -1519,19 +1461,10 @@ namespace SyncrioServer
 
                 if (cnLines.Any(i => i.StartsWith("guid")))
                 {
-                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
-
-                    if (!newList.Any(i => i == cnLines[cnIndex]))
-                    {
-                        newList.Add("ContractNode");
-                        newList.Add("{");
-                        newList.AddRange(cnLines);
-                        newList.Add("}");
-                    }
-                    else
-                    {
-                        return;
-                    }
+                    newList.Add("ContractNode");
+                    newList.Add("{");
+                    newList.AddRange(cnLines);
+                    newList.Add("}");
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
@@ -1577,19 +1510,10 @@ namespace SyncrioServer
 
                 if (cnLines.Any(i => i.StartsWith("guid")))
                 {
-                    int cnIndex = cnLines.FindIndex(i => i.StartsWith("guid"));
-
-                    if (!newList.Any(i => i == cnLines[cnIndex]))
-                    {
-                        newList.Add("ContractNode");
-                        newList.Add("{");
-                        newList.AddRange(cnLines);
-                        newList.Add("}");
-                    }
-                    else
-                    {
-                        return;
-                    }
+                    newList.Add("ContractNode");
+                    newList.Add("{");
+                    newList.AddRange(cnLines);
+                    newList.Add("}");
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
@@ -1962,26 +1886,8 @@ namespace SyncrioServer
             else
             {
                 List<string> newList = new List<string>();
-
-                string startString = buliding + " = ";
-
-                int cursor = newList.FindIndex(i => i.StartsWith(startString));
-
-                if (cursor != -1)
-                {
-                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length), english) < level)
-                    {
-                        newList[cursor] = startString + level.ToString();
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-                else
-                {
-                    newList.Add(startString + level.ToString());
-                }
+                
+                newList.Add(buliding + " = " + level.ToString());
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2027,26 +1933,8 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                string startString = buliding + " = ";
-
-                int cursor = newList.FindIndex(i => i.StartsWith(startString));
-
-                if (cursor != -1)
-                {
-                    if (Convert.ToInt32(newList[cursor].Substring(startString.Length), english) < level)
-                    {
-                        newList[cursor] = startString + level.ToString();
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-                else
-                {
-                    newList.Add(startString + level.ToString());
-                }
-
+                newList.Add(buliding + " = " + level.ToString());
+                
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
         }
@@ -2078,13 +1966,8 @@ namespace SyncrioServer
             else
             {
                 List<string> newList = new List<string>();
-
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor == -1)
-                {
-                    newList.Add(buliding);
-                }
+                
+                newList.Add(buliding);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2108,14 +1991,7 @@ namespace SyncrioServer
             else
             {
                 List<string> newList = new List<string>();
-
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor != -1)
-                {
-                    newList.RemoveAt(cursor);
-                }
-
+                
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
             }
         }
@@ -2147,12 +2023,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor == -1)
-                {
-                    newList.Add(buliding);
-                }
+                newList.Add(buliding);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2176,14 +2047,7 @@ namespace SyncrioServer
             else
             {
                 List<string> newList = new List<string>();
-
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor != -1)
-                {
-                    newList.RemoveAt(cursor);
-                }
-
+                
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
             }
         }
@@ -2216,12 +2080,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor == -1)
-                {
-                    newList.Add(buliding);
-                }
+                newList.Add(buliding);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2245,14 +2104,7 @@ namespace SyncrioServer
             else
             {
                 List<string> newList = new List<string>();
-
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor != -1)
-                {
-                    newList.RemoveAt(cursor);
-                }
-
+                
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
             }
         }
@@ -2284,12 +2136,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor == -1)
-                {
-                    newList.Add(buliding);
-                }
+                newList.Add(buliding);
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2313,14 +2160,7 @@ namespace SyncrioServer
             else
             {
                 List<string> newList = new List<string>();
-
-                int cursor = newList.FindIndex(i => i == buliding);
-
-                if (cursor != -1)
-                {
-                    newList.RemoveAt(cursor);
-                }
-
+                
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath2);
             }
         }
@@ -2351,10 +2191,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                if (!newList.Any(i => i == string.Format(english, "{0}{1}{2}", part, " : ", techNeeded)))
-                {
-                    newList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
-                }
+                newList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2385,10 +2222,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                if (!newList.Any(i => i == string.Format(english, "{0}{1}{2}", part, " : ", techNeeded)))
-                {
-                    newList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
-                }
+                newList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2420,10 +2254,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                if (!newList.Any(i => i == string.Format(english, "{0}{1}{2}", upgrade, " : ", techNeeded)))
-                {
-                    newList.Add(string.Format(english, "{0}{1}{2}", upgrade, " : ", techNeeded));
-                }
+                newList.Add(string.Format(english, "{0}{1}{2}", upgrade, " : ", techNeeded));
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2454,10 +2285,7 @@ namespace SyncrioServer
             {
                 List<string> newList = new List<string>();
 
-                if (!newList.Any(i => i == string.Format(english, "{0}{1}{2}", upgrade, " : ", techNeeded)))
-                {
-                    newList.Add(string.Format(english, "{0}{1}{2}", upgrade, " : ", techNeeded));
-                }
+                newList.Add(string.Format(english, "{0}{1}{2}", upgrade, " : ", techNeeded));
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
@@ -2742,8 +2570,7 @@ namespace SyncrioServer
                 newList.Add("{");
                 newList.AddRange(sciNode);
                 newList.Add("}");
-
-
+                
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
         }

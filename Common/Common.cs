@@ -63,9 +63,9 @@ namespace SyncrioCommon
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
         public const int PROTOCOL_VERSION = 49;
         //Program version. This is written in the build scripts.
-        public const string PROGRAM_VERSION = "v0.9.0.0";
+        public const string PROGRAM_VERSION = "v0.9.0.1";
         //Mod control version - The last version to add parts
-        public const string MODCONTROL_VERSION = "1.2";
+        public const string MODCONTROL_VERSION = "1.3";
         //Compression threshold
         public const int COMPRESSION_THRESHOLD = 4096;
 
@@ -469,6 +469,8 @@ namespace SyncrioCommon
             stockPartList.Add("RelayAntenna5");
             stockPartList.Add("RelayAntenna50");
             stockPartList.Add("HeatShield0");
+            // 1.3 parts
+            stockPartList.Add("InfraredTelescope");
             return stockPartList;
             //MAKE SURE TO CHANGE Common.MODCONTROL_VERSION
         }
