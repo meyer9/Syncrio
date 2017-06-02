@@ -134,14 +134,13 @@ namespace SyncrioServer
             data.Add(SyncrioUtil.ByteArraySerializer.Serialize(newScenario));
             
             string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
-            string scenarioFolder = Path.Combine(playerFolder, "Scenario");
 
-            if (!Directory.Exists(scenarioFolder))
+            if (!Directory.Exists(playerFolder))
             {
-                Directory.CreateDirectory(scenarioFolder);
+                Directory.CreateDirectory(playerFolder);
             }
 
-            string filePath = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+            string filePath = Path.Combine(playerFolder, "ResourceScenario.txt");
 
             if (File.Exists(filePath))
             {
@@ -300,6 +299,23 @@ namespace SyncrioServer
                                     else
                                     {
                                         ScenarioAddContract(cnLines, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.REMOVE_CONTRACT:
+                                {
+                                    string cnGUID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioRemoveContract(cnGUID, groupName);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioRemoveContract(cnGUID, callingClient);
                                     }
                                 }
                                 break;
@@ -1105,14 +1121,13 @@ namespace SyncrioServer
             List<byte[]> data = new List<byte[]>();
 
             string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, player.playerName);
-            string scenarioFolder = Path.Combine(playerFolder, "Scenario");
 
-            if (!Directory.Exists(scenarioFolder))
+            if (!Directory.Exists(playerFolder))
             {
-                Directory.CreateDirectory(scenarioFolder);
+                Directory.CreateDirectory(playerFolder);
             }
 
-            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+            string filePath = Path.Combine(playerFolder, "Contracts.txt");
 
             if (File.Exists(filePath))
             {
@@ -1122,7 +1137,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
             }
 
-            string filePath2 = Path.Combine(scenarioFolder, "Waypoints.txt");
+            string filePath2 = Path.Combine(playerFolder, "Waypoints.txt");
 
             if (File.Exists(filePath2))
             {
@@ -1132,7 +1147,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
             }
 
-            string filePath3 = Path.Combine(scenarioFolder, "Currency.txt");
+            string filePath3 = Path.Combine(playerFolder, "Currency.txt");
 
             if (File.Exists(filePath3))
             {
@@ -1142,7 +1157,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath3));
             }
 
-            string filePath4 = Path.Combine(scenarioFolder, "BuildingLevel.txt");
+            string filePath4 = Path.Combine(playerFolder, "BuildingLevel.txt");
 
             if (File.Exists(filePath4))
             {
@@ -1152,7 +1167,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath4));
             }
 
-            string filePath5 = Path.Combine(scenarioFolder, "BuildingDead.txt");
+            string filePath5 = Path.Combine(playerFolder, "BuildingDead.txt");
 
             if (File.Exists(filePath5))
             {
@@ -1162,7 +1177,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath5));
             }
 
-            string filePath6 = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+            string filePath6 = Path.Combine(playerFolder, "BuildingAlive.txt");
 
             if (File.Exists(filePath6))
             {
@@ -1172,7 +1187,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath6));
             }
 
-            string filePath7 = Path.Combine(scenarioFolder, "Progress.txt");
+            string filePath7 = Path.Combine(playerFolder, "Progress.txt");
 
             if (File.Exists(filePath7))
             {
@@ -1182,7 +1197,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath7));
             }
 
-            string filePath8 = Path.Combine(scenarioFolder, "Tech.txt");
+            string filePath8 = Path.Combine(playerFolder, "Tech.txt");
 
             if (File.Exists(filePath8))
             {
@@ -1192,7 +1207,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath8));
             }
 
-            string filePath9 = Path.Combine(scenarioFolder, "ScienceRecieved.txt");
+            string filePath9 = Path.Combine(playerFolder, "ScienceRecieved.txt");
 
             if (File.Exists(filePath9))
             {
@@ -1202,7 +1217,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath9));
             }
 
-            string filePath10 = Path.Combine(scenarioFolder, "Parts.txt");
+            string filePath10 = Path.Combine(playerFolder, "Parts.txt");
 
             if (File.Exists(filePath10))
             {
@@ -1212,7 +1227,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath10));
             }
 
-            string filePath11 = Path.Combine(scenarioFolder, "Upgrades.txt");
+            string filePath11 = Path.Combine(playerFolder, "Upgrades.txt");
 
             if (File.Exists(filePath11))
             {
@@ -1222,7 +1237,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
             }
 
-            string filePath12 = Path.Combine(scenarioFolder, "Weights.txt");
+            string filePath12 = Path.Combine(playerFolder, "Weights.txt");
 
             if (File.Exists(filePath12))
             {
@@ -1232,7 +1247,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath12));
             }
 
-            string filePath13 = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+            string filePath13 = Path.Combine(playerFolder, "ResourceScenario.txt");
 
             if (File.Exists(filePath13))
             {
@@ -1242,7 +1257,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath13));
             }
 
-            string filePath14 = Path.Combine(scenarioFolder, "StrategySystem.txt");
+            string filePath14 = Path.Combine(playerFolder, "StrategySystem.txt");
 
             if (File.Exists(filePath14))
             {
@@ -1517,6 +1532,91 @@ namespace SyncrioServer
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioRemoveContract(string cnGUID, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                string cnID = string.Format(english, "guid = {0}", cnGUID);
+
+                if (oldList.Any(i => i == cnID))
+                {
+                    int oldIndex = oldList.FindIndex(i => i == cnID);
+                    
+                    int looped = 0;
+                    while (oldList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                    {
+                        looped++;
+                    }
+
+                    if (oldList[oldIndex - looped] == "ContractNode" && oldList[(oldIndex - looped) + 1] == "{" && oldList[(oldIndex - looped) + 2] == "CONTRACT")
+                    {
+                        int tempIndex = oldIndex - looped;
+                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
+                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
+                        
+                        oldList.RemoveRange(range.Key, range.Value);
+                    }
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+        }
+
+        private void ScenarioRemoveContract(string cnGUID, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Contracts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                string cnID = string.Format(english, "guid = {0}", cnGUID);
+
+                if (oldList.Any(i => i == cnID))
+                {
+                    int oldIndex = oldList.FindIndex(i => i == cnID);
+
+                    int looped = 0;
+                    while (oldList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                    {
+                        looped++;
+                    }
+
+                    if (oldList[oldIndex - looped] == "ContractNode" && oldList[(oldIndex - looped) + 1] == "{" && oldList[(oldIndex - looped) + 2] == "CONTRACT")
+                    {
+                        int tempIndex = oldIndex - looped;
+                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
+                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
+
+                        oldList.RemoveRange(range.Key, range.Value);
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
         }
 

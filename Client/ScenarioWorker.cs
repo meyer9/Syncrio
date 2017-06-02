@@ -194,7 +194,7 @@ namespace SyncrioClientSide
 
                             try
                             {
-                                if (name[0] == "Contracts")
+                                if (name[0] == "Contracts" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     if (!ScenarioEventHandler.fetch.MissionControlOpen)
                                     {
@@ -295,7 +295,7 @@ namespace SyncrioClientSide
                                     }
                                 }
 
-                                if (name[0] == "Weights")
+                                if (name[0] == "Weights" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     foreach (string weight in dataList)
                                     {
@@ -891,7 +891,7 @@ namespace SyncrioClientSide
                                     ScenarioEventHandler.fetch.lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ResourceCfg));
                                 }
 
-                                if (name[0] == "StrategySystem")
+                                if (name[0] == "StrategySystem" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     if (!ScenarioEventHandler.fetch.AdministrationOpen)
                                     {
