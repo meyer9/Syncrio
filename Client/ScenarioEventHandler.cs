@@ -606,7 +606,7 @@ namespace SyncrioClientSide
                 return;
             }
 
-            if (contract.ContractState != Contracts.Contract.State.Withdrawn)
+            if (contract.ContractState != Contracts.Contract.State.Withdrawn && contract.ContractState != Contracts.Contract.State.OfferExpired)
             {
                 if (GroupSystem.playerGroupAssigned)
                 {

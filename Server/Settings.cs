@@ -79,7 +79,7 @@ namespace SyncrioServer
             serverSettings.SaveSettings();
         }
 
-        private static void CheckForCareerMode()
+        public static void CheckForCareerMode()
         {
             if (serverSettings.Settings.gameMode == GameMode.CAREER)
             {
@@ -103,6 +103,8 @@ namespace SyncrioServer
         public GameDifficulty gameDifficulty = GameDifficulty.NORMAL;
         [Description("Enable DarkMultiPlayer Cooperative Mode.\n# WARNING: If disabled Syncrio will not work with DarkMultiPlayer!\n# WARNING: If enabled it Must be enabled on the client side as well!\n# This mode will turn off the functions (on the Syncrio side) that both Syncrio and DarkMultiPlayer have.\n# This speeds up the KSP and the Syncrio server by removing the duplicate functions.")]
         public bool DarkMultiPlayerCoopMode = false;
+        [Description("The wait time between checking if there is any new scenario data to send.\n# This value is in seconds. Increasing this value will lower cpu usage and network traffic, but increase the time it takes scenario data to be sent to the players.")]
+        public int scenarioDataCheckInterval = 1;
         [Description("Enable white-listing.")]
         public bool whitelisted = false;
         [Description("Enable mod control.\n# WARNING: Only consider turning off mod control for private servers and you know all players will have the same mods installed.\n# The game will constantly complain about missing parts if there are missing mods.")]
@@ -147,9 +149,5 @@ namespace SyncrioServer
         public bool compressionEnabled = true;
         [Description("Specify the amount of days a log file should be considered as expired and deleted. 0 = Disabled")]
         public double expireLogs = 0;
-    }
-
-    public class SpecialSettingsStore
-    {
     }
 }
