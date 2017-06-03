@@ -722,6 +722,41 @@ namespace SyncrioServer
                                     }
                                 }
                                 break;
+                            case ScenarioDataType.REMOVE_PART:
+                                {
+                                    string partID = subDataReader.Read<string>();
+                                    string techNeededID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioRemovePart(partID, techNeededID, groupName);
+
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(ScenarioDataType.PART_PURCHASED))
+                                                {
+                                                    dataSendQueue.Add(ScenarioDataType.PART_PURCHASED, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[ScenarioDataType.PART_PURCHASED].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[ScenarioDataType.PART_PURCHASED].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+                                                //Send data back as a part purchased
+                                                dataSendQueue[ScenarioDataType.PART_PURCHASED][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioRemovePart(partID, techNeededID, callingClient);
+                                    }
+                                }
+                                break;
                             case ScenarioDataType.PART_UPGRADE_PURCHASED:
                                 {
                                     string upgradeID = subDataReader.Read<string>();
@@ -2584,7 +2619,7 @@ namespace SyncrioServer
 
                 if (!oldList.Any(i => i == string.Format(english, "{0}{1}{2}",part, " : ", techNeeded)))
                 {
-                    oldList.Add(part + " : " + techNeeded);
+                    oldList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
@@ -2627,6 +2662,65 @@ namespace SyncrioServer
                 newList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioRemovePart(string part, string techNeeded, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Parts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int index = oldList.FindIndex(i => i == string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
+
+                if (index != -1)
+                {
+                    oldList.RemoveAt(index);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+        }
+
+        private void ScenarioRemovePart(string part, string techNeeded, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Parts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int index = oldList.FindIndex(i => i == string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
+
+                if (index != -1)
+                {
+                    oldList.RemoveAt(index);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
         }
 

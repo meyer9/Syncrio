@@ -512,12 +512,23 @@ namespace SyncrioClientSide
 
                                             AvailablePart truePart = PartLoader.getPartInfoByName(partName);
 
-                                            if (ResearchAndDevelopment.GetTechnologyState(partTech) != RDTech.State.Unavailable)
+                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+
+                                            RDTech.State state;
+
+                                            if (ptNode != null)
+                                            {
+                                                state = ptNode.state;
+                                            }
+                                            else
+                                            {
+                                                state = RDTech.State.Unavailable;
+                                            }
+
+                                            if (state != RDTech.State.Unavailable)
                                             {
                                                 if (!ResearchAndDevelopment.PartTechAvailable(truePart))
                                                 {
-                                                    ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
-
                                                     ptNode.partsPurchased.Add(truePart);
 
                                                     ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
@@ -527,9 +538,7 @@ namespace SyncrioClientSide
                                                     if (ResearchAndDevelopment.IsExperimentalPart(truePart))
                                                     {
                                                         ResearchAndDevelopment.RemoveExperimentalPart(truePart);
-
-                                                        ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
-
+                                                        
                                                         ptNode.partsPurchased.Add(truePart);
 
                                                         ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);

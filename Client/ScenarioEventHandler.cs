@@ -553,6 +553,36 @@ namespace SyncrioClientSide
                     */
 
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                    foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                    {
+                        if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                        {
+                            Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+                            
+                            byte[] data2;
+
+                            using (MessageWriter mw = new MessageWriter())
+                            {
+                                mw.Write<bool>(true);//In group
+                                mw.Write<string>(groupName);
+
+                                mw.Write<string>(trueParam.tgtPartInfo.name);
+                                mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                data2 = mw.GetMessageBytes();
+                            }
+
+                            /*
+                            if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                            {
+                                revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
+                            }
+                            */
+
+                            SendData((int)ScenarioDataType.PART_PURCHASED, data2);
+                        }
+                    }
                 }
             }
             else
@@ -596,6 +626,35 @@ namespace SyncrioClientSide
                 */
 
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                {
+                    if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                    {
+                        Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                        byte[] data2;
+
+                        using (MessageWriter mw = new MessageWriter())
+                        {
+                            mw.Write<bool>(false);//In group
+
+                            mw.Write<string>(trueParam.tgtPartInfo.name);
+                            mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                            data2 = mw.GetMessageBytes();
+                        }
+
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
+                        }
+                        */
+
+                        SendData((int)ScenarioDataType.PART_PURCHASED, data2);
+                    }
+                }
             }
         }
 
@@ -657,6 +716,38 @@ namespace SyncrioClientSide
 
                         SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
+                        if (contract.IsFinished())
+                        {
+                            foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                            {
+                                if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                                {
+                                    Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                                    byte[] data2;
+
+                                    using (MessageWriter mw = new MessageWriter())
+                                    {
+                                        mw.Write<bool>(true);//In group
+                                        mw.Write<string>(groupName);
+
+                                        mw.Write<string>(trueParam.tgtPartInfo.name);
+                                        mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                        data2 = mw.GetMessageBytes();
+                                    }
+
+                                    /*
+                                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                                    {
+                                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                                    }
+                                    */
+
+                                    SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                                }
+                            }
+                        }
                     }
                 }
                 else
@@ -702,6 +793,38 @@ namespace SyncrioClientSide
                     */
 
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                    if (contract.IsFinished())
+                    {
+                        foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                        {
+                            if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                            {
+                                Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                                byte[] data2;
+
+                                using (MessageWriter mw = new MessageWriter())
+                                {
+                                    mw.Write<bool>(false);//In group
+
+                                    mw.Write<string>(trueParam.tgtPartInfo.name);
+                                    mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                    data2 = mw.GetMessageBytes();
+                                }
+
+                                /*
+                                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                                {
+                                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                                }
+                                */
+
+                                SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                            }
+                        }
+                    }
                 }
             }
             else
@@ -732,7 +855,36 @@ namespace SyncrioClientSide
                         */
 
                         SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
+                        
+                        foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                        {
+                            if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                            {
+                                Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
 
+                                byte[] data2;
+
+                                using (MessageWriter mw = new MessageWriter())
+                                {
+                                    mw.Write<bool>(true);//In group
+                                    mw.Write<string>(groupName);
+
+                                    mw.Write<string>(trueParam.tgtPartInfo.name);
+                                    mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                    data2 = mw.GetMessageBytes();
+                                }
+
+                                /*
+                                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                                {
+                                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                                }
+                                */
+
+                                SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                            }
+                        }
                     }
                 }
                 else
@@ -756,6 +908,35 @@ namespace SyncrioClientSide
                     */
 
                     SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
+
+                    foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                    {
+                        if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                        {
+                            Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                            byte[] data2;
+
+                            using (MessageWriter mw = new MessageWriter())
+                            {
+                                mw.Write<bool>(false);//In group
+
+                                mw.Write<string>(trueParam.tgtPartInfo.name);
+                                mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                data2 = mw.GetMessageBytes();
+                            }
+
+                            /*
+                            if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                            {
+                                revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                            }
+                            */
+
+                            SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                        }
+                    }
                 }
             }
         }
