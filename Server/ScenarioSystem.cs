@@ -56,8 +56,8 @@ namespace SyncrioServer
     class ScenarioSystem
     {
         private static ScenarioSystem singleton;
-        public int numberOfPlayersSyncing = 0;
-        public static object subspaceListLock = new object();
+        private Dictionary<ScenarioDataType, Dictionary<string, Dictionary<ClientObject, long>>> dataSendQueue = new Dictionary<ScenarioDataType, Dictionary<string, Dictionary<ClientObject, long>>>();//<Data type, <Group name, <Player sending data, Last data send time>>>
+        private object scenarioQueueLock = new object();
 
         public static CultureInfo english = new CultureInfo("en-US");
 
@@ -134,14 +134,13 @@ namespace SyncrioServer
             data.Add(SyncrioUtil.ByteArraySerializer.Serialize(newScenario));
             
             string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
-            string scenarioFolder = Path.Combine(playerFolder, "Scenario");
 
-            if (!Directory.Exists(scenarioFolder))
+            if (!Directory.Exists(playerFolder))
             {
-                Directory.CreateDirectory(scenarioFolder);
+                Directory.CreateDirectory(playerFolder);
             }
 
-            string filePath = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+            string filePath = Path.Combine(playerFolder, "ResourceScenario.txt");
 
             if (File.Exists(filePath))
             {
@@ -193,6 +192,63 @@ namespace SyncrioServer
             }
 
             Messages.ScenarioData.SendStartData(client, data);
+        }
+
+        public void CheckScenarioQueue()
+        {
+            lock (scenarioQueueLock)
+            {
+                Dictionary<ScenarioDataType, Dictionary<string, List<ClientObject>>> clientsToRemove = new Dictionary<ScenarioDataType, Dictionary<string, List<ClientObject>>>();
+
+                foreach (ScenarioDataType type in dataSendQueue.Keys)
+                {
+                    foreach (string group in dataSendQueue[type].Keys)
+                    {
+                        foreach (ClientObject player in dataSendQueue[type][group].Keys)
+                        {
+                            if ((Server.serverClock.ElapsedMilliseconds - dataSendQueue[type][group][player]) > 1000)
+                            {
+                                ScenarioSendData(group, type, player);
+                                
+                                if (!clientsToRemove.ContainsKey(type))
+                                {
+                                    clientsToRemove.Add(type, new Dictionary<string, List<ClientObject>>() { { group, new List<ClientObject>() } });
+                                }
+                                else
+                                {
+                                    if (!clientsToRemove[type].ContainsKey(group))
+                                    {
+                                        clientsToRemove[type].Add(group, new List<ClientObject>());
+                                    }
+                                }
+
+                                clientsToRemove[type][group].Add(player);
+                            }
+                        }
+                    }
+                }
+
+                foreach (ScenarioDataType type in clientsToRemove.Keys)
+                {
+                    foreach (string group in clientsToRemove[type].Keys)
+                    {
+                        foreach (ClientObject player in clientsToRemove[type][group])
+                        {
+                            dataSendQueue[type][group].Remove(player);
+                        }
+
+                        if (clientsToRemove[type][group].Count == 0)
+                        {
+                            clientsToRemove[type].Remove(group);
+                        }
+                    }
+
+                    if (clientsToRemove[type].Count == 0)
+                    {
+                        clientsToRemove.Remove(type);
+                    }
+                }
+            }
         }
 
         /*
@@ -255,7 +311,22 @@ namespace SyncrioServer
                                                 ScenarioSetWeights(weightsList, groupName);
                                             }
 
-                                            ScenarioSendData(groupName, ScenarioDataType.CONTRACT_UPDATED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -294,12 +365,44 @@ namespace SyncrioServer
                                         {
                                             ScenarioAddContract(cnLines, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.CONTRACT_OFFERED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
                                     {
                                         ScenarioAddContract(cnLines, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.REMOVE_CONTRACT:
+                                {
+                                    string cnGUID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioRemoveContract(cnGUID, groupName);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioRemoveContract(cnGUID, callingClient);
                                     }
                                 }
                                 break;
@@ -317,7 +420,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioSaveLoadedWaypoint(wpName, wpLines, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.CUSTOM_WAYPOINT_LOAD, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -340,7 +458,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioSaveWaypoint(wpName, wpLines, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.CUSTOM_WAYPOINT_SAVE, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -359,7 +492,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioChangeCurrency(value, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.FUNDS_CHANGED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -376,19 +524,24 @@ namespace SyncrioServer
                                     {
                                         if (GroupSystem.fetch.GroupExists(groupName))
                                         {
-                                            if (callingClient.subspace != -1)
-                                            {
-                                                ScenarioChangeCurrency(1, value, groupName);
-                                            }
-                                            else
-                                            {
-                                                if (callingClient.lastSubspace != -1)
-                                                {
-                                                    ScenarioChangeCurrency(1, value, groupName);
-                                                }
-                                            }
+                                            ScenarioChangeCurrency(1, value, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.REPUTATION_CHANGED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -407,7 +560,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioChangeCurrency(2, value, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.SCIENCE_CHANGED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -427,7 +595,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioBuildingUpgrade(facilityID, level, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.KSC_FACILITY_UPGRADED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -446,7 +629,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioBuildingBreak(buildingID, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.KSC_STRUCTURE_COLLAPSED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -465,7 +663,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioBuildingFix(buildingID, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.KSC_STRUCTURE_REPAIRED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -485,12 +698,62 @@ namespace SyncrioServer
                                         {
                                             ScenarioAddPart(partID, techNeededID, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.PART_PURCHASED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
                                     {
                                         ScenarioAddPart(partID, techNeededID, callingClient);
+                                    }
+                                }
+                                break;
+                            case ScenarioDataType.REMOVE_PART:
+                                {
+                                    string partID = subDataReader.Read<string>();
+                                    string techNeededID = subDataReader.Read<string>();
+
+                                    if (isInGroup)
+                                    {
+                                        if (GroupSystem.fetch.GroupExists(groupName))
+                                        {
+                                            ScenarioRemovePart(partID, techNeededID, groupName);
+
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(ScenarioDataType.PART_PURCHASED))
+                                                {
+                                                    dataSendQueue.Add(ScenarioDataType.PART_PURCHASED, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[ScenarioDataType.PART_PURCHASED].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[ScenarioDataType.PART_PURCHASED].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+                                                //Send data back as a part purchased
+                                                dataSendQueue[ScenarioDataType.PART_PURCHASED][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ScenarioRemovePart(partID, techNeededID, callingClient);
                                     }
                                 }
                                 break;
@@ -505,7 +768,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioAddUpgrade(upgradeID, techNeededID, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.PART_UPGRADE_PURCHASED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -528,7 +806,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioAddProgress(progressID, pnLines, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.PROGRESS_UPDATED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -557,7 +850,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioAddTech(techID, techNode, parts, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.TECHNOLOGY_RESEARCHED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -578,7 +886,22 @@ namespace SyncrioServer
                                         {
                                             ScenarioScienceRecieved(sciID, dataValue, sciNode, groupName);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.SCIENCE_RECIEVED, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -599,7 +922,22 @@ namespace SyncrioServer
 
                                             SyncrioUtil.FileHandler.WriteToFile(subDataReader.Read<byte[]>(), filePath);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.RESOURCE_SCENARIO, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -623,7 +961,22 @@ namespace SyncrioServer
 
                                             SyncrioUtil.FileHandler.WriteToFile(subDataReader.Read<byte[]>(), filePath);
 
-                                            ScenarioSendData(groupName, ScenarioDataType.STRATEGY_SYSTEM, callingClient);
+                                            lock (scenarioQueueLock)
+                                            {
+                                                if (!dataSendQueue.ContainsKey(type))
+                                                {
+                                                    dataSendQueue.Add(type, new Dictionary<string, Dictionary<ClientObject, long>>() { { groupName, new Dictionary<ClientObject, long>() } });
+                                                }
+                                                else
+                                                {
+                                                    if (!dataSendQueue[type].ContainsKey(groupName))
+                                                    {
+                                                        dataSendQueue[type].Add(groupName, new Dictionary<ClientObject, long>());
+                                                    }
+                                                }
+
+                                                dataSendQueue[type][groupName][callingClient] = Server.serverClock.ElapsedMilliseconds;
+                                            }
                                         }
                                     }
                                     else
@@ -1105,14 +1458,13 @@ namespace SyncrioServer
             List<byte[]> data = new List<byte[]>();
 
             string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, player.playerName);
-            string scenarioFolder = Path.Combine(playerFolder, "Scenario");
 
-            if (!Directory.Exists(scenarioFolder))
+            if (!Directory.Exists(playerFolder))
             {
-                Directory.CreateDirectory(scenarioFolder);
+                Directory.CreateDirectory(playerFolder);
             }
 
-            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+            string filePath = Path.Combine(playerFolder, "Contracts.txt");
 
             if (File.Exists(filePath))
             {
@@ -1122,7 +1474,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
             }
 
-            string filePath2 = Path.Combine(scenarioFolder, "Waypoints.txt");
+            string filePath2 = Path.Combine(playerFolder, "Waypoints.txt");
 
             if (File.Exists(filePath2))
             {
@@ -1132,7 +1484,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath2));
             }
 
-            string filePath3 = Path.Combine(scenarioFolder, "Currency.txt");
+            string filePath3 = Path.Combine(playerFolder, "Currency.txt");
 
             if (File.Exists(filePath3))
             {
@@ -1142,7 +1494,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath3));
             }
 
-            string filePath4 = Path.Combine(scenarioFolder, "BuildingLevel.txt");
+            string filePath4 = Path.Combine(playerFolder, "BuildingLevel.txt");
 
             if (File.Exists(filePath4))
             {
@@ -1152,7 +1504,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath4));
             }
 
-            string filePath5 = Path.Combine(scenarioFolder, "BuildingDead.txt");
+            string filePath5 = Path.Combine(playerFolder, "BuildingDead.txt");
 
             if (File.Exists(filePath5))
             {
@@ -1162,7 +1514,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath5));
             }
 
-            string filePath6 = Path.Combine(scenarioFolder, "BuildingAlive.txt");
+            string filePath6 = Path.Combine(playerFolder, "BuildingAlive.txt");
 
             if (File.Exists(filePath6))
             {
@@ -1172,7 +1524,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath6));
             }
 
-            string filePath7 = Path.Combine(scenarioFolder, "Progress.txt");
+            string filePath7 = Path.Combine(playerFolder, "Progress.txt");
 
             if (File.Exists(filePath7))
             {
@@ -1182,7 +1534,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath7));
             }
 
-            string filePath8 = Path.Combine(scenarioFolder, "Tech.txt");
+            string filePath8 = Path.Combine(playerFolder, "Tech.txt");
 
             if (File.Exists(filePath8))
             {
@@ -1192,7 +1544,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath8));
             }
 
-            string filePath9 = Path.Combine(scenarioFolder, "ScienceRecieved.txt");
+            string filePath9 = Path.Combine(playerFolder, "ScienceRecieved.txt");
 
             if (File.Exists(filePath9))
             {
@@ -1202,7 +1554,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath9));
             }
 
-            string filePath10 = Path.Combine(scenarioFolder, "Parts.txt");
+            string filePath10 = Path.Combine(playerFolder, "Parts.txt");
 
             if (File.Exists(filePath10))
             {
@@ -1212,7 +1564,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath10));
             }
 
-            string filePath11 = Path.Combine(scenarioFolder, "Upgrades.txt");
+            string filePath11 = Path.Combine(playerFolder, "Upgrades.txt");
 
             if (File.Exists(filePath11))
             {
@@ -1222,7 +1574,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath11));
             }
 
-            string filePath12 = Path.Combine(scenarioFolder, "Weights.txt");
+            string filePath12 = Path.Combine(playerFolder, "Weights.txt");
 
             if (File.Exists(filePath12))
             {
@@ -1232,7 +1584,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath12));
             }
 
-            string filePath13 = Path.Combine(scenarioFolder, "ResourceScenario.txt");
+            string filePath13 = Path.Combine(playerFolder, "ResourceScenario.txt");
 
             if (File.Exists(filePath13))
             {
@@ -1242,7 +1594,7 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath13));
             }
 
-            string filePath14 = Path.Combine(scenarioFolder, "StrategySystem.txt");
+            string filePath14 = Path.Combine(playerFolder, "StrategySystem.txt");
 
             if (File.Exists(filePath14))
             {
@@ -1517,6 +1869,91 @@ namespace SyncrioServer
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioRemoveContract(string cnGUID, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Contracts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                string cnID = string.Format(english, "guid = {0}", cnGUID);
+
+                if (oldList.Any(i => i == cnID))
+                {
+                    int oldIndex = oldList.FindIndex(i => i == cnID);
+                    
+                    int looped = 0;
+                    while (oldList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                    {
+                        looped++;
+                    }
+
+                    if (oldList[oldIndex - looped] == "ContractNode" && oldList[(oldIndex - looped) + 1] == "{" && oldList[(oldIndex - looped) + 2] == "CONTRACT")
+                    {
+                        int tempIndex = oldIndex - looped;
+                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
+                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
+                        
+                        oldList.RemoveRange(range.Key, range.Value);
+                    }
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+        }
+
+        private void ScenarioRemoveContract(string cnGUID, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Contracts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                string cnID = string.Format(english, "guid = {0}", cnGUID);
+
+                if (oldList.Any(i => i == cnID))
+                {
+                    int oldIndex = oldList.FindIndex(i => i == cnID);
+
+                    int looped = 0;
+                    while (oldList[oldIndex - looped] != "ContractNode" && looped <= 20)
+                    {
+                        looped++;
+                    }
+
+                    if (oldList[oldIndex - looped] == "ContractNode" && oldList[(oldIndex - looped) + 1] == "{" && oldList[(oldIndex - looped) + 2] == "CONTRACT")
+                    {
+                        int tempIndex = oldIndex - looped;
+                        int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, tempIndex + 1);
+                        KeyValuePair<int, int> range = new KeyValuePair<int, int>(tempIndex, (matchBracketIdx - tempIndex) + 1);
+
+                        oldList.RemoveRange(range.Key, range.Value);
+                    }
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
         }
 
@@ -2182,7 +2619,7 @@ namespace SyncrioServer
 
                 if (!oldList.Any(i => i == string.Format(english, "{0}{1}{2}",part, " : ", techNeeded)))
                 {
-                    oldList.Add(part + " : " + techNeeded);
+                    oldList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
                 }
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
@@ -2225,6 +2662,65 @@ namespace SyncrioServer
                 newList.Add(string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioRemovePart(string part, string techNeeded, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Parts.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int index = oldList.FindIndex(i => i == string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
+
+                if (index != -1)
+                {
+                    oldList.RemoveAt(index);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+            }
+        }
+
+        private void ScenarioRemovePart(string part, string techNeeded, ClientObject client)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, client.playerName);
+            string filePath = Path.Combine(playerFolder, "Parts.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                int index = oldList.FindIndex(i => i == string.Format(english, "{0}{1}{2}", part, " : ", techNeeded));
+
+                if (index != -1)
+                {
+                    oldList.RemoveAt(index);
+                }
+                else
+                {
+                    return;
+                }
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
             }
         }
 

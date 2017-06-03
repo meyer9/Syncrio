@@ -524,6 +524,7 @@ namespace SyncrioServer
                     Messages.Chat.SendChatMessageToClient(callingClient, "You joined " + groupName);
                     Messages.Group.SendGroupToAll(groupName, go);
                     SaveGroup(groupName);
+                    ScenarioSystem.fetch.ScenarioSendAllData(groupName, callingClient);
                     return true;
                 }
             }
@@ -563,6 +564,7 @@ namespace SyncrioServer
                 Messages.Chat.SendChatMessageToClient(callingClient, "You joined " + groupName);
                 Messages.Group.SendGroupToAll(groupName, go);
                 SaveGroup(groupName);
+                ScenarioSystem.fetch.ScenarioSendAllData(groupName, callingClient);
                 return true;
             }
         }

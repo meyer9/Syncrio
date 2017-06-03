@@ -194,7 +194,7 @@ namespace SyncrioClientSide
 
                             try
                             {
-                                if (name[0] == "Contracts")
+                                if (name[0] == "Contracts" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     if (!ScenarioEventHandler.fetch.MissionControlOpen)
                                     {
@@ -295,7 +295,7 @@ namespace SyncrioClientSide
                                     }
                                 }
 
-                                if (name[0] == "Weights")
+                                if (name[0] == "Weights" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     foreach (string weight in dataList)
                                     {
@@ -512,12 +512,23 @@ namespace SyncrioClientSide
 
                                             AvailablePart truePart = PartLoader.getPartInfoByName(partName);
 
-                                            if (ResearchAndDevelopment.GetTechnologyState(partTech) != RDTech.State.Unavailable)
+                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
+
+                                            RDTech.State state;
+
+                                            if (ptNode != null)
+                                            {
+                                                state = ptNode.state;
+                                            }
+                                            else
+                                            {
+                                                state = RDTech.State.Unavailable;
+                                            }
+
+                                            if (state != RDTech.State.Unavailable)
                                             {
                                                 if (!ResearchAndDevelopment.PartTechAvailable(truePart))
                                                 {
-                                                    ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
-
                                                     ptNode.partsPurchased.Add(truePart);
 
                                                     ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
@@ -527,9 +538,7 @@ namespace SyncrioClientSide
                                                     if (ResearchAndDevelopment.IsExperimentalPart(truePart))
                                                     {
                                                         ResearchAndDevelopment.RemoveExperimentalPart(truePart);
-
-                                                        ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(partTech);
-
+                                                        
                                                         ptNode.partsPurchased.Add(truePart);
 
                                                         ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
@@ -891,7 +900,7 @@ namespace SyncrioClientSide
                                     ScenarioEventHandler.fetch.lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(ResourceCfg));
                                 }
 
-                                if (name[0] == "StrategySystem")
+                                if (name[0] == "StrategySystem" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
                                     if (!ScenarioEventHandler.fetch.AdministrationOpen)
                                     {

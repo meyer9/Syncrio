@@ -61,9 +61,9 @@ namespace SyncrioCommon
         //Split messages into 8kb chunks to higher priority messages have more injection points into the TCP stream.
         public const int SPLIT_MESSAGE_LENGTH = 8192;
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
-        public const int PROTOCOL_VERSION = 49;
+        public const int PROTOCOL_VERSION = 50;
         //Program version. This is written in the build scripts.
-        public const string PROGRAM_VERSION = "v0.9.0.1";
+        public const string PROGRAM_VERSION = "v1.0.0.0-alpha.3";
         //Mod control version - The last version to add parts
         public const string MODCONTROL_VERSION = "1.2";
         //Compression threshold
@@ -641,6 +641,7 @@ namespace SyncrioCommon
     {
         CONTRACT_UPDATED,
         CONTRACT_OFFERED,
+        REMOVE_CONTRACT,
         CUSTOM_WAYPOINT_LOAD,
         CUSTOM_WAYPOINT_SAVE,
         FUNDS_CHANGED,
@@ -650,6 +651,7 @@ namespace SyncrioCommon
         KSC_STRUCTURE_COLLAPSED,
         KSC_STRUCTURE_REPAIRED,
         PART_PURCHASED,
+        REMOVE_PART,
         PART_UPGRADE_PURCHASED,
         PROGRESS_UPDATED,
         TECHNOLOGY_RESEARCHED,

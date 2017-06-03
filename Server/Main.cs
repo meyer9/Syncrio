@@ -96,7 +96,10 @@ namespace SyncrioServer
 
                 //Periodic day check
                 long lastDayCheck = 0;
-                
+
+                //Periodic data check
+                long lastDataCheck = 0;
+
                 //Set Scenario directory
                 ScenarioDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scenarios");
 
@@ -174,6 +177,14 @@ namespace SyncrioServer
                         }
                     }
 
+                    Settings.CheckForCareerMode();
+
+                    if (Settings.settingsStore.scenarioDataCheckInterval <= 0)
+                    {
+                        Settings.settingsStore.scenarioDataCheckInterval = 1;
+                        Settings.Save();
+                    }
+
                     serverRestarting = false;
                     SyncrioLog.Normal("Starting SyncrioServer " + Common.PROGRAM_VERSION + ", protocol " + Common.PROTOCOL_VERSION);
 
@@ -245,6 +256,13 @@ namespace SyncrioServer
                                 SyncrioLog.WriteToLog("Continued from logfile " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ".log");
                                 day = DateTime.Now.Day;
                             }
+                        }
+
+                        if ((serverClock.ElapsedMilliseconds - lastDataCheck) > Settings.settingsStore.scenarioDataCheckInterval * 1000)
+                        {
+                            lastDataCheck = serverClock.ElapsedMilliseconds;
+
+                            ScenarioSystem.fetch.CheckScenarioQueue();
                         }
 
                         Thread.Sleep(500);
@@ -329,10 +347,6 @@ namespace SyncrioServer
             if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData", "GroupScenarios")))
             {
                 Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "GroupScenarios"));
-            }
-            if (!Directory.Exists(Path.Combine(ScenarioDirectory, "GroupData", "SubspaceRefs")))
-            {
-                Directory.CreateDirectory(Path.Combine(ScenarioDirectory, "GroupData", "SubspaceRefs"));
             }
             if (!Directory.Exists(Path.Combine(ScenarioDirectory, "Players")))
             {

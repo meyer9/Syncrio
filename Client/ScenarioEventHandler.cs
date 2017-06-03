@@ -500,7 +500,7 @@ namespace SyncrioClientSide
             AdministrationOpen = false;
         }
 
-        private void OnContractUpdatedWithWeights(Contracts.Contract contract)
+        private void OnContractUpdatedWithWeights(Contracts.Contract contract)//onAccepted only
         {
             if (cooldown || delaySync)
             {
@@ -524,19 +524,10 @@ namespace SyncrioClientSide
                         contract.Save(cn);
 
                         List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                        if (contract.IsFinished())
-                        {
-                            cnList.Insert(0, "CONTRACT_FINISHED");
-                            cnList.Insert(1, "{");
-                            cnList.Add("}");
-                        }
-                        else
-                        {
-                            cnList.Insert(0, "CONTRACT");
-                            cnList.Insert(1, "{");
-                            cnList.Add("}");
-                        }
+                        
+                        cnList.Insert(0, "CONTRACT");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
 
                         byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
@@ -562,6 +553,36 @@ namespace SyncrioClientSide
                     */
 
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                    foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                    {
+                        if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                        {
+                            Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+                            
+                            byte[] data2;
+
+                            using (MessageWriter mw = new MessageWriter())
+                            {
+                                mw.Write<bool>(true);//In group
+                                mw.Write<string>(groupName);
+
+                                mw.Write<string>(trueParam.tgtPartInfo.name);
+                                mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                data2 = mw.GetMessageBytes();
+                            }
+
+                            /*
+                            if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                            {
+                                revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
+                            }
+                            */
+
+                            SendData((int)ScenarioDataType.PART_PURCHASED, data2);
+                        }
+                    }
                 }
             }
             else
@@ -576,19 +597,10 @@ namespace SyncrioClientSide
                     contract.Save(cn);
 
                     List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                    if (contract.IsFinished())
-                    {
-                        cnList.Insert(0, "CONTRACT_FINISHED");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
-                    else
-                    {
-                        cnList.Insert(0, "CONTRACT");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
+                    
+                    cnList.Insert(0, "CONTRACT");
+                    cnList.Insert(1, "{");
+                    cnList.Add("}");
 
                     byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
@@ -614,6 +626,35 @@ namespace SyncrioClientSide
                 */
 
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                {
+                    if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                    {
+                        Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                        byte[] data2;
+
+                        using (MessageWriter mw = new MessageWriter())
+                        {
+                            mw.Write<bool>(false);//In group
+
+                            mw.Write<string>(trueParam.tgtPartInfo.name);
+                            mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                            data2 = mw.GetMessageBytes();
+                        }
+
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
+                        }
+                        */
+
+                        SendData((int)ScenarioDataType.PART_PURCHASED, data2);
+                    }
+                }
             }
         }
 
@@ -624,18 +665,98 @@ namespace SyncrioClientSide
                 return;
             }
 
-            if (GroupSystem.playerGroupAssigned)
+            if (contract.ContractState != Contracts.Contract.State.Withdrawn && contract.ContractState != Contracts.Contract.State.OfferExpired)
             {
-                string groupName = GroupSystem.playerGroupName;
+                if (GroupSystem.playerGroupAssigned)
+                {
+                    string groupName = GroupSystem.playerGroupName;
 
-                if (!string.IsNullOrEmpty(groupName))
+                    if (!string.IsNullOrEmpty(groupName))
+                    {
+                        byte[] data;
+
+                        using (MessageWriter mw = new MessageWriter())
+                        {
+                            mw.Write<bool>(true);//In group
+                            mw.Write<string>(groupName);
+
+                            ConfigNode cn = new ConfigNode();
+                            contract.Save(cn);
+
+                            List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                            if (contract.IsFinished())
+                            {
+                                cnList.Insert(0, "CONTRACT_FINISHED");
+                                cnList.Insert(1, "{");
+                                cnList.Add("}");
+                            }
+                            else
+                            {
+                                cnList.Insert(0, "CONTRACT");
+                                cnList.Insert(1, "{");
+                                cnList.Add("}");
+                            }
+
+                            byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
+
+                            mw.Write<byte[]>(cnData);
+
+                            mw.Write<int>(0);
+
+                            data = mw.GetMessageBytes();
+                        }
+
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
+                        }
+                        */
+
+                        SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                        if (contract.IsFinished())
+                        {
+                            foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                            {
+                                if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                                {
+                                    Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                                    byte[] data2;
+
+                                    using (MessageWriter mw = new MessageWriter())
+                                    {
+                                        mw.Write<bool>(true);//In group
+                                        mw.Write<string>(groupName);
+
+                                        mw.Write<string>(trueParam.tgtPartInfo.name);
+                                        mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                        data2 = mw.GetMessageBytes();
+                                    }
+
+                                    /*
+                                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                                    {
+                                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                                    }
+                                    */
+
+                                    SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                                }
+                            }
+                        }
+                    }
+                }
+                else
                 {
                     byte[] data;
 
                     using (MessageWriter mw = new MessageWriter())
                     {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
+                        mw.Write<bool>(false);//In group
 
                         ConfigNode cn = new ConfigNode();
                         contract.Save(cn);
@@ -673,51 +794,150 @@ namespace SyncrioClientSide
 
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
+                    if (contract.IsFinished())
+                    {
+                        foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                        {
+                            if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                            {
+                                Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                                byte[] data2;
+
+                                using (MessageWriter mw = new MessageWriter())
+                                {
+                                    mw.Write<bool>(false);//In group
+
+                                    mw.Write<string>(trueParam.tgtPartInfo.name);
+                                    mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                    data2 = mw.GetMessageBytes();
+                                }
+
+                                /*
+                                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                                {
+                                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                                }
+                                */
+
+                                SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                            }
+                        }
+                    }
                 }
             }
             else
             {
-                byte[] data;
-
-                using (MessageWriter mw = new MessageWriter())
+                if (GroupSystem.playerGroupAssigned)
                 {
-                    mw.Write<bool>(false);//In group
+                    string groupName = GroupSystem.playerGroupName;
 
-                    ConfigNode cn = new ConfigNode();
-                    contract.Save(cn);
-
-                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                    if (contract.IsFinished())
+                    if (!string.IsNullOrEmpty(groupName))
                     {
-                        cnList.Insert(0, "CONTRACT_FINISHED");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
+                        byte[] data;
+
+                        using (MessageWriter mw = new MessageWriter())
+                        {
+                            mw.Write<bool>(true);//In group
+                            mw.Write<string>(groupName);
+                            
+                            mw.Write<string>(contract.ContractGuid.ToString());
+
+                            data = mw.GetMessageBytes();
+                        }
+
+                        /*
+                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                        {
+                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_CONTRACT));
+                        }
+                        */
+
+                        SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
+                        
+                        foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                        {
+                            if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                            {
+                                Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                                byte[] data2;
+
+                                using (MessageWriter mw = new MessageWriter())
+                                {
+                                    mw.Write<bool>(true);//In group
+                                    mw.Write<string>(groupName);
+
+                                    mw.Write<string>(trueParam.tgtPartInfo.name);
+                                    mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                    data2 = mw.GetMessageBytes();
+                                }
+
+                                /*
+                                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                                {
+                                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                                }
+                                */
+
+                                SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                            }
+                        }
                     }
-                    else
-                    {
-                        cnList.Insert(0, "CONTRACT");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
-
-                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
-
-                    mw.Write<byte[]>(cnData);
-
-                    mw.Write<int>(0);
-
-                    data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                else
                 {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                }
-                */
+                    byte[] data;
 
-                SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+                    using (MessageWriter mw = new MessageWriter())
+                    {
+                        mw.Write<bool>(false);//In group
+
+                        mw.Write<string>(contract.ContractGuid.ToString());
+
+                        data = mw.GetMessageBytes();
+                    }
+
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                    {
+                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_CONTRACT));
+                    }
+                    */
+
+                    SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
+
+                    foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                    {
+                        if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
+                        {
+                            Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                            byte[] data2;
+
+                            using (MessageWriter mw = new MessageWriter())
+                            {
+                                mw.Write<bool>(false);//In group
+
+                                mw.Write<string>(trueParam.tgtPartInfo.name);
+                                mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
+
+                                data2 = mw.GetMessageBytes();
+                            }
+
+                            /*
+                            if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
+                            {
+                                revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
+                            }
+                            */
+
+                            SendData((int)ScenarioDataType.REMOVE_PART, data2);
+                        }
+                    }
+                }
             }
         }
 

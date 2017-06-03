@@ -312,28 +312,11 @@ namespace SyncrioServer.Messages
             }
         }
 
-        public static void HandleSubspaceRef(int parentNumber, int subspaceNumber)
-        {
-            if (!Directory.Exists(Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces")))
-            {
-                Directory.CreateDirectory(Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces"));
-            }
-
-            string path = Path.Combine(Server.ScenarioDirectory, "GroupData", "SubspaceRefs", "Subspaces", Convert.ToString(subspaceNumber, ScenarioSystem.english) + ".txt");
-
-            List<string> listToSave = new List<string>();
-
-            listToSave.Add(Convert.ToString(parentNumber, ScenarioSystem.english));
-
-            SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(listToSave), path);
-        }
-
         private static void HandleNewSubspace(ClientObject client, long serverClock, double planetTime, float subspaceSpeed)
         {
             lock (createLock)
             {
                 SyncrioLog.Debug("Creating subspace: " + freeID);
-                HandleSubspaceRef(client.lastSubspace, freeID);
                 //Create subspace
                 Subspace newSubspace = new Subspace();
                 newSubspace.serverClock = serverClock;
