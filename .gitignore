@@ -27,3 +27,7 @@ Common/obj/Release/SyncrioCommon.csproj.FileListAbsolute.txt
 Client/obj/Release/SyncrioClientSide.csprojResolveAssemblyReference.cache
 Server/obj/Release/SyncrioServer.csprojResolveAssemblyReference.cache
 Server/obj/Release/DesignTimeResolveAssemblyReferences.cache
+UnityEngine.UI.dll
+UnityEngine.dll
+Assembly-CSharp.dll
+Assembly-CSharp-firstpass.dll
