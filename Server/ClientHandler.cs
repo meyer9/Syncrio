@@ -699,8 +699,11 @@ namespace SyncrioServer
                         ScenarioSystem.fetch.SyncScenario(client, message.data);
                         break;
                         /*
-                    case ClientMessageType.REVERTED_SCENARIO_DATA:
-                        ScenarioSystem.fetch.RevertScenario(client, message.data);
+                    case ClientMessageType.ENTER_FLIGHT:
+                        ScenarioSystem.fetch.EnterFlight(client, message.data);
+                        break;
+                    case ClientMessageType.EXIT_FLIGHT:
+                        ScenarioSystem.fetch.ExitFlight(client, message.data);
                         break;
                         */
                     case ClientMessageType.SEND_VESSELS:
@@ -709,7 +712,7 @@ namespace SyncrioServer
                     case ClientMessageType.MOD_DATA:
                         Messages.ModData.HandleModDataMessage(client, message.data);
                         break;
-                        case ClientMessageType.KERBAL_REMOVE:
+                    case ClientMessageType.KERBAL_REMOVE:
                         Messages.KerbalRemove.HandleKerbalRemoval(client, message.data);
                         break;
                     case ClientMessageType.SPLIT_MESSAGE:
