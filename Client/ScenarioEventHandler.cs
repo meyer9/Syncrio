@@ -40,8 +40,8 @@ namespace SyncrioClientSide
         private float scenarioCheckInterval = 4f;
         private float lastSync = 0f;
         private float syncCooldown = 1f;
+        private bool wasInFlight = false;
         public List<KeyValuePair<string, List<byte[]>>> scenarioBacklog = new List<KeyValuePair<string, List<byte[]>>>();
-        //public List<KeyValuePair<byte[], ScenarioDataType>> revertBacklog = new List<KeyValuePair<byte[], ScenarioDataType>>();
         public bool RnDOpen = false;
         public bool MissionControlOpen = false;
         public bool AdministrationOpen = false;
@@ -77,13 +77,6 @@ namespace SyncrioClientSide
 
                 if (!ScenarioWorker.fetch.stopSync)
                 {
-                    /*
-                    if (!HighLogic.LoadedSceneIsFlight && revertBacklog.Count > 0)
-                    {
-                        revertBacklog = new List<KeyValuePair<byte[], ScenarioDataType>>();
-                    }
-                    */
-
                     if (scenarioBacklog.Count > 0)
                     {
                         List<int> dataToRemove = new List<int>();
@@ -99,7 +92,7 @@ namespace SyncrioClientSide
                                 continue;
                             }
 
-                            if (scenarioBacklog[i].Key == "Tech" && !RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR)
+                            if (scenarioBacklog[i].Key == "Tech" && !RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER))
                             {
                                 ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
 
@@ -108,7 +101,7 @@ namespace SyncrioClientSide
                                 continue;
                             }
 
-                            if (scenarioBacklog[i].Key == "Science" && !RnDOpen)
+                            if (scenarioBacklog[i].Key == "Science" && !RnDOpen && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER || HighLogic.LoadedScene == GameScenes.EDITOR))
                             {
                                 ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
 
@@ -117,7 +110,7 @@ namespace SyncrioClientSide
                                 continue;
                             }
 
-                            if (scenarioBacklog[i].Key == "Contract" && !MissionControlOpen)
+                            if (scenarioBacklog[i].Key == "Contract" && !MissionControlOpen && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER || HighLogic.LoadedScene == GameScenes.EDITOR))
                             {
                                 ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
 
@@ -149,12 +142,99 @@ namespace SyncrioClientSide
 
                         if (dataToRemove.Count > 0)
                         {
-                            for (int i = dataToRemove.Count; i < 0; i--)
+                            for (int i = dataToRemove.Count; i > 0; i--)
                             {
                                 scenarioBacklog.RemoveAt(dataToRemove[i - 1]);
                             }
                         }
                     }
+
+                    /*
+                    if (HighLogic.LoadedSceneIsFlight)
+                    {
+                        if (!wasInFlight)
+                        {
+                            wasInFlight = true;
+
+                            byte[] messageData;
+
+                            ClientMessage newMessage = new ClientMessage();
+
+                            newMessage.type = ClientMessageType.ENTER_FLIGHT;
+                            newMessage.handled = false;
+
+                            using (MessageWriter mw = new MessageWriter())
+                            {
+                                if (GroupSystem.playerGroupAssigned)
+                                {
+                                    string groupName = GroupSystem.playerGroupName;
+
+                                    if (!string.IsNullOrEmpty(groupName))
+                                    {
+                                        mw.Write<bool>(true);//In group
+                                        mw.Write<string>(groupName);
+                                    }
+                                    else
+                                    {
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    mw.Write<bool>(false);//In group
+                                }
+
+                                messageData = mw.GetMessageBytes();
+                            }
+
+                            newMessage.data = messageData;
+
+                            NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
+                        }
+                    }
+                    else
+                    {
+                        if (wasInFlight)
+                        {
+                            wasInFlight = false;
+
+                            byte[] messageData;
+
+                            ClientMessage newMessage = new ClientMessage();
+
+                            newMessage.type = ClientMessageType.EXIT_FLIGHT;
+                            newMessage.handled = false;
+
+                            using (MessageWriter mw = new MessageWriter())
+                            {
+                                if (GroupSystem.playerGroupAssigned)
+                                {
+                                    string groupName = GroupSystem.playerGroupName;
+
+                                    if (!string.IsNullOrEmpty(groupName))
+                                    {
+                                        mw.Write<bool>(true);//In group
+                                        mw.Write<string>(groupName);
+                                    }
+                                    else
+                                    {
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    mw.Write<bool>(false);//In group
+                                }
+
+                                messageData = mw.GetMessageBytes();
+                            }
+
+                            newMessage.data = messageData;
+
+                            NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
+                        }
+                    }
+                    */
 
                     if (!registered)
                     {
@@ -346,30 +426,6 @@ namespace SyncrioClientSide
             }
         }
 
-        /*
-        public void SendRevert()
-        {
-            byte[] messageBytes;
-            ClientMessage newMessage = new ClientMessage();
-            newMessage.handled = false;
-            newMessage.type = ClientMessageType.REVERTED_SCENARIO_DATA;
-            using (MessageWriter mw = new MessageWriter())
-            {
-                mw.Write<int>(revertBacklog.Count);
-
-                for (int i = 0; i < revertBacklog.Count; i++)
-                {
-                    mw.Write<int>((int)revertBacklog[i].Value);
-                    mw.Write<byte[]>(revertBacklog[i].Key);
-                }
-
-                messageBytes = mw.GetMessageBytes();
-            }
-            newMessage.data = messageBytes;
-            NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
-        }
-        */
-
         private void RegisterEvents()
         {
             try
@@ -545,13 +601,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                     foreach (Contracts.ContractParameter _param in contract.AllParameters)
@@ -572,13 +621,6 @@ namespace SyncrioClientSide
 
                                 data2 = mw.GetMessageBytes();
                             }
-
-                            /*
-                            if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                            {
-                                revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
-                            }
-                            */
 
                             SendData((int)ScenarioDataType.PART_PURCHASED, data2);
                         }
@@ -618,13 +660,6 @@ namespace SyncrioClientSide
                     data = mw.GetMessageBytes();
                 }
 
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                }
-                */
-
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                 foreach (Contracts.ContractParameter _param in contract.AllParameters)
@@ -632,7 +667,7 @@ namespace SyncrioClientSide
                     if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
                     {
                         Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
-
+                        
                         byte[] data2;
 
                         using (MessageWriter mw = new MessageWriter())
@@ -644,14 +679,7 @@ namespace SyncrioClientSide
 
                             data2 = mw.GetMessageBytes();
                         }
-
-                        /*
-                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                        {
-                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
-                        }
-                        */
-
+                        
                         SendData((int)ScenarioDataType.PART_PURCHASED, data2);
                     }
                 }
@@ -706,14 +734,7 @@ namespace SyncrioClientSide
 
                             data = mw.GetMessageBytes();
                         }
-
-                        /*
-                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                        {
-                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                        }
-                        */
-
+                        
                         SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                         if (contract.IsFinished())
@@ -736,14 +757,7 @@ namespace SyncrioClientSide
 
                                         data2 = mw.GetMessageBytes();
                                     }
-
-                                    /*
-                                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                                    {
-                                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
-                                    }
-                                    */
-
+                                    
                                     SendData((int)ScenarioDataType.REMOVE_PART, data2);
                                 }
                             }
@@ -785,13 +799,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                     if (contract.IsFinished())
@@ -810,16 +817,9 @@ namespace SyncrioClientSide
 
                                     mw.Write<string>(trueParam.tgtPartInfo.name);
                                     mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
-
+                                    
                                     data2 = mw.GetMessageBytes();
                                 }
-
-                                /*
-                                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                                {
-                                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
-                                }
-                                */
 
                                 SendData((int)ScenarioDataType.REMOVE_PART, data2);
                             }
@@ -846,14 +846,7 @@ namespace SyncrioClientSide
 
                             data = mw.GetMessageBytes();
                         }
-
-                        /*
-                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                        {
-                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_CONTRACT));
-                        }
-                        */
-
+                        
                         SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
                         
                         foreach (Contracts.ContractParameter _param in contract.AllParameters)
@@ -875,13 +868,6 @@ namespace SyncrioClientSide
                                     data2 = mw.GetMessageBytes();
                                 }
 
-                                /*
-                                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                                {
-                                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
-                                }
-                                */
-
                                 SendData((int)ScenarioDataType.REMOVE_PART, data2);
                             }
                         }
@@ -899,13 +885,6 @@ namespace SyncrioClientSide
 
                         data = mw.GetMessageBytes();
                     }
-
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_CONTRACT));
-                    }
-                    */
 
                     SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
 
@@ -926,13 +905,6 @@ namespace SyncrioClientSide
 
                                 data2 = mw.GetMessageBytes();
                             }
-
-                            /*
-                            if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                            {
-                                revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REMOVE_PART));
-                            }
-                            */
 
                             SendData((int)ScenarioDataType.REMOVE_PART, data2);
                         }
@@ -992,13 +964,6 @@ namespace SyncrioClientSide
                             data = mw.GetMessageBytes();
                         }
 
-                        /*
-                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                        {
-                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_OFFERED));
-                        }
-                        */
-
                         SendData((int)ScenarioDataType.CONTRACT_OFFERED, data);
                     }
                 }
@@ -1035,13 +1000,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_OFFERED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.CONTRACT_OFFERED, data);
             }
@@ -1094,13 +1052,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
 
                 }
@@ -1140,13 +1091,6 @@ namespace SyncrioClientSide
                     data = mw.GetMessageBytes();
                 }
 
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CONTRACT_UPDATED));
-                }
-                */
-
                 SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
             }
         }
@@ -1182,13 +1126,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_LOAD));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
                 }
             }
@@ -1210,13 +1147,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_LOAD));
-                }
-                */
 
                 SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
             }
@@ -1253,13 +1183,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_SAVE));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
                 }
             }
@@ -1281,13 +1204,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.CUSTOM_WAYPOINT_SAVE));
-                }
-                */
 
                 SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
             }
@@ -1326,13 +1242,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.FUNDS_CHANGED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
                 }
             }
@@ -1348,13 +1257,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.FUNDS_CHANGED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
             }
@@ -1393,13 +1295,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REPUTATION_CHANGED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
                 }
             }
@@ -1415,13 +1310,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.REPUTATION_CHANGED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
             }
@@ -1460,13 +1348,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_CHANGED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
                 }
             }
@@ -1482,13 +1363,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_CHANGED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
             }
@@ -1521,13 +1395,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_FACILITY_UPGRADED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
                 }
             }
@@ -1545,13 +1412,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_FACILITY_UPGRADED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
             }
@@ -1582,13 +1442,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_COLLAPSED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
                 }
             }
@@ -1604,13 +1457,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_COLLAPSED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
             }
@@ -1641,13 +1487,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_REPAIRED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
                 }
             }
@@ -1663,13 +1502,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.KSC_STRUCTURE_REPAIRED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
             }
@@ -1701,13 +1533,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.PART_PURCHASED, data);
                 }
             }
@@ -1724,13 +1549,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_PURCHASED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.PART_PURCHASED, data);
             }
@@ -1762,13 +1580,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_UPGRADE_PURCHASED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
                 }
             }
@@ -1785,13 +1596,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PART_UPGRADE_PURCHASED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
             }
@@ -1885,13 +1689,6 @@ namespace SyncrioClientSide
                             data = mw.GetMessageBytes();
                         }
 
-                        /*
-                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                        {
-                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PROGRESS_UPDATED));
-                        }
-                        */
-
                         SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
                     }
                 }
@@ -1911,13 +1708,6 @@ namespace SyncrioClientSide
 
                         data = mw.GetMessageBytes();
                     }
-
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.PROGRESS_UPDATED));
-                    }
-                    */
 
                     SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
                 }
@@ -1964,13 +1754,6 @@ namespace SyncrioClientSide
                             data = mw.GetMessageBytes();
                         }
 
-                        /*
-                        if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                        {
-                            revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.TECHNOLOGY_RESEARCHED));
-                        }
-                        */
-
                         SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
                     }
                 }
@@ -1999,13 +1782,6 @@ namespace SyncrioClientSide
 
                         data = mw.GetMessageBytes();
                     }
-
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.TECHNOLOGY_RESEARCHED));
-                    }
-                    */
 
                     SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
                 }
@@ -2047,13 +1823,6 @@ namespace SyncrioClientSide
                         data = mw.GetMessageBytes();
                     }
 
-                    /*
-                    if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                    {
-                        revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_RECIEVED));
-                    }
-                    */
-
                     SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
                 }
             }
@@ -2079,13 +1848,6 @@ namespace SyncrioClientSide
 
                     data = mw.GetMessageBytes();
                 }
-
-                /*
-                if (HighLogic.LoadedSceneIsFlight && Settings.fetch.revertEnabled)
-                {
-                    revertBacklog.Add(new KeyValuePair<byte[], ScenarioDataType>(data, ScenarioDataType.SCIENCE_RECIEVED));
-                }
-                */
 
                 SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
             }

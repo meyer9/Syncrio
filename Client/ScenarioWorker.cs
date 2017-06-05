@@ -196,8 +196,18 @@ namespace SyncrioClientSide
                             {
                                 if (name[0] == "Contracts" && HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                                 {
-                                    if (!ScenarioEventHandler.fetch.MissionControlOpen)
+                                    if (!ScenarioEventHandler.fetch.MissionControlOpen && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER || HighLogic.LoadedScene == GameScenes.EDITOR))
                                     {
+                                        List<Contracts.Contract> contracts = Contracts.ContractSystem.Instance.Contracts;
+
+                                        for (int i = 0; i < contracts.Count; i++)
+                                        {
+                                            if (contracts[i].ContractState == Contracts.Contract.State.Active)
+                                            {
+                                                contracts[i].Unregister();
+                                            }
+                                        }
+
                                         ConfigNode ContractCFG = new ConfigNode();
 
                                         Contracts.ContractSystem.Instance.Save(ContractCFG);
@@ -283,6 +293,16 @@ namespace SyncrioClientSide
 
                                             HighLogic.CurrentGame.scenarios = psmLocked;
                                         }
+                                        
+                                        List<Contracts.Contract> newContracts = Contracts.ContractSystem.Instance.Contracts;
+
+                                        for (int i = 0; i < newContracts.Count; i++)
+                                        {
+                                            if (newContracts[i].ContractState == Contracts.Contract.State.Active)
+                                            {
+                                                newContracts[i].Register();
+                                            }
+                                        }
                                     }
                                     else
                                     {
@@ -318,7 +338,7 @@ namespace SyncrioClientSide
 
                                 if (name[0] == "Waypoints")
                                 {
-                                    if (HighLogic.LoadedScene != GameScenes.TRACKSTATION)
+                                    if (HighLogic.LoadedScene != GameScenes.TRACKSTATION && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER || HighLogic.LoadedScene == GameScenes.EDITOR))
                                     {
                                         ConfigNode WaypointCFG = new ConfigNode();
 
@@ -680,7 +700,7 @@ namespace SyncrioClientSide
 
                                 if (name[0] == "Tech")
                                 {
-                                    if (!ScenarioEventHandler.fetch.RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR)
+                                    if (!ScenarioEventHandler.fetch.RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER))
                                     {
                                         int looped = 0;
                                         while (looped < dataList.Count)
@@ -784,7 +804,7 @@ namespace SyncrioClientSide
 
                                 if (name[0] == "ScienceRecieved")
                                 {
-                                    if (!ScenarioEventHandler.fetch.RnDOpen)
+                                    if (!ScenarioEventHandler.fetch.RnDOpen && (HighLogic.LoadedScene == GameScenes.FLIGHT || HighLogic.LoadedScene == GameScenes.TRACKSTATION || HighLogic.LoadedScene == GameScenes.SPACECENTER || HighLogic.LoadedScene == GameScenes.EDITOR))
                                     {
                                         ConfigNode RnDCFG = new ConfigNode();
 

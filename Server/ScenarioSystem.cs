@@ -252,9 +252,14 @@ namespace SyncrioServer
         }
 
         /*
-        public void RevertScenario(ClientObject callingClient, byte[] messageData)
+        public void EnterFlight(ClientObject callingClient, byte[] messageData)
         {
+            
+        }
 
+        public void ExitFlight(ClientObject callingClient, byte[] messageData)
+        {
+            
         }
         */
 
