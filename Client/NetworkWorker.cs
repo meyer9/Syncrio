@@ -226,7 +226,6 @@ namespace SyncrioClientSide
                         SyncrioLog.Debug("Starting Game!");
                         Client.fetch.status = "Starting game";
                         state = ClientState.STARTING;
-                        //Client.fetch.startGame = true;
 
                         Client.fetch.StartGame();
                     }
@@ -281,11 +280,11 @@ namespace SyncrioClientSide
                 }
                 if (ScenarioWorker.fetch.stopSync)
                 {
-                    ScreenMessages.PostScreenMessage("Failed to pass mod part validation." + Environment.NewLine + "SYNCING DISABLED!!!", 10.0f, ScreenMessageStyle.UPPER_CENTER);
+                    ScreenMessages.PostScreenMessage("Failed to pass mod part validation." + Environment.NewLine + "SYNCING DISABLED!", 10.0f, ScreenMessageStyle.UPPER_CENTER);
                 }
                 else
                 {
-                    ScenarioWorker.fetch.LoadBaseScenarioData();
+                    ScenarioWorker.fetch.loadBaseData = true;
                 }
                 startup = false;
                 int latestSubspace = TimeSyncer.fetch.GetMostAdvancedSubspace();
@@ -1437,6 +1436,7 @@ namespace SyncrioClientSide
 
                         data.Add(scenarioData);
                     }
+
                     if (Client.fetch.gameRunning)
                     {
                         ScenarioWorker.fetch.LoadScenarioData(data);

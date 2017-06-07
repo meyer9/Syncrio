@@ -698,14 +698,15 @@ namespace SyncrioServer
                     case ClientMessageType.SCENARIO_DATA:
                         ScenarioSystem.fetch.SyncScenario(client, message.data);
                         break;
-                        /*
                     case ClientMessageType.ENTER_FLIGHT:
                         ScenarioSystem.fetch.EnterFlight(client, message.data);
                         break;
                     case ClientMessageType.EXIT_FLIGHT:
                         ScenarioSystem.fetch.ExitFlight(client, message.data);
                         break;
-                        */
+                    case ClientMessageType.REVERT_FLIGHT:
+                        ScenarioSystem.fetch.RevertFlight(client, message.data);
+                        break;
                     case ClientMessageType.SEND_VESSELS:
                         Messages.Vessel.HandleVessels(client, message.data);
                         break;

@@ -30,7 +30,6 @@ namespace SyncrioClientSide
 {
     class ScenarioEventHandler
     {
-        public bool enabled = false;
         private static ScenarioEventHandler singleton;
         private bool registered = false;
         private Dictionary<string, List<string>> lastPrograssData = new Dictionary<string, List<string>>();//<Progress Id, Progress Data>
@@ -61,6 +60,32 @@ namespace SyncrioClientSide
         {
             if (Client.fetch.gameRunning)
             {
+                if (ScenarioWorker.fetch.loadBaseData)
+                {
+                    if ((UnityEngine.Time.realtimeSinceStartup - ScenarioWorker.fetch.lastBaseDataLoadAttempt) > 1f)
+                    {
+                        ScenarioWorker.fetch.lastBaseDataLoadAttempt = UnityEngine.Time.realtimeSinceStartup;
+
+                        if (ScenarioWorker.fetch.baseDataLoadAttempts < 5)
+                        {
+                            if (!ScenarioWorker.fetch.LoadBaseScenarioData())
+                            {
+                                ScenarioWorker.fetch.baseDataLoadAttempts += 1;
+                            }
+                            else
+                            {
+                                ScenarioWorker.fetch.loadBaseData = false;
+                            }
+                        }
+                        else
+                        {
+                            SyncrioLog.Debug("KSP scenario handlers failed to start within 5 seconds.");
+
+                            ScenarioWorker.fetch.loadBaseData = false;
+                        }
+                    }
+                }
+
                 if (ScenarioWorker.fetch.isSyncing || startCooldown)
                 {
                     lastSync = UnityEngine.Time.realtimeSinceStartup;
@@ -137,7 +162,14 @@ namespace SyncrioClientSide
                                 continue;
                             }
 
-                            dataToRemove.Add(i);
+                            if (scenarioBacklog[i].Key == "Building" && HighLogic.LoadedScene == GameScenes.SPACECENTER && !RnDOpen && !MissionControlOpen && !AdministrationOpen)
+                            {
+                                ScenarioWorker.fetch.LoadScenarioData(scenarioBacklog[i].Value);
+
+                                dataToRemove.Add(i);
+
+                                continue;
+                            }
                         }
 
                         if (dataToRemove.Count > 0)
@@ -148,11 +180,10 @@ namespace SyncrioClientSide
                             }
                         }
                     }
-
-                    /*
+                    
                     if (HighLogic.LoadedSceneIsFlight)
                     {
-                        if (!wasInFlight)
+                        if (!wasInFlight && HighLogic.LoadedScene != GameScenes.LOADING)
                         {
                             wasInFlight = true;
 
@@ -194,7 +225,7 @@ namespace SyncrioClientSide
                     }
                     else
                     {
-                        if (wasInFlight)
+                        if (wasInFlight && HighLogic.LoadedScene != GameScenes.LOADING)
                         {
                             wasInFlight = false;
 
@@ -234,7 +265,6 @@ namespace SyncrioClientSide
                             NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
                         }
                     }
-                    */
 
                     if (!registered)
                     {
@@ -294,25 +324,6 @@ namespace SyncrioClientSide
 
                                     using (MessageWriter mw = new MessageWriter())
                                     {
-                                        if (GroupSystem.playerGroupAssigned)
-                                        {
-                                            string groupName = GroupSystem.playerGroupName;
-
-                                            if (!string.IsNullOrEmpty(groupName))
-                                            {
-                                                mw.Write<bool>(true);//In group
-                                                mw.Write<string>(groupName);
-                                            }
-                                            else
-                                            {
-                                                return;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            mw.Write<bool>(false);//In group
-                                        }
-
                                         mw.Write<byte[]>(data);
 
                                         messageData = mw.GetMessageBytes();
@@ -323,11 +334,14 @@ namespace SyncrioClientSide
                             }
                             else
                             {
-                                ConfigNode module = new ConfigNode();
+                                if (ResourceScenario.Instance != null)
+                                {
+                                    ConfigNode module = new ConfigNode();
 
-                                ResourceScenario.Instance.Save(module);
+                                    ResourceScenario.Instance.Save(module);
 
-                                lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
+                                    lastResourceScenarioModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
+                                }
                             }
 
                             if (lastStrategySystemModule != null)
@@ -378,25 +392,6 @@ namespace SyncrioClientSide
 
                                     using (MessageWriter mw = new MessageWriter())
                                     {
-                                        if (GroupSystem.playerGroupAssigned)
-                                        {
-                                            string groupName = GroupSystem.playerGroupName;
-
-                                            if (!string.IsNullOrEmpty(groupName))
-                                            {
-                                                mw.Write<bool>(true);//In group
-                                                mw.Write<string>(groupName);
-                                            }
-                                            else
-                                            {
-                                                return;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            mw.Write<bool>(false);//In group
-                                        }
-
                                         mw.Write<byte[]>(data);
 
                                         messageData = mw.GetMessageBytes();
@@ -407,11 +402,14 @@ namespace SyncrioClientSide
                             }
                             else
                             {
-                                ConfigNode module = new ConfigNode();
+                                if (Strategies.StrategySystem.Instance != null)
+                                {
+                                    ConfigNode module = new ConfigNode();
 
-                                Strategies.StrategySystem.Instance.Save(module);
+                                    Strategies.StrategySystem.Instance.Save(module);
 
-                                lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
+                                    lastStrategySystemModule = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(module));
+                                }
                             }
                         }
                     }
@@ -426,20 +424,58 @@ namespace SyncrioClientSide
             }
         }
 
+        public void SendRevert()
+        {
+            byte[] messageData;
+
+            ClientMessage newMessage = new ClientMessage();
+
+            newMessage.type = ClientMessageType.REVERT_FLIGHT;
+            newMessage.handled = false;
+
+            using (MessageWriter mw = new MessageWriter())
+            {
+                if (GroupSystem.playerGroupAssigned)
+                {
+                    string groupName = GroupSystem.playerGroupName;
+
+                    if (!string.IsNullOrEmpty(groupName))
+                    {
+                        mw.Write<bool>(true);//In group
+                        mw.Write<string>(groupName);
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    mw.Write<bool>(false);//In group
+                }
+
+                messageData = mw.GetMessageBytes();
+            }
+
+            newMessage.data = messageData;
+
+            NetworkWorker.fetch.SendScenarioCommand(newMessage, false);
+        }
+
         private void RegisterEvents()
         {
             try
             {
-                GameEvents.Contract.onAccepted.Add(OnContractUpdatedWithWeights);
-                GameEvents.Contract.onCancelled.Add(OnContractUpdated);
-                GameEvents.Contract.onCompleted.Add(OnContractUpdated);
-                GameEvents.Contract.onDeclined.Add(OnContractUpdated);
-                GameEvents.Contract.onFailed.Add(OnContractUpdated);
-                GameEvents.Contract.onFinished.Add(OnContractUpdated);
+                GameEvents.Contract.onAccepted.Add(OnContractAccepted);
+                GameEvents.Contract.onCancelled.Add(OnContractCancelled);
+                GameEvents.Contract.onCompleted.Add(OnContractCompleted);
+                GameEvents.Contract.onDeclined.Add(OnContractDeclined);
+                GameEvents.Contract.onFailed.Add(OnContractFailed);
+                GameEvents.Contract.onFinished.Add(OnContractFinished);
                 GameEvents.Contract.onOffered.Add(OnContractOffered);
                 GameEvents.Contract.onParameterChange.Add(OnContractParameterChange);
-                GameEvents.Contract.onRead.Add(OnContractUpdated);
-                GameEvents.Contract.onSeen.Add(OnContractUpdated);
+                GameEvents.Contract.onRead.Add(OnContractRead);
+                GameEvents.Contract.onSeen.Add(OnContractSeen);
 
                 GameEvents.onCustomWaypointLoad.Add(OnCustomWaypointLoad);
                 GameEvents.onCustomWaypointSave.Add(OnCustomWaypointSave);
@@ -481,16 +517,16 @@ namespace SyncrioClientSide
             registered = false;
             try
             {
-                GameEvents.Contract.onAccepted.Remove(OnContractUpdatedWithWeights);
-                GameEvents.Contract.onCancelled.Remove(OnContractUpdated);
-                GameEvents.Contract.onCompleted.Remove(OnContractUpdated);
-                GameEvents.Contract.onDeclined.Remove(OnContractUpdated);
-                GameEvents.Contract.onFailed.Remove(OnContractUpdated);
-                GameEvents.Contract.onFinished.Remove(OnContractUpdated);
+                GameEvents.Contract.onAccepted.Remove(OnContractAccepted);
+                GameEvents.Contract.onCancelled.Remove(OnContractCancelled);
+                GameEvents.Contract.onCompleted.Remove(OnContractCompleted);
+                GameEvents.Contract.onDeclined.Remove(OnContractDeclined);
+                GameEvents.Contract.onFailed.Remove(OnContractFailed);
+                GameEvents.Contract.onFinished.Remove(OnContractFinished);
                 GameEvents.Contract.onOffered.Remove(OnContractOffered);
                 GameEvents.Contract.onParameterChange.Remove(OnContractParameterChange);
-                GameEvents.Contract.onRead.Remove(OnContractUpdated);
-                GameEvents.Contract.onSeen.Remove(OnContractUpdated);
+                GameEvents.Contract.onRead.Remove(OnContractRead);
+                GameEvents.Contract.onSeen.Remove(OnContractSeen);
 
                 GameEvents.onCustomWaypointLoad.Remove(OnCustomWaypointLoad);
                 GameEvents.onCustomWaypointSave.Remove(OnCustomWaypointSave);
@@ -556,39 +592,90 @@ namespace SyncrioClientSide
             AdministrationOpen = false;
         }
 
-        private void OnContractUpdatedWithWeights(Contracts.Contract contract)//onAccepted only
+        private void OnContractAccepted(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.ACCEPTED);
+        }
+
+        private void OnContractCancelled(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.CANCELLED);
+        }
+
+        private void OnContractCompleted(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.COMPLETED);
+        }
+
+        private void OnContractDeclined(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.DECLINED);
+        }
+
+        private void OnContractFailed(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.FAILED);
+        }
+
+        private void OnContractFinished(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.FINISHED);
+        }
+
+        private void OnContractParameterChange(Contracts.Contract contract, Contracts.ContractParameter param)
+        {
+            ContractUpdated(contract, ContractUpdateType.PARAMETER_CHANGED);
+        }
+
+        private void OnContractRead(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.READ);
+        }
+
+        private void OnContractSeen(Contracts.Contract contract)
+        {
+            ContractUpdated(contract, ContractUpdateType.SEEN);
+        }
+
+        private void ContractUpdated(Contracts.Contract contract, ContractUpdateType type)
         {
             if (cooldown || delaySync)
             {
                 return;
             }
 
-            if (GroupSystem.playerGroupAssigned)
+            if (contract.ContractState != Contracts.Contract.State.Withdrawn && contract.ContractState != Contracts.Contract.State.OfferExpired)
             {
-                string groupName = GroupSystem.playerGroupName;
+                byte[] data;
 
-                if (!string.IsNullOrEmpty(groupName))
+                using (MessageWriter mw = new MessageWriter())
                 {
-                    byte[] data;
+                    mw.Write<int>((int)type);
 
-                    using (MessageWriter mw = new MessageWriter())
+                    ConfigNode cn = new ConfigNode();
+                    contract.Save(cn);
+
+                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                    if (contract.IsFinished())
                     {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        ConfigNode cn = new ConfigNode();
-                        contract.Save(cn);
-
-                        List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-                        
+                        cnList.Insert(0, "CONTRACT_FINISHED");
+                        cnList.Insert(1, "{");
+                        cnList.Add("}");
+                    }
+                    else
+                    {
                         cnList.Insert(0, "CONTRACT");
                         cnList.Insert(1, "{");
                         cnList.Add("}");
+                    }
 
-                        byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
+                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
-                        mw.Write<byte[]>(cnData);
-                        
+                    mw.Write<byte[]>(cnData);
+
+                    if (type == ContractUpdateType.ACCEPTED)
+                    {
                         //Also send the contract weights
                         mw.Write<int>(Contracts.ContractSystem.ContractWeights.Count);
 
@@ -597,25 +684,29 @@ namespace SyncrioClientSide
                             mw.Write<string>(key);
                             mw.Write<int>(Contracts.ContractSystem.ContractWeights[key]);
                         }
-
-                        data = mw.GetMessageBytes();
+                    }
+                    else
+                    {
+                        mw.Write<int>(0);
                     }
 
-                    SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+                    data = mw.GetMessageBytes();
+                }
 
+                SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
+
+                if (type == ContractUpdateType.ACCEPTED)
+                {
                     foreach (Contracts.ContractParameter _param in contract.AllParameters)
                     {
                         if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
                         {
                             Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
-                            
+
                             byte[] data2;
 
                             using (MessageWriter mw = new MessageWriter())
                             {
-                                mw.Write<bool>(true);//In group
-                                mw.Write<string>(groupName);
-
                                 mw.Write<string>(trueParam.tgtPartInfo.name);
                                 mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
 
@@ -626,181 +717,8 @@ namespace SyncrioClientSide
                         }
                     }
                 }
-            }
-            else
-            {
-                byte[] data;
-
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    ConfigNode cn = new ConfigNode();
-                    contract.Save(cn);
-
-                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-                    
-                    cnList.Insert(0, "CONTRACT");
-                    cnList.Insert(1, "{");
-                    cnList.Add("}");
-
-                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
-
-                    mw.Write<byte[]>(cnData);
-
-                    //Also send the contract weights
-                    mw.Write<int>(Contracts.ContractSystem.ContractWeights.Count);
-
-                    foreach (string key in Contracts.ContractSystem.ContractWeights.Keys)
-                    {
-                        mw.Write<string>(key);
-                        mw.Write<int>(Contracts.ContractSystem.ContractWeights[key]);
-                    }
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
-
-                foreach (Contracts.ContractParameter _param in contract.AllParameters)
-                {
-                    if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
-                    {
-                        Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
-                        
-                        byte[] data2;
-
-                        using (MessageWriter mw = new MessageWriter())
-                        {
-                            mw.Write<bool>(false);//In group
-
-                            mw.Write<string>(trueParam.tgtPartInfo.name);
-                            mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
-
-                            data2 = mw.GetMessageBytes();
-                        }
-                        
-                        SendData((int)ScenarioDataType.PART_PURCHASED, data2);
-                    }
-                }
-            }
-        }
-
-        private void OnContractUpdated(Contracts.Contract contract)
-        {
-            if (cooldown || delaySync)
-            {
-                return;
-            }
-
-            if (contract.ContractState != Contracts.Contract.State.Withdrawn && contract.ContractState != Contracts.Contract.State.OfferExpired)
-            {
-                if (GroupSystem.playerGroupAssigned)
-                {
-                    string groupName = GroupSystem.playerGroupName;
-
-                    if (!string.IsNullOrEmpty(groupName))
-                    {
-                        byte[] data;
-
-                        using (MessageWriter mw = new MessageWriter())
-                        {
-                            mw.Write<bool>(true);//In group
-                            mw.Write<string>(groupName);
-
-                            ConfigNode cn = new ConfigNode();
-                            contract.Save(cn);
-
-                            List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                            if (contract.IsFinished())
-                            {
-                                cnList.Insert(0, "CONTRACT_FINISHED");
-                                cnList.Insert(1, "{");
-                                cnList.Add("}");
-                            }
-                            else
-                            {
-                                cnList.Insert(0, "CONTRACT");
-                                cnList.Insert(1, "{");
-                                cnList.Add("}");
-                            }
-
-                            byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
-
-                            mw.Write<byte[]>(cnData);
-
-                            mw.Write<int>(0);
-
-                            data = mw.GetMessageBytes();
-                        }
-                        
-                        SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
-
-                        if (contract.IsFinished())
-                        {
-                            foreach (Contracts.ContractParameter _param in contract.AllParameters)
-                            {
-                                if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
-                                {
-                                    Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
-
-                                    byte[] data2;
-
-                                    using (MessageWriter mw = new MessageWriter())
-                                    {
-                                        mw.Write<bool>(true);//In group
-                                        mw.Write<string>(groupName);
-
-                                        mw.Write<string>(trueParam.tgtPartInfo.name);
-                                        mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
-
-                                        data2 = mw.GetMessageBytes();
-                                    }
-                                    
-                                    SendData((int)ScenarioDataType.REMOVE_PART, data2);
-                                }
-                            }
-                        }
-                    }
-                }
                 else
                 {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(false);//In group
-
-                        ConfigNode cn = new ConfigNode();
-                        contract.Save(cn);
-
-                        List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                        if (contract.IsFinished())
-                        {
-                            cnList.Insert(0, "CONTRACT_FINISHED");
-                            cnList.Insert(1, "{");
-                            cnList.Add("}");
-                        }
-                        else
-                        {
-                            cnList.Insert(0, "CONTRACT");
-                            cnList.Insert(1, "{");
-                            cnList.Add("}");
-                        }
-
-                        byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
-
-                        mw.Write<byte[]>(cnData);
-
-                        mw.Write<int>(0);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
-
                     if (contract.IsFinished())
                     {
                         foreach (Contracts.ContractParameter _param in contract.AllParameters)
@@ -813,11 +731,9 @@ namespace SyncrioClientSide
 
                                 using (MessageWriter mw = new MessageWriter())
                                 {
-                                    mw.Write<bool>(false);//In group
-
                                     mw.Write<string>(trueParam.tgtPartInfo.name);
                                     mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
-                                    
+
                                     data2 = mw.GetMessageBytes();
                                 }
 
@@ -829,85 +745,34 @@ namespace SyncrioClientSide
             }
             else
             {
-                if (GroupSystem.playerGroupAssigned)
-                {
-                    string groupName = GroupSystem.playerGroupName;
+                byte[] data;
 
-                    if (!string.IsNullOrEmpty(groupName))
+                using (MessageWriter mw = new MessageWriter())
+                {
+                    mw.Write<string>(contract.ContractGuid.ToString());
+
+                    data = mw.GetMessageBytes();
+                }
+
+                SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
+                        
+                foreach (Contracts.ContractParameter _param in contract.AllParameters)
+                {
+                    if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
                     {
-                        byte[] data;
+                        Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
+
+                        byte[] data2;
 
                         using (MessageWriter mw = new MessageWriter())
                         {
-                            mw.Write<bool>(true);//In group
-                            mw.Write<string>(groupName);
-                            
-                            mw.Write<string>(contract.ContractGuid.ToString());
+                            mw.Write<string>(trueParam.tgtPartInfo.name);
+                            mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
 
-                            data = mw.GetMessageBytes();
+                            data2 = mw.GetMessageBytes();
                         }
-                        
-                        SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
-                        
-                        foreach (Contracts.ContractParameter _param in contract.AllParameters)
-                        {
-                            if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
-                            {
-                                Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
 
-                                byte[] data2;
-
-                                using (MessageWriter mw = new MessageWriter())
-                                {
-                                    mw.Write<bool>(true);//In group
-                                    mw.Write<string>(groupName);
-
-                                    mw.Write<string>(trueParam.tgtPartInfo.name);
-                                    mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
-
-                                    data2 = mw.GetMessageBytes();
-                                }
-
-                                SendData((int)ScenarioDataType.REMOVE_PART, data2);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(false);//In group
-
-                        mw.Write<string>(contract.ContractGuid.ToString());
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.REMOVE_CONTRACT, data);
-
-                    foreach (Contracts.ContractParameter _param in contract.AllParameters)
-                    {
-                        if (_param.GetType() == typeof(Contracts.Parameters.PartTest))
-                        {
-                            Contracts.Parameters.PartTest trueParam = (Contracts.Parameters.PartTest)_param;
-
-                            byte[] data2;
-
-                            using (MessageWriter mw = new MessageWriter())
-                            {
-                                mw.Write<bool>(false);//In group
-
-                                mw.Write<string>(trueParam.tgtPartInfo.name);
-                                mw.Write<string>(trueParam.tgtPartInfo.TechRequired);
-
-                                data2 = mw.GetMessageBytes();
-                            }
-
-                            SendData((int)ScenarioDataType.REMOVE_PART, data2);
-                        }
+                        SendData((int)ScenarioDataType.REMOVE_PART, data2);
                     }
                 }
             }
@@ -936,26 +801,14 @@ namespace SyncrioClientSide
 
                         using (MessageWriter mw = new MessageWriter())
                         {
-                            mw.Write<bool>(true);//In group
-                            mw.Write<string>(groupName);
-
                             ConfigNode cn = new ConfigNode();
                             contract.Save(cn);
 
                             List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                            if (contract.IsFinished())
-                            {
-                                cnList.Insert(0, "CONTRACT_FINISHED");
-                                cnList.Insert(1, "{");
-                                cnList.Add("}");
-                            }
-                            else
-                            {
-                                cnList.Insert(0, "CONTRACT");
-                                cnList.Insert(1, "{");
-                                cnList.Add("}");
-                            }
+                            
+                            cnList.Insert(0, "CONTRACT");
+                            cnList.Insert(1, "{");
+                            cnList.Add("}");
 
                             byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
@@ -974,25 +827,14 @@ namespace SyncrioClientSide
 
                 using (MessageWriter mw = new MessageWriter())
                 {
-                    mw.Write<bool>(false);//In group
-
                     ConfigNode cn = new ConfigNode();
                     contract.Save(cn);
 
                     List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                    if (contract.IsFinished())
-                    {
-                        cnList.Insert(0, "CONTRACT_FINISHED");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
-                    else
-                    {
-                        cnList.Insert(0, "CONTRACT");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
+                    
+                    cnList.Insert(0, "CONTRACT");
+                    cnList.Insert(1, "{");
+                    cnList.Add("}");
 
                     byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
 
@@ -1005,151 +847,29 @@ namespace SyncrioClientSide
             }
         }
 
-        private void OnContractParameterChange(Contracts.Contract contract, Contracts.ContractParameter param)
-        {
-            if (cooldown || delaySync)
-            {
-                return;
-            }
-
-            if (GroupSystem.playerGroupAssigned)
-            {
-                string groupName = GroupSystem.playerGroupName;
-
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        ConfigNode cn = new ConfigNode();
-                        contract.Save(cn);
-
-                        List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                        if (contract.IsFinished())
-                        {
-                            cnList.Insert(0, "CONTRACT_FINISHED");
-                            cnList.Insert(1, "{");
-                            cnList.Add("}");
-                        }
-                        else
-                        {
-                            cnList.Insert(0, "CONTRACT");
-                            cnList.Insert(1, "{");
-                            cnList.Add("}");
-                        }
-
-                        byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
-
-                        mw.Write<byte[]>(cnData);
-
-                        mw.Write<int>(0);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
-
-                }
-            }
-            else
-            {
-                byte[] data;
-
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    ConfigNode cn = new ConfigNode();
-                    contract.Save(cn);
-
-                    List<string> cnList = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cn));
-
-                    if (contract.IsFinished())
-                    {
-                        cnList.Insert(0, "CONTRACT_FINISHED");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
-                    else
-                    {
-                        cnList.Insert(0, "CONTRACT");
-                        cnList.Insert(1, "{");
-                        cnList.Add("}");
-                    }
-
-                    byte[] cnData = SyncrioUtil.ByteArraySerializer.Serialize(cnList);
-
-                    mw.Write<byte[]>(cnData);
-
-                    mw.Write<int>(0);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.CONTRACT_UPDATED, data);
-            }
-        }
-
         private void OnCustomWaypointLoad(GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode> waypoint)
         {
             if (cooldown || delaySync)
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(waypoint.from.FullName);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                ConfigNode wp = new ConfigNode();
+                waypoint.to.CopyTo(wp);
+                byte[] wpData = ConfigNodeSerializer.fetch.Serialize(wp);
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
+                mw.Write<byte[]>(wpData);
 
-                        mw.Write<string>(waypoint.from.FullName);
-
-                        ConfigNode wp = new ConfigNode();
-                        waypoint.to.CopyTo(wp);
-                        byte[] wpData = ConfigNodeSerializer.fetch.Serialize(wp);
-
-                        mw.Write<byte[]>(wpData);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(waypoint.from.FullName);
-
-                    ConfigNode wp = new ConfigNode();
-                    waypoint.to.CopyTo(wp);
-                    byte[] wpData = ConfigNodeSerializer.fetch.Serialize(wp);
-
-                    mw.Write<byte[]>(wpData);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
-            }
+            SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_LOAD, data);
         }
 
         private void OnCustomWaypointSave(GameEvents.FromToAction<FinePrint.Waypoint, ConfigNode> waypoint)
@@ -1158,55 +878,23 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(waypoint.from.FullName);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                ConfigNode wp = new ConfigNode();
+                waypoint.to.CopyTo(wp);
+                byte[] wpData = ConfigNodeSerializer.fetch.Serialize(wp);
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
+                mw.Write<byte[]>(wpData);
 
-                        mw.Write<string>(waypoint.from.FullName);
-
-                        ConfigNode wp = new ConfigNode();
-                        waypoint.to.CopyTo(wp);
-                        byte[] wpData = ConfigNodeSerializer.fetch.Serialize(wp);
-
-                        mw.Write<byte[]>(wpData);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(waypoint.from.FullName);
-
-                    ConfigNode wp = new ConfigNode();
-                    waypoint.to.CopyTo(wp);
-                    byte[] wpData = ConfigNodeSerializer.fetch.Serialize(wp);
-
-                    mw.Write<byte[]>(wpData);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
-            }
+            SendData((int)ScenarioDataType.CUSTOM_WAYPOINT_SAVE, data);
         }
 
         private void OnFundsChanged(double value, TransactionReasons reason)
@@ -1224,42 +912,18 @@ namespace SyncrioClientSide
                 return;
             }
 
-            if (GroupSystem.playerGroupAssigned)
+            byte[] data;
+
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<int>((int)reason);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                mw.Write<double>(value);
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<double>(value);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<double>(value);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
-            }
+            SendData((int)ScenarioDataType.FUNDS_CHANGED, data);
         }
 
         private void OnReputationChanged(float value, TransactionReasons reason)
@@ -1276,43 +940,19 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<int>((int)reason);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                mw.Write<float>(value);
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<float>(value);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<float>(value);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
-            }
+            SendData((int)ScenarioDataType.REPUTATION_CHANGED, data);
         }
 
         private void OnScienceChanged(float value, TransactionReasons reason)
@@ -1329,43 +969,19 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<int>((int)reason);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                mw.Write<float>(value);
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<float>(value);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<float>(value);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
-            }
+            SendData((int)ScenarioDataType.SCIENCE_CHANGED, data);
         }
 
         private void OnKSCFacilityUpgraded(Upgradeables.UpgradeableFacility facility, int level)
@@ -1374,47 +990,19 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(facility.id);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                mw.Write<int>(level);
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<string>(facility.id);
-
-                        mw.Write<int>(level);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(facility.id);
-
-                    mw.Write<int>(level);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
-            }
+            SendData((int)ScenarioDataType.KSC_FACILITY_UPGRADED, data);
         }
 
         private void OnKSCStructureCollapsed(DestructibleBuilding building)
@@ -1424,42 +1012,16 @@ namespace SyncrioClientSide
                 return;
             }
 
-            if (GroupSystem.playerGroupAssigned)
+            byte[] data;
+
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(building.id);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<string>(building.id);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(building.id);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
-            }
+            SendData((int)ScenarioDataType.KSC_STRUCTURE_COLLAPSED, data);
         }
 
         private void OnKSCStructureRepaired(DestructibleBuilding building)
@@ -1468,43 +1030,17 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(building.id);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<string>(building.id);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(building.id);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
-            }
+            SendData((int)ScenarioDataType.KSC_STRUCTURE_REPAIRED, data);
         }
 
         private void OnPartPurchased(AvailablePart part)
@@ -1513,45 +1049,18 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(part.name);
+                mw.Write<string>(part.TechRequired);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<string>(part.name);
-                        mw.Write<string>(part.TechRequired);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.PART_PURCHASED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(part.name);
-                    mw.Write<string>(part.TechRequired);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.PART_PURCHASED, data);
-            }
+            SendData((int)ScenarioDataType.PART_PURCHASED, data);
         }
 
         private void OnPartUpgradePurchased(PartUpgradeHandler.Upgrade upgrade)
@@ -1560,45 +1069,18 @@ namespace SyncrioClientSide
             {
                 return;
             }
+            
+            byte[] data;
 
-            if (GroupSystem.playerGroupAssigned)
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(upgrade.name);
+                mw.Write<string>(upgrade.techRequired);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
-
-                        mw.Write<string>(upgrade.name);
-                        mw.Write<string>(upgrade.techRequired);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(upgrade.name);
-                    mw.Write<string>(upgrade.techRequired);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
-            }
+            SendData((int)ScenarioDataType.PART_UPGRADE_PURCHASED, data);
         }
 
         private void OnProgressNodeSave(GameEvents.FromToAction<ProgressNode, ConfigNode> dataNode)
@@ -1667,50 +1149,20 @@ namespace SyncrioClientSide
 
             if (send)
             {
-                if (GroupSystem.playerGroupAssigned)
+                byte[] data;
+
+                using (MessageWriter mw = new MessageWriter())
                 {
-                    string groupName = GroupSystem.playerGroupName;
+                    mw.Write<string>(dataNode.from.Id);
 
-                    if (!string.IsNullOrEmpty(groupName))
-                    {
-                        byte[] data;
+                    byte[] pnData = ConfigNodeSerializer.fetch.Serialize(dataNode.to);
 
-                        using (MessageWriter mw = new MessageWriter())
-                        {
-                            mw.Write<bool>(true);//In group
-                            mw.Write<string>(groupName);
+                    mw.Write<byte[]>(pnData);
 
-                            mw.Write<string>(dataNode.from.Id);
-
-                            byte[] pnData = ConfigNodeSerializer.fetch.Serialize(dataNode.to);
-
-                            mw.Write<byte[]>(pnData);
-
-                            data = mw.GetMessageBytes();
-                        }
-
-                        SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
-                    }
+                    data = mw.GetMessageBytes();
                 }
-                else
-                {
-                    byte[] data;
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(false);//In group
-
-                        mw.Write<string>(dataNode.from.Id);
-
-                        byte[] pnData = ConfigNodeSerializer.fetch.Serialize(dataNode.to);
-
-                        mw.Write<byte[]>(pnData);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
-                }
+                SendData((int)ScenarioDataType.PROGRESS_UPDATED, data);
             }
         }
 
@@ -1723,68 +1175,29 @@ namespace SyncrioClientSide
 
             if (tech.target == RDTech.OperationResult.Successful)
             {
-                if (GroupSystem.playerGroupAssigned)
+                byte[] data;
+
+                using (MessageWriter mw = new MessageWriter())
                 {
-                    string groupName = GroupSystem.playerGroupName;
+                    mw.Write<string>(tech.host.techID);
 
-                    if (!string.IsNullOrEmpty(groupName))
+                    ConfigNode techCFG = new ConfigNode();
+                    tech.host.Save(techCFG);
+                    byte[] techData = ConfigNodeSerializer.fetch.Serialize(techCFG);
+
+                    mw.Write<byte[]>(techData);
+
+                    mw.Write<int>(tech.host.partsPurchased.Count);
+
+                    for (int i = 0; i < tech.host.partsPurchased.Count; i++)
                     {
-                        byte[] data;
-
-                        using (MessageWriter mw = new MessageWriter())
-                        {
-                            mw.Write<bool>(true);//In group
-                            mw.Write<string>(groupName);
-
-                            mw.Write<string>(tech.host.techID);
-
-                            ConfigNode techCFG = new ConfigNode();
-                            tech.host.Save(techCFG);
-                            byte[] techData = ConfigNodeSerializer.fetch.Serialize(techCFG);
-
-                            mw.Write<byte[]>(techData);
-
-                            mw.Write<int>(tech.host.partsPurchased.Count);
-
-                            for (int i = 0; i < tech.host.partsPurchased.Count; i++)
-                            {
-                                mw.Write<string>(tech.host.partsPurchased[i].name);
-                            }
-
-                            data = mw.GetMessageBytes();
-                        }
-
-                        SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
-                    }
-                }
-                else
-                {
-                    byte[] data;
-
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(false);//In group
-
-                        mw.Write<string>(tech.host.techID);
-
-                        ConfigNode techCFG = new ConfigNode();
-                        tech.host.Save(techCFG);
-                        byte[] techData = ConfigNodeSerializer.fetch.Serialize(techCFG);
-
-                        mw.Write<byte[]>(techData);
-
-                        mw.Write<int>(tech.host.partsPurchased.Count);
-
-                        for (int i = 0; i < tech.host.partsPurchased.Count; i++)
-                        {
-                            mw.Write<string>(tech.host.partsPurchased[i].name);
-                        }
-
-                        data = mw.GetMessageBytes();
+                        mw.Write<string>(tech.host.partsPurchased[i].name);
                     }
 
-                    SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
+                    data = mw.GetMessageBytes();
                 }
+
+                SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
             }
         }
 
@@ -1794,63 +1207,27 @@ namespace SyncrioClientSide
             {
                 return;
             }
-            
-            if (GroupSystem.playerGroupAssigned)
+
+            byte[] data;
+
+            using (MessageWriter mw = new MessageWriter())
             {
-                string groupName = GroupSystem.playerGroupName;
+                mw.Write<string>(subject.id);
 
-                if (!string.IsNullOrEmpty(groupName))
-                {
-                    byte[] data;
+                float dataAmount = subject.science / subject.subjectValue;
 
-                    using (MessageWriter mw = new MessageWriter())
-                    {
-                        mw.Write<bool>(true);//In group
-                        mw.Write<string>(groupName);
+                mw.Write<float>(dataAmount * subject.dataScale);
 
-                        mw.Write<string>(subject.id);
+                ConfigNode sciCFG = new ConfigNode();
+                subject.Save(sciCFG);
+                byte[] sciData = ConfigNodeSerializer.fetch.Serialize(sciCFG);
 
-                        float dataAmount = subject.science / subject.subjectValue;
+                mw.Write<byte[]>(sciData);
 
-                        mw.Write<float>(dataAmount * subject.dataScale);
-
-                        ConfigNode sciCFG = new ConfigNode();
-                        subject.Save(sciCFG);
-                        byte[] sciData = ConfigNodeSerializer.fetch.Serialize(sciCFG);
-
-                        mw.Write<byte[]>(sciData);
-
-                        data = mw.GetMessageBytes();
-                    }
-
-                    SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
-                }
+                data = mw.GetMessageBytes();
             }
-            else
-            {
-                byte[] data;
 
-                using (MessageWriter mw = new MessageWriter())
-                {
-                    mw.Write<bool>(false);//In group
-
-                    mw.Write<string>(subject.id);
-
-                    float dataAmount = subject.science / subject.subjectValue;
-
-                    mw.Write<float>(dataAmount * subject.dataScale);
-
-                    ConfigNode sciCFG = new ConfigNode();
-                    subject.Save(sciCFG);
-                    byte[] sciData = ConfigNodeSerializer.fetch.Serialize(sciCFG);
-
-                    mw.Write<byte[]>(sciData);
-
-                    data = mw.GetMessageBytes();
-                }
-
-                SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
-            }
+            SendData((int)ScenarioDataType.SCIENCE_RECIEVED, data);
         }
 
         internal void SendData(int type, byte[] data)
@@ -1862,6 +1239,26 @@ namespace SyncrioClientSide
             using (MessageWriter mw = new MessageWriter())
             {
                 mw.Write<int>(type);
+
+                if (GroupSystem.playerGroupAssigned)
+                {
+                    string groupName = GroupSystem.playerGroupName;
+
+                    if (!string.IsNullOrEmpty(groupName))
+                    {
+                        mw.Write<bool>(true);//In group
+                        mw.Write<string>(groupName);
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    mw.Write<bool>(false);//In group
+                }
+
                 mw.Write<byte[]>(data);
 
                 messageBytes = mw.GetMessageBytes();
@@ -1877,7 +1274,6 @@ namespace SyncrioClientSide
                 if (singleton != null)
                 {
                     Client.updateEvent.Remove(singleton.Update);
-                    singleton.enabled = false;
                     if (singleton.registered)
                     {
                         singleton.UnregisterEvents();
@@ -1885,7 +1281,6 @@ namespace SyncrioClientSide
                 }
                 singleton = new ScenarioEventHandler();
                 Client.updateEvent.Add(singleton.Update);
-                singleton.delaySync = true;
             }
         }
     }

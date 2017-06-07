@@ -404,7 +404,7 @@ namespace SyncrioServer
                             string errorText = "Cannot create group " + groupName + ", " + ownerName + " does not exist";
                             SyncrioLog.Debug(errorText);
                             Messages.Chat.SendChatMessageToClient(callingClient, errorText);
-                            Messages.Group.ErrorCreatingGroup(callingClient, "You Dont Exist! ;)");
+                            Messages.Group.ErrorCreatingGroup(callingClient, "You Dont Exist!");
                             return false;
                         }
                         GroupObject go = new GroupObject();
@@ -424,8 +424,8 @@ namespace SyncrioServer
                 }
                 else
                 {
-                    SyncrioLog.Debug("The Max # of Groups has been reached!");
-                    Messages.Group.ErrorCreatingGroup(callingClient, "Max # of Groups reached!");
+                    SyncrioLog.Debug("The Max number of Groups has been reached!");
+                    Messages.Group.ErrorCreatingGroup(callingClient, "Max number of Groups reached!");
                     return false;
                 }
             }

@@ -491,6 +491,13 @@ namespace SyncrioClientSide
                             {
                                 HighLogic.CurrentGame.Parameters.Flight.CanLeaveToSpaceCenter = true;
                             }
+
+                            if (HighLogic.LoadedScene == GameScenes.MAINMENU)
+                            {
+                                gameRunning = false;
+                                fireReset = true;
+                                NetworkWorker.fetch.SendDisconnect("Quit to main menu");
+                            }
                         }
                     }
                 }
@@ -501,14 +508,6 @@ namespace SyncrioClientSide
                     FireResetEvent();
                     madeItToSpaceCenter = false;
                 }
-
-                /*
-                if (startGame)
-                {
-                    startGame = false;
-                    StartGame();
-                }
-                */
             }
             catch (Exception e)
             {
@@ -653,25 +652,6 @@ namespace SyncrioClientSide
 
                     using (MessageWriter mw = new MessageWriter())
                     {
-                        if (GroupSystem.playerGroupAssigned)
-                        {
-                            string groupName = GroupSystem.playerGroupName;
-
-                            if (!string.IsNullOrEmpty(groupName))
-                            {
-                                mw.Write<bool>(true);//In group
-                                mw.Write<string>(groupName);
-                            }
-                            else
-                            {
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            mw.Write<bool>(false);//In group
-                        }
-
                         mw.Write<byte[]>(data);
 
                         messageData = mw.GetMessageBytes();
