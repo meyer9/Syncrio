@@ -117,19 +117,14 @@ namespace SyncrioClientSide
                 int updatesReverted = 0;
                 SyncrioLog.Debug("Revert detected!");
                 TimeSyncer.fetch.UnlockSubspace();
-                if (!Settings.fetch.revertEnabled)
+                if (!HighLogic.fetch.currentGame.Parameters.Flight.CanQuickLoad)
                 {
                     SyncrioLog.Debug("Unsafe revert detected!");
                     ScreenMessages.PostScreenMessage("Unsafe revert detected!", 5f, ScreenMessageStyle.UPPER_CENTER);
                 }
                 else
                 {
-                    /*
-                    if (ScenarioEventHandler.fetch.revertBacklog.Count > 0)
-                    {
-                        ScenarioEventHandler.fetch.SendRevert();
-                    }
-                    */
+                    ScenarioEventHandler.fetch.SendRevert();
 
                     kerbalProtoQueue.Clear();
                     //Kerbal queue

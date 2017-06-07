@@ -61,9 +61,9 @@ namespace SyncrioCommon
         //Split messages into 8kb chunks to higher priority messages have more injection points into the TCP stream.
         public const int SPLIT_MESSAGE_LENGTH = 8192;
         //Bump this every time there is a network change (Basically, if MessageWriter or MessageReader is touched).
-        public const int PROTOCOL_VERSION = 50;
+        public const int PROTOCOL_VERSION = 51;
         //Program version. This is written in the build scripts.
-        public const string PROGRAM_VERSION = "v1.0.0.0-beta.2";
+        public const string PROGRAM_VERSION = "v1.0.0.0-beta.3";
         //Mod control version - The last version to add parts
         public const string MODCONTROL_VERSION = "1.3";
         //Compression threshold
@@ -572,8 +572,9 @@ namespace SyncrioCommon
         PLAYER_STATUS,
         PLAYER_COLOR,
         SCENARIO_DATA,
-        //ENTER_FLIGHT,
-        //EXIT_FLIGHT,
+        ENTER_FLIGHT,
+        EXIT_FLIGHT,
+        REVERT_FLIGHT,
         SEND_VESSELS,
         JOIN_GROUP_REQUEST,
         LEAVE_GROUP,
@@ -661,6 +662,48 @@ namespace SyncrioCommon
         SCIENCE_RECIEVED,
         RESOURCE_SCENARIO,
         STRATEGY_SYSTEM
+    }
+
+    public enum ContractUpdateType
+    {
+        ACCEPTED,
+        CANCELLED,
+        COMPLETED,
+        DECLINED,
+        FAILED,
+        FINISHED,
+        PARAMETER_CHANGED,
+        READ,
+        SEEN
+    }
+
+    public enum KSPTransactionReasons //Meke Sure this is still correct every time KSP updates
+    {
+        None = 0,
+        ContractAdvance = 2,
+        ContractReward = 4,
+        ContractPenalty = 8,
+        VesselRollout = 16,
+        VesselRecovery = 32,
+        VesselLoss = 64,
+        Vessels = 112,
+        StrategyInput = 128,
+        StrategyOutput = 256,
+        StrategySetup = 512,
+        Strategies = 896,
+        ScienceTransmission = 1024,
+        StructureRepair = 2048,
+        StructureCollapse = 4096,
+        StructureConstruction = 8192,
+        Structures = 14336,
+        RnDTechResearch = 16384,
+        RnDPartPurchase = 32768,
+        RnDs = 49152,
+        Cheating = 65536,
+        CrewRecruited = 131072,
+        ContractDecline = 262144,
+        Contracts = 262158,
+        Progression = 524288
     }
 
     public enum ConnectionStatus

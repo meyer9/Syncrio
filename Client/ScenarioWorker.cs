@@ -64,6 +64,9 @@ namespace SyncrioClientSide
         public bool nonGroupScenarios;
         public List<byte[]> baseData;
         public List<byte[]> startData;
+        public int baseDataLoadAttempts = 0;
+        public bool loadBaseData = false;
+        public float lastBaseDataLoadAttempt = 0f;
 
         public static ScenarioWorker fetch
         {
@@ -138,36 +141,25 @@ namespace SyncrioClientSide
             return returnVal;
         }
 
-        public void LoadBaseScenarioData()
+        public bool LoadBaseScenarioData()
         {
-            if (ResearchAndDevelopment.Instance == null || (HighLogic.CurrentGame.Mode == Game.Modes.CAREER && Contracts.ContractSystem.Instance == null) || ProgressTracking.Instance == null)
+            if (ResearchAndDevelopment.Instance == null || ProgressTracking.Instance == null || (HighLogic.CurrentGame.Mode == Game.Modes.CAREER && Contracts.ContractSystem.Instance == null))
             {
-                int timeoutCounter = 0;
-
-                while ((ResearchAndDevelopment.Instance == null || (HighLogic.CurrentGame.Mode == Game.Modes.CAREER && Contracts.ContractSystem.Instance == null) || ProgressTracking.Instance == null) && timeoutCounter != 40)
-                {
-                    timeoutCounter += 1;
-
-                    Thread.Sleep(50);
-                }
+                return false;
             }
 
             if (baseData != null)
             {
                 if (baseData.Count > 0)
                 {
-                    if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
-                    {
-                        Contracts.ContractSystem.Instance.ClearContractsCurrent();
-                        Contracts.ContractSystem.Instance.ClearContractsFinished();
-                    }
-
                     LoadScenarioData(baseData);
                     baseData = null;
                 }
             }
 
             ScenarioEventHandler.fetch.delaySync = false;
+
+            return true;
         }
 
         public void LoadScenarioData(List<byte[]> data)
@@ -463,60 +455,151 @@ namespace SyncrioClientSide
 
                                 if (name[0] == "BuildingLevel")
                                 {
-                                    foreach (ScenarioUpgradeableFacilities.ProtoUpgradeable proto in ScenarioUpgradeableFacilities.protoUpgradeables.Values)
+                                    if (HighLogic.LoadedScene == GameScenes.SPACECENTER && !ScenarioEventHandler.fetch.RnDOpen && !ScenarioEventHandler.fetch.MissionControlOpen && !ScenarioEventHandler.fetch.AdministrationOpen)
                                     {
-                                        foreach (Upgradeables.UpgradeableFacility facility in proto.facilityRefs)
+                                        ConfigNode cfg = new ConfigNode();
+
+                                        ScenarioUpgradeableFacilities.Instance.Save(cfg);
+
+                                        List<string> cfgData = SyncrioUtil.ByteArraySerializer.Deserialize(ConfigNodeSerializer.fetch.Serialize(cfg));
+
+                                        foreach (string building in dataList)
                                         {
-                                            if (dataList.Any(i => i.StartsWith(facility.id)))
+                                            string[] subData = building.Split('=');
+
+                                            string id = subData[0].Trim();
+                                            int level = Convert.ToInt32(subData[1].Trim(), Client.english);
+
+                                            float realLevel;
+
+                                            if (level == 2)
                                             {
-                                                int index = dataList.FindIndex(i => i.StartsWith(facility.id));
+                                                realLevel = 1f;
+                                            }
+                                            else
+                                            {
+                                                if (level == 1)
+                                                {
+                                                    realLevel = 0.5f;
+                                                }
+                                                else
+                                                {
+                                                    realLevel = 0;
+                                                }
+                                            }
 
-                                                string[] subData = dataList[index].Split('=');
+                                            if (cfgData.Contains(id))
+                                            {
+                                                int index = cfgData.FindIndex(i => i == id);
 
-                                                string id = subData[0].Trim();
-                                                string level = subData[1].Trim();
-                                                
-                                                facility.SetLevel(Convert.ToInt32(level, Client.english));
+                                                cfgData[index + 2] = string.Format(Client.english, "lvl = {0}", realLevel);
                                             }
                                         }
+
+                                        cfg = ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(cfgData));
+
+                                        List<ProtoScenarioModule> psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                        int idx = psmLocked.FindIndex(i => i.moduleName == "ScenarioUpgradeableFacilities");
+
+                                        if (idx != -1)
+                                        {
+                                            if (ScenarioRunner.GetLoadedModules().Contains(psmLocked[idx].moduleRef))
+                                            {
+                                                ScenarioRunner.RemoveModule(psmLocked[idx].moduleRef);
+                                            }
+
+                                            psmLocked[idx].moduleRef = ScenarioRunner.Instance.AddModule(cfg);
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
+                                        }
+                                        else
+                                        {
+                                            ScenarioModule sm = ScenarioRunner.Instance.AddModule(cfg);
+
+                                            HighLogic.CurrentGame.AddProtoScenarioModule(sm.GetType(), new GameScenes[4] { GameScenes.SPACECENTER, GameScenes.EDITOR, GameScenes.FLIGHT, GameScenes.TRACKSTATION });
+
+                                            psmLocked = HighLogic.CurrentGame.scenarios;
+
+                                            idx = psmLocked.FindIndex(i => i.moduleName == "ScenarioUpgradeableFacilities");
+
+                                            psmLocked[idx].moduleRef = sm;
+                                            psmLocked[idx].moduleRef.targetScenes = HighLogic.CurrentGame.scenarios[idx].targetScenes;
+
+                                            HighLogic.CurrentGame.scenarios = psmLocked;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Building", dataBacklog));
                                     }
                                 }
 
                                 if (name[0] == "BuildingDead")
                                 {
-                                    foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
+                                    if (HighLogic.LoadedScene == GameScenes.SPACECENTER && !ScenarioEventHandler.fetch.RnDOpen && !ScenarioEventHandler.fetch.MissionControlOpen && !ScenarioEventHandler.fetch.AdministrationOpen)
                                     {
-                                        foreach (DestructibleBuilding building in protoD.dBuildingRefs)
+                                        foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
                                         {
-                                            if (dataList.Any(i => i == building.id))
+                                            foreach (DestructibleBuilding building in protoD.dBuildingRefs)
                                             {
-                                                int index = dataList.FindIndex(i => i == building.id);
-
-                                                if (!building.IsDestroyed)
+                                                if (dataList.Any(i => i == building.id))
                                                 {
-                                                    building.Demolish();
+                                                    int index = dataList.FindIndex(i => i == building.id);
+
+                                                    if (!building.IsDestroyed)
+                                                    {
+                                                        building.Demolish();
+                                                    }
                                                 }
                                             }
                                         }
+                                    }
+                                    else
+                                    {
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Building", dataBacklog));
                                     }
                                 }
 
                                 if (name[0] == "BuildingAlive")
                                 {
-                                    foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
+                                    if (HighLogic.LoadedScene == GameScenes.SPACECENTER && !ScenarioEventHandler.fetch.RnDOpen && !ScenarioEventHandler.fetch.MissionControlOpen && !ScenarioEventHandler.fetch.AdministrationOpen)
                                     {
-                                        foreach (DestructibleBuilding building in protoD.dBuildingRefs)
+                                        foreach (ScenarioDestructibles.ProtoDestructible protoD in ScenarioDestructibles.protoDestructibles.Values)
                                         {
-                                            if (dataList.Any(i => i == building.id))
+                                            foreach (DestructibleBuilding building in protoD.dBuildingRefs)
                                             {
-                                                int index = dataList.FindIndex(i => i == building.id);
-
-                                                if (!building.IsIntact)
+                                                if (dataList.Any(i => i == building.id))
                                                 {
-                                                    building.Repair();
+                                                    int index = dataList.FindIndex(i => i == building.id);
+
+                                                    if (!building.IsIntact)
+                                                    {
+                                                        building.Repair();
+                                                    }
                                                 }
                                             }
                                         }
+                                    }
+                                    else
+                                    {
+                                        List<byte[]> dataBacklog = new List<byte[]>();
+
+                                        dataBacklog.Add(data[v]);
+                                        dataBacklog.Add(data[v + 1]);
+
+                                        ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Building", dataBacklog));
                                     }
                                 }
 
@@ -524,6 +607,32 @@ namespace SyncrioClientSide
                                 {
                                     if (!ScenarioEventHandler.fetch.RnDOpen && HighLogic.LoadedScene != GameScenes.EDITOR)
                                     {
+                                        List<AvailablePart> allParts = PartLoader.Instance.loadedParts;
+
+                                        for (int i = 0; i < allParts.Count; i++)
+                                        {
+                                            ProtoTechNode ptNode = ResearchAndDevelopment.Instance.GetTechState(allParts[i].TechRequired);
+
+                                            RDTech.State state;
+
+                                            if (ptNode != null)
+                                            {
+                                                state = ptNode.state;
+                                            }
+                                            else
+                                            {
+                                                state = RDTech.State.Unavailable;
+                                            }
+
+                                            if (state == RDTech.State.Unavailable)
+                                            {
+                                                if (ResearchAndDevelopment.PartTechAvailable(allParts[i]))
+                                                {
+                                                    ResearchAndDevelopment.RemoveExperimentalPart(allParts[i]);
+                                                }
+                                            }
+                                        }
+
                                         foreach (string part in dataList)
                                         {
                                             string[] split = part.Split(':');
@@ -553,6 +662,7 @@ namespace SyncrioClientSide
 
                                                     ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
                                                 }
+                                                /*
                                                 else
                                                 {
                                                     if (ResearchAndDevelopment.IsExperimentalPart(truePart))
@@ -564,6 +674,7 @@ namespace SyncrioClientSide
                                                         ResearchAndDevelopment.Instance.SetTechState(partTech, ptNode);
                                                     }
                                                 }
+                                                */
                                             }
                                             else
                                             {

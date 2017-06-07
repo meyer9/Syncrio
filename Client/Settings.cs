@@ -116,7 +116,6 @@ namespace SyncrioClientSide
 
         public void LoadSettings()
         {
-
             //Read XML settings
             try
             {

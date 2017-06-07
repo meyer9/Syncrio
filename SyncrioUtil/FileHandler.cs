@@ -81,16 +81,32 @@ namespace SyncrioUtil
         {
             foreach (string file in Directory.GetFiles(path))
             {
-                lock (GetFileLock(file))
-                {
-                    File.Delete(file);
-                }
+                DeleteFile(file);
             }
+
             foreach (string folder in Directory.GetDirectories(path))
             {
                 DeleteDirectory(folder);
             }
+
             Directory.Delete(path);
+        }
+
+        public static void DeleteFile(string filePath)
+        {
+            lock (GetFileLock(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            try
+            {
+                fileLockList.Remove(filePath);
+            }
+            catch
+            {
+                //Don't care
+            }
         }
     }
 }
