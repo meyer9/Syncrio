@@ -3760,7 +3760,7 @@ namespace SyncrioServer
         private void ScenarioExperimentDeployed(string experimentID, List<string> expNode, ClientObject callingClient)
         {
             string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, callingClient.playerName);
-            string filePath = Path.Combine(playerFolder, "ScienceRecieved.txt");
+            string filePath = Path.Combine(playerFolder, "Experiments.txt");
 
             if (!Directory.Exists(playerFolder))
             {
