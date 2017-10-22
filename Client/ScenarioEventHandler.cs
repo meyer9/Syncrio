@@ -495,6 +495,7 @@ namespace SyncrioClientSide
 
                 GameEvents.OnTechnologyResearched.Add(OnTechnologyResearched);
                 GameEvents.OnScienceRecieved.Add(OnScienceRecieved);
+                GameEvents.OnExperimentDeployed.Add(OnExperimentDeployed);
 
                 GameEvents.onGUIRnDComplexSpawn.Add(OnGUIRnDComplexSpawn);
                 GameEvents.onGUIRnDComplexDespawn.Add(OnGUIRnDComplexDespawn);
@@ -546,6 +547,7 @@ namespace SyncrioClientSide
 
                 GameEvents.OnTechnologyResearched.Remove(OnTechnologyResearched);
                 GameEvents.OnScienceRecieved.Remove(OnScienceRecieved);
+                GameEvents.OnExperimentDeployed.Remove(OnExperimentDeployed);
 
                 GameEvents.onGUIRnDComplexSpawn.Remove(OnGUIRnDComplexSpawn);
                 GameEvents.onGUIRnDComplexDespawn.Remove(OnGUIRnDComplexDespawn);
@@ -1199,6 +1201,31 @@ namespace SyncrioClientSide
 
                 SendData((int)ScenarioDataType.TECHNOLOGY_RESEARCHED, data);
             }
+        }
+
+        private void OnExperimentDeployed(ScienceData s)
+        {
+            if (cooldown || delaySync)
+            {
+                return;
+            }
+
+            byte[] data;
+
+            ScienceSubject subj = ResearchAndDevelopment.GetSubjectByID(s.subjectID);
+
+            using (MessageWriter mw = new MessageWriter())
+            {
+                ConfigNode cn = new ConfigNode();
+                subj.Save(cn);
+
+                mw.Write<string>(s.subjectID);
+                mw.Write<byte[]>(ConfigNodeSerializer.fetch.Serialize(cn));
+
+                data = mw.GetMessageBytes();
+            }
+
+            SendData((int)ScenarioDataType.EXPERIMENT_DEPLOYED, data);
         }
 
         private void OnScienceRecieved(float dataValue, ScienceSubject subject, ProtoVessel vessel, bool reverseEngineered)

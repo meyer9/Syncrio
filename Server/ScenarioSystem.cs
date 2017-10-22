@@ -1175,6 +1175,26 @@ namespace SyncrioServer
                             }
                         }
                         break;
+                    case ScenarioDataType.EXPERIMENT_DEPLOYED:
+                        {
+                            string experimentName = mr.Read<string>();
+
+                            List<string> experimentNode = SyncrioUtil.ByteArraySerializer.Deserialize(mr.Read<byte[]>());
+
+                            if (isInGroup)
+                            {
+                                if (GroupSystem.fetch.GroupExists(groupName))
+                                {
+                                    ScenarioExperimentDeployed(experimentName, experimentNode, groupName);
+
+                                    QueueData(type, groupName, callingClient);
+                                }
+                            } else
+                            {
+                                ScenarioExperimentDeployed(experimentName, experimentNode, callingClient);
+                            }
+                        }
+                        break;
                     case ScenarioDataType.RESOURCE_SCENARIO:
                         {
                             if (isInGroup)
@@ -1416,6 +1436,14 @@ namespace SyncrioServer
                                 List<string> sciNode = SyncrioUtil.ByteArraySerializer.Deserialize(mr.Read<byte[]>());
 
                                 ScenarioScienceRecieved(sciID, dataValue, sciNode, groupName, true);
+                            }
+                            break;
+                        case ScenarioDataType.EXPERIMENT_DEPLOYED:
+                            {
+                                string experimentID = mr.Read<string>();
+                                List<string> expNode = SyncrioUtil.ByteArraySerializer.Deserialize(mr.Read<byte[]>());
+
+                                ScenarioExperimentDeployed(experimentID, expNode, groupName);
                             }
                             break;
                         case ScenarioDataType.RESOURCE_SCENARIO:
@@ -1675,6 +1703,26 @@ namespace SyncrioServer
                         }
                     }
                     break;
+                case ScenarioDataType.EXPERIMENT_DEPLOYED:
+                    {
+                        string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+                        string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+                        string filePath = Path.Combine(scenarioFolder, "Experiments.txt");
+
+                        if (!Directory.Exists(scenarioFolder))
+                        {
+                            Directory.CreateDirectory(scenarioFolder);
+                        }
+
+                        if (File.Exists(filePath))
+                        {
+                            List<string> tempList = new List<string>();
+                            tempList.Add("Experiments");
+                            data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                            data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+                        }
+                    }
+                    break;
                 case ScenarioDataType.RESOURCE_SCENARIO:
                     {
                         string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
@@ -1888,6 +1936,16 @@ namespace SyncrioServer
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath14));
             }
 
+            string filePath15 = Path.Combine(scenarioFolder, "Experiments.txt");
+
+            if (File.Exists(filePath15))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Experiments");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath15));
+            }
+
             Dictionary<string, GroupObject> groups = GroupSystem.fetch.GetCopy();
 
             if (groups[groupName].members.Contains(player.playerName))
@@ -2045,6 +2103,16 @@ namespace SyncrioServer
                 tempList.Add("StrategySystem");
                 data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
                 data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath14));
+            }
+
+            string filePath15 = Path.Combine(playerFolder, "Experiments.txt");
+
+            if (File.Exists(filePath15))
+            {
+                List<string> tempList = new List<string>();
+                tempList.Add("Experiments");
+                data.Add(SyncrioUtil.ByteArraySerializer.Serialize(tempList));
+                data.Add(SyncrioUtil.FileHandler.ReadFromFile(filePath15));
             }
 
             Messages.ScenarioData.SendScenarioModules(player, data);
@@ -3621,6 +3689,85 @@ namespace SyncrioServer
 
                 SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
             }
+        }
+
+        private void HandleExperimentFile(string filePath, string experimentID, List<string> expNode)
+        {
+
+            if (File.Exists(filePath))
+            {
+                List<string> oldList = SyncrioUtil.ByteArraySerializer.Deserialize(SyncrioUtil.FileHandler.ReadFromFile(filePath));
+
+                if (oldList == null)
+                {
+                    oldList = new List<string>();
+                }
+
+                if (!oldList.Contains(string.Format(english, "Experiment : {0}", experimentID)))
+                {
+                    oldList.Add(string.Format(english, "Experiment : {0}", experimentID));
+
+                    oldList.Add("ExpNode");
+                    oldList.Add("{");
+                    oldList.AddRange(expNode);
+                    oldList.Add("}");
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+                else
+                {
+                    int index = oldList.FindIndex(i => i == string.Format(english, "Experiment : {0}", experimentID));
+
+                    int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(oldList, index + 2);
+                    KeyValuePair<int, int> range = new KeyValuePair<int, int>(index, (matchBracketIdx - index) + 1);
+
+                    oldList.RemoveRange(range.Key + 4, range.Value - 5);
+
+                    oldList.InsertRange(range.Key + 4, expNode);
+
+                    SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(oldList), filePath);
+                }
+            }
+            else
+            {
+                List<string> newList = new List<string>();
+
+                newList.Add(string.Format(english, "Experiment : {0}", experimentID));
+
+                newList.Add("ExpNode");
+                newList.Add("{");
+                newList.AddRange(expNode);
+                newList.Add("}");
+
+                SyncrioUtil.FileHandler.WriteToFile(SyncrioUtil.ByteArraySerializer.Serialize(newList), filePath);
+            }
+        }
+
+        private void ScenarioExperimentDeployed(string experimentID, List<string> expNode, string groupName)
+        {
+            string groupFolder = Path.Combine(ScenarioSystem.fetch.groupScenariosDirectory, groupName);
+            string scenarioFolder = Path.Combine(groupFolder, "Scenario");
+            string filePath = Path.Combine(scenarioFolder, "Experiments.txt");
+
+            if (!Directory.Exists(scenarioFolder))
+            {
+                Directory.CreateDirectory(scenarioFolder);
+            }
+
+            HandleExperimentFile(filePath, experimentID, expNode);
+        }
+
+        private void ScenarioExperimentDeployed(string experimentID, List<string> expNode, ClientObject callingClient)
+        {
+            string playerFolder = Path.Combine(ScenarioSystem.fetch.playerDirectory, callingClient.playerName);
+            string filePath = Path.Combine(playerFolder, "ScienceRecieved.txt");
+
+            if (!Directory.Exists(playerFolder))
+            {
+                Directory.CreateDirectory(playerFolder);
+            }
+
+            HandleExperimentFile(filePath, experimentID, expNode);
         }
 
         private void ScenarioScienceRecieved(string sciID, float dataValue, List<string> sciNode, string groupName, bool altFunction = false)

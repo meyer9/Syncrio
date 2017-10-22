@@ -67,6 +67,8 @@ namespace SyncrioClientSide
         public int baseDataLoadAttempts = 0;
         public bool loadBaseData = false;
         public float lastBaseDataLoadAttempt = 0f;
+        private delegate ScienceSubject getScienceSubjectDelegate(ResearchAndDevelopment r, ScienceSubject subject);
+        private getScienceSubjectDelegate getScienceSubjectThunk;
 
         public static ScenarioWorker fetch
         {
@@ -74,6 +76,13 @@ namespace SyncrioClientSide
             {
                 return singleton;
             }
+        }
+
+        public ScenarioWorker()
+        {
+            Type rAndDType = typeof(ResearchAndDevelopment);
+            MethodInfo getScienceSubjectMethodInfo = rAndDType.GetMethod("getScienceSubject", BindingFlags.NonPublic | BindingFlags.Instance);
+            getScienceSubjectThunk = (getScienceSubjectDelegate)Delegate.CreateDelegate(typeof(getScienceSubjectDelegate), null, getScienceSubjectMethodInfo);
         }
 
         public void LoadMissingScenarioDataIntoGame()
@@ -1049,6 +1058,39 @@ namespace SyncrioClientSide
                                         dataBacklog.Add(data[v + 1]);
 
                                         ScenarioEventHandler.fetch.scenarioBacklog.Add(new KeyValuePair<string, List<byte[]>>("Strategy", dataBacklog));
+                                    }
+                                }
+
+                                if (name[0] == "Experiments")
+                                {
+                                    List<ConfigNode> subjectNodes = new List<ConfigNode>();
+                                    
+                                    int looped = 0;
+                                    while (looped < dataList.Count)
+                                    {
+                                        if (dataList[looped].StartsWith("Experiment : ") && dataList[looped + 1] == "ExpNode" && dataList[looped + 2] == "{")
+                                        {
+                                            int matchBracketIdx = SyncrioUtil.DataCleaner.FindMatchingBracket(dataList, looped + 2);
+
+                                            List<string> subjectNodeRaw = dataList.GetRange(looped + 3, (matchBracketIdx - looped) - 3);
+
+                                            subjectNodes.Add(ConfigNodeSerializer.fetch.Deserialize(SyncrioUtil.ByteArraySerializer.Serialize(subjectNodeRaw)));
+                                            looped++;
+                                        }
+                                        else
+                                        {
+                                            looped++;
+                                        }
+                                    }
+                                    List<ScienceSubject> subjects = new List<ScienceSubject>();
+
+                                    foreach (ConfigNode subjectNode in subjectNodes)
+                                    {
+                                        subjects.Add(new ScienceSubject(subjectNode));
+                                    }
+                                    foreach (ScienceSubject subj in subjects)
+                                    {
+                                        getScienceSubjectThunk(ResearchAndDevelopment.Instance, subj);
                                     }
                                 }
                             }

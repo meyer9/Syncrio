@@ -661,7 +661,8 @@ namespace SyncrioCommon
         TECHNOLOGY_RESEARCHED,
         SCIENCE_RECIEVED,
         RESOURCE_SCENARIO,
-        STRATEGY_SYSTEM
+        STRATEGY_SYSTEM,
+        EXPERIMENT_DEPLOYED
     }
 
     public enum ContractUpdateType
